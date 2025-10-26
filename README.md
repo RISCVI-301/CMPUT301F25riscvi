@@ -11,3 +11,10 @@
 | Sanika Verma | sanika3 | SanikaVerma     |
 | Swayam Sagar | swayam2 | Swayam1129    |
 
+
+## Documentation
+
+- [Wiki Link](https://github.com/RISCVI-301/CMPUT301F25riscvi/wiki)
+- [UI Mockups](https://github.com/RISCVI-301/CMPUT301F25riscvi/wiki/User-Interface-Mockups)
+
+
