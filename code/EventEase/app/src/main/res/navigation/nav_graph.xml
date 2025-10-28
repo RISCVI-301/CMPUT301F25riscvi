@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/discoverFragment">
+
+    <!-- Fragments -->
+    <fragment
+        android:id="@+id/discoverFragment"
+        android:name="com.EventEase.ui.entrant.discover.DiscoverFragment"
+        android:label="Discover" />
+
+    <fragment
+        android:id="@+id/invitationsFragment"
+        android:name="com.EventEase.ui.entrant.invitations.InvitationsFragment"
+        android:label="Invitations" />
+
+    <!-- Activity placeholders (IDs only); actual navigation to these may be via intents later -->
+    <activity
+        android:id="@+id/eventDetailActivity"
+        android:name="com.EventEase.ui.entrant.eventdetail.EventDetailActivity"
+        android:label="Event Detail" />
+
+    <activity
+        android:id="@+id/profileActivity"
+        android:name="com.EventEase.ui.entrant.profile.ProfileActivity"
+        android:label="Profile" />
+</navigation>
