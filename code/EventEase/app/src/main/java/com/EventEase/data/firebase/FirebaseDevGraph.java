@@ -7,7 +7,12 @@ import com.EventEase.model.*;
 import java.util.*;
 
 public final class FirebaseDevGraph {
-    public final AuthManager auth = new AuthManager();
+    public final AuthManager auth = new AuthManager() {
+        @Override
+        public String getUid() {
+            return "";
+        }
+    };
     public final FirebaseEventRepository events;
     public final FirebaseWaitlistRepository waitlists;
     public final FirebaseProfileRepository profiles;

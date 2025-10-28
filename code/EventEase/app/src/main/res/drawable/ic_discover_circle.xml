@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="oval">
+            <size android:width="36dp" android:height="36dp"/>
+            <solid android:color="@color/ee_icon_circle"/>
+        </shape>
+    </item>
+    <item
+        android:drawable="@drawable/ic_discover"
+        android:gravity="center"
+        android:tint="@color/ee_white"/>
+</layer-list>

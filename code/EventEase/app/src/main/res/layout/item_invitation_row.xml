@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="220dp"
+    android:layout_marginBottom="20dp"
+    app:cardCornerRadius="14dp"
+    app:cardElevation="14dp"
+    app:cardBackgroundColor="#3D5A80"
+    app:cardUseCompatPadding="true">
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/card_glow_bg"
+        android:padding="12dp">
+
+        <ImageView
+            android:id="@+id/event_image"
+            android:layout_width="match_parent"
+            android:layout_height="140dp"
+            android:scaleType="centerCrop"
+            android:src="@drawable/sample_event"
+            android:contentDescription="@string/event_image"/>
+
+        <TextView
+            android:id="@+id/event_name"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/event_image"
+            android:layout_marginTop="8dp"
+            android:text="Sample Event"
+            android:textStyle="bold"
+            android:textColor="@android:color/white"
+            android:textSize="16sp"/>
+
+        <TextView
+            android:id="@+id/event_price"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/event_name"
+            android:text="Price: $25"
+            android:textColor="@android:color/white"
+            android:textSize="14sp"
+            android:layout_marginTop="4dp"/>
+    </RelativeLayout>
+</androidx.cardview.widget.CardView>

@@ -1,24 +1,26 @@
 package com.example.eventease;
 
 import android.os.Bundle;
-import android.util.Log;
-
-import androidx.activity.EdgeToEdge;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.graphics.Insets;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
-
-import com.google.firebase.FirebaseApp;
+import androidx.core.view.WindowCompat;
+import androidx.navigation.NavController;
+import androidx.navigation.Navigation;
+import androidx.navigation.ui.NavigationUI;
+import com.example.eventease.R;
+import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 public class MainActivity extends AppCompatActivity {
-
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        FirebaseApp.initializeApp(this);
-        Log.d("FirebaseTest", "FirebaseApp initialized: " + (FirebaseApp.getApps(this).size() > 0));
-        setContentView(R.layout.activity_main);
-    }
+        setContentView(R.layout.activity_mainfragments);
 
+        // Do NOT draw behind status/navigation bars
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
+
+        BottomNavigationView bottom = findViewById(R.id.bottom_nav);
+        NavController nav = Navigation.findNavController(this, R.id.nav_host_main);
+        NavigationUI.setupWithNavController(bottom, nav);
     }
+}

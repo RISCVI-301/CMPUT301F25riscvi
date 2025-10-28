@@ -4,16 +4,20 @@
     android:id="@+id/nav_graph"
     app:startDestination="@id/discoverFragment">
 
-    <!-- Fragments -->
+    <fragment
+        android:id="@+id/myEventsFragment"
+        android:name="com.EventEase.ui.entrant.myevents.MyEventsFragment"
+        android:label="My Events" />
+
     <fragment
         android:id="@+id/discoverFragment"
         android:name="com.EventEase.ui.entrant.discover.DiscoverFragment"
         android:label="Discover" />
 
     <fragment
-        android:id="@+id/invitationsFragment"
-        android:name="com.EventEase.ui.entrant.invitations.InvitationsFragment"
-        android:label="Invitations" />
+        android:id="@+id/accountFragment"
+        android:name="com.EventEase.ui.entrant.profile.AccountFragment"
+        android:label="Account" />
 
     <!-- Activity placeholders (IDs only); actual navigation to these may be via intents later -->
     <activity

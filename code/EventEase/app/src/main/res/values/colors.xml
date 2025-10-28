@@ -1,5 +1,11 @@
-<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
+    <!-- palette from your base -->
+    <color name="ee_bg">#142C52</color>
+    <color name="ee_topbar_bg">#A7D4D4</color>
+    <color name="ee_topbar_fg">#0D1E3F</color>
+    <color name="ee_bottombar_bg">#B8CCE0</color>
+    <color name="ee_white">#FFFFFF</color>
+    <color name="ee_icon_circle">#213C64</color>
+    <color name="ee_card_bg">#1E3963</color>
+    <color name="ee_card_stroke">#2A4A78</color>
 </resources>
