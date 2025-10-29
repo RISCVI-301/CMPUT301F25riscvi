@@ -35,39 +35,47 @@ class MyEventsAdapter extends RecyclerView.Adapter<MyEventsAdapter.VH> {
         notifyDataSetChanged();
     }
 
-    @NonNull @Override public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+    @NonNull @Override
+    public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View v = LayoutInflater.from(parent.getContext())
                 .inflate(R.layout.item_my_event_row, parent, false);
         return new VH(v);
     }
 
-    @Override public void onBindViewHolder(@NonNull VH h, int pos) {
+    @Override
+    public void onBindViewHolder(@NonNull VH h, int pos) {
         Event e = data.get(pos);
-        h.title.setText(e.getTitle());
+
+        // Title
+        h.title.setText(e.getTitle() != null ? e.getTitle() : "Untitled");
+
+        // Subtitle = date • location
         String when = e.getStartAt() != null ? df.format(e.getStartAt()) : "TBD";
         String where = e.getLocation() != null ? e.getLocation() : "";
         h.subtitle.setText(where.isEmpty() ? when : (when + " • " + where));
 
+        // Image placeholder (replace with real image later if you have URLs)
+        h.image.setImageResource(R.drawable.card_image_placeholder);
+
+        // INVITED badge
         boolean invited = invitedEventIds != null && invitedEventIds.contains(e.getId());
         h.badge.setVisibility(invited ? View.VISIBLE : View.GONE);
-
-        // choose icon per type if you want later; for now use cart icon
-        h.icon.setImageResource(R.drawable.ic_my_events);
     }
 
-    @Override public int getItemCount() { return data.size(); }
+    @Override
+    public int getItemCount() { return data.size(); }
 
     static class VH extends RecyclerView.ViewHolder {
-        final ImageView icon;
-        final TextView title;
-        final TextView subtitle;
-        final TextView badge;
+        final ImageView image;     // @id/event_image
+        final TextView title;      // @id/event_name
+        final TextView subtitle;   // @id/event_price
+        final TextView badge;      // @id/invited_badge
         VH(@NonNull View v) {
             super(v);
-            icon = v.findViewById(R.id.my_event_icon);
-            title = v.findViewById(R.id.my_event_title);
-            subtitle = v.findViewById(R.id.my_event_subtitle);
-            badge = v.findViewById(R.id.my_event_badge);
+            image = v.findViewById(R.id.event_image);
+            title = v.findViewById(R.id.event_name);
+            subtitle = v.findViewById(R.id.event_price);
+            badge = v.findViewById(R.id.invited_badge);
         }
     }
 }

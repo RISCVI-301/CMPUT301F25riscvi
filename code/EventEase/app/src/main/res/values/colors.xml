@@ -1,6 +1,6 @@
 <resources>
     <!-- palette from your base -->
-    <color name="ee_bg">#142C52</color>
+    <color name="ee_bg">#223C65</color>
     <color name="ee_topbar_bg">#A7D4D4</color>
     <color name="ee_topbar_fg">#0D1E3F</color>
     <color name="ee_bottombar_bg">#B8CCE0</color>
@@ -8,4 +8,16 @@
     <color name="ee_icon_circle">#213C64</color>
     <color name="ee_card_bg">#1E3963</color>
     <color name="ee_card_stroke">#2A4A78</color>
+
+    <color name="ee_icon_circle_light">#446EAF</color>
+    <color name="ee_icon_circle_dark">#1E3556</color>
+
+
+    <color name="ee_nav_selected">#FFFFFF</color>
+    <color name="ee_nav_unselected">#6B7D8F</color>
+    <color name="ee_nav_circle_bg">#5A7A9A</color>
+    <color name="bottom_nav_text_selected">#FFFFFf</color>
+    <color name="bottom_nav_text_unselected">#7A8B9C</color>
+    <color name="ee_bottombar_text_active">#FFFFFFFF</color>
+    <color name="ee_bottombar_text_inactive">#223C65</color>
 </resources>

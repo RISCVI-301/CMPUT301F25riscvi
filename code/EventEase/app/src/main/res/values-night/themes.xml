@@ -1,7 +1,25 @@
-<resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
-    <style name="Base.Theme.EventEase" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your dark theme here. -->
-        <!-- <item name="colorPrimary">@color/my_dark_primary</item> -->
+<resources>
+
+    <style name="Theme.EventEase" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/ee_bg</item>
+        <item name="android:statusBarColor">@color/ee_topbar_bg</item>
+        <item name="android:navigationBarColor">@color/ee_bottombar_bg</item>
+        <item name="bottomNavigationStyle">@style/AppBottomNav</item>
     </style>
+
+    <style name="AppBottomNav" parent="Widget.Material3.BottomNavigationView">
+        <item name="itemIconTint">@null</item>
+        <item name="itemTextColor">@color/bottom_nav_text</item>
+
+        <item name="itemActiveIndicatorStyle">@style/AppBottomNav.ActiveIndicator</item>
+        <item name="itemRippleColor">@android:color/transparent</item>
+        <item name="itemBackground">@drawable/bnv_item_bg_transparent</item>
+    </style>
+
+    <!-- Important: inherit from the correct M3 parent -->
+    <style name="AppBottomNav.ActiveIndicator"
+        parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
+        <item name="android:color">@android:color/transparent</item>
+    </style>
+
 </resources>

@@ -22,9 +22,9 @@ import com.EventEase.data.InvitationListener;
 import com.EventEase.data.InvitationRepository;
 import com.EventEase.data.ListenerRegistration;
 import com.EventEase.data.WaitlistRepository;
-import com.EventEase.data.firebase.FirebaseDevGraph;
 import com.EventEase.model.Event;
 import com.EventEase.model.Invitation;
+import com.example.eventease.App;                // ✅ use shared DevGraph
 import com.example.eventease.R;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
@@ -41,7 +41,7 @@ import java.util.concurrent.Executors;
 
 public class MyEventsFragment extends Fragment {
 
-    private static final FirebaseDevGraph GRAPH = new FirebaseDevGraph();
+    // ✅ no local FirebaseDevGraph here
 
     private EventRepository eventRepo;
     private WaitlistRepository waitlistRepo;
@@ -94,10 +94,12 @@ public class MyEventsFragment extends Fragment {
     @Override
     public void onStart() {
         super.onStart();
-        eventRepo = GRAPH.events;
-        waitlistRepo = GRAPH.waitlists;
-        invitationRepo = GRAPH.invitations;
-        auth = GRAPH.auth;
+
+        // ✅ pull shared repos/auth from App.graph()
+        eventRepo      = App.graph().events;
+        waitlistRepo   = App.graph().waitlists;
+        invitationRepo = App.graph().invitations;
+        auth           = App.graph().auth;
 
         setLoading(true);
         loadMyEvents();
@@ -227,18 +229,12 @@ public class MyEventsFragment extends Fragment {
         }
 
         void bind(Event e, boolean invited) {
-            // title
             name.setText(e.getTitle() != null ? e.getTitle() : "Untitled");
 
-            // subtitle: date • location (your layout originally said "price")
             String when = (e.getStartAt() != null) ? df.format(e.getStartAt()) : "TBD";
             String where = e.getLocation() != null ? e.getLocation() : "";
             subtitle.setText(where.isEmpty() ? when : (when + " • " + where));
 
-            // image placeholder (leave existing src or set programmatically)
-            // image.setImageResource(R.drawable.sample_event);
-
-            // invited badge
             invitedBadge.setVisibility(invited ? View.VISIBLE : View.GONE);
         }
     }

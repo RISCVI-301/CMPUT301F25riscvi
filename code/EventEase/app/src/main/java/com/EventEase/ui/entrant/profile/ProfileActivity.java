@@ -13,15 +13,13 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.EventEase.auth.AuthManager;
 import com.EventEase.data.ProfileRepository;
-import com.EventEase.data.firebase.FirebaseDevGraph;
 import com.EventEase.model.Profile;
+import com.example.eventease.App;        // ✅ shared DevGraph
 import com.example.eventease.R;
 import com.google.android.gms.tasks.Task;
 
 public class ProfileActivity extends AppCompatActivity {
 
-    // Dev wiring (prod names, in-memory impls)
-    private static final FirebaseDevGraph GRAPH = new FirebaseDevGraph();
     private ProfileRepository repo;
     private AuthManager auth;
 
@@ -36,8 +34,9 @@ public class ProfileActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_profile);
 
-        repo = GRAPH.profiles;
-        auth = GRAPH.auth;
+        // ✅ use the app-wide DevGraph
+        repo = App.graph().profiles;
+        auth = App.graph().auth;
 
         nameField = findViewById(R.id.profile_name);
         emailField = findViewById(R.id.profile_email);
@@ -46,7 +45,6 @@ public class ProfileActivity extends AppCompatActivity {
         progress  = findViewById(R.id.profile_progress);
 
         loadProfile();
-
         saveBtn.setOnClickListener(v -> saveProfile());
     }
 
@@ -68,7 +66,7 @@ public class ProfileActivity extends AppCompatActivity {
                     setLoading(false);
                 })
                 .addOnFailureListener(e -> {
-                    // It’s fine if not found yet; keep fields empty
+                    // fine if not found yet
                     setLoading(false);
                 });
     }

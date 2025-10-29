@@ -21,9 +21,7 @@
             android:id="@+id/event_image"
             android:layout_width="match_parent"
             android:layout_height="140dp"
-            android:scaleType="centerCrop"
-            android:src="@drawable/sample_event"
-            android:contentDescription="@string/event_image"/>
+            android:scaleType="centerCrop" />
 
         <!-- INVITED badge (over the image, top-right) -->
         <TextView
@@ -37,7 +35,6 @@
             android:paddingRight="10dp"
             android:paddingTop="4dp"
             android:paddingBottom="4dp"
-            android:text="INVITED"
             android:textStyle="bold"
             android:textSize="12sp"
             android:textColor="@android:color/white"
