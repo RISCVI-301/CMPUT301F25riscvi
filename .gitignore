@@ -1,1 +1,54 @@
+# Gradle files
+.gradle/
+.gradle/caches/
+.gradle/daemon/
+build/
+
+# Local configuration file (SDK path, etc.)
+local.properties
+
+# Log files
+*.log
+
+# Android Studio generated files and folders
+captures/
+.externalNativeBuild/
+.cxx/
+*.aab
+*.apk
+output-metadata.json
+
+# IntelliJ / Android Studio project files
+*.iml
+.idea/
+misc.xml
+deploymentTargetDropDown.xml
+render.experimental.xml
+
+# Keystore files
+*.jks
+*.keystore
+
+# Google Services (Firebase)
+google-services.json
+serviceAccountKey.json
+**/serviceAccount*.json
+
+# Android Profiling
+*.hprof
+
+# macOS system files
 .DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+Icon?
+
+# Temporary or backup files
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
