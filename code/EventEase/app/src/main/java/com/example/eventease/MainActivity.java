@@ -1,5 +1,6 @@
 package com.example.eventease;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 
@@ -16,9 +17,15 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        //FireBase
         FirebaseApp.initializeApp(this);
         Log.d("FirebaseTest", "FirebaseApp initialized: " + (FirebaseApp.getApps(this).size() > 0));
-        setContentView(R.layout.admin_image_management);
-    }
 
+
+        // Hand off to AdminImageManagementActivity
+        Intent intent = new Intent(this, AdminImageManagementActivity.class);
+        startActivity(intent);
+        finish(); // Finish MainActivity so 'Back' does not come back here.
+    }
 }
