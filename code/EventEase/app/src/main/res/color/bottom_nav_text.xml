@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Selected label uses your theme's onPrimary (you set it to white) -->
+    <item android:state_checked="true" android:color="@color/ee_bottombar_text_active"/>
+    <!-- Unselected label uses your theme's onSurfaceVariant (you set it to ee_nav_unselected) -->
+    <item android:color="@color/ee_bottombar_text_inactive"/>
+</selector>
