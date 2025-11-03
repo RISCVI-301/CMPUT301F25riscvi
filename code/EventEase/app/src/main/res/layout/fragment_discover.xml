@@ -6,38 +6,16 @@
     android:id="@+id/events_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#142C52"
+    android:background="@android:color/transparent"
+    android:padding="16dp"
     tools:context=".ui.discover.DiscoverFragment">
 
-    <!-- Top bar -->
-    <LinearLayout
-        android:id="@+id/top_bar"
-        android:layout_width="0dp"
-        android:layout_height="70dp"
-        android:background="#A7D4D4"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingHorizontal="16dp"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
-            android:fontFamily="@font/fredoka_one"
-            android:text="EventEase"
-            android:textColor="#114c43"
-            android:textSize="40sp" />
-    </LinearLayout>
-
-    <!-- “Events” pill -->
+    <!-- "Events" pill -->
     <FrameLayout
         android:id="@+id/events_pill"
         android:layout_width="221dp"
         android:layout_height="57dp"
-        android:layout_marginTop="20dp"
+        android:layout_marginTop="8dp"
         android:background="@drawable/events_pill"
         android:elevation="8dp"
         android:paddingStart="20dp"
@@ -45,9 +23,9 @@
         android:paddingEnd="20dp"
         android:paddingBottom="12dp"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.113"
+        app:layout_constraintHorizontal_bias="0.0"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/top_bar">
+        app:layout_constraintTop_toTopOf="parent">
 
         <TextView
             android:id="@+id/events_header"
@@ -62,14 +40,13 @@
             android:textSize="30sp" />
     </FrameLayout>
 
-    <!-- RecyclerView (paddingBottom keeps list above bottom nav) -->
+    <!-- RecyclerView -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rvDiscover"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:clipToPadding="false"
-        android:paddingTop="8dp"
-        android:paddingBottom="92dp"
+        android:paddingTop="16dp"
         app:layout_constraintTop_toBottomOf="@id/events_pill"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -77,20 +54,4 @@
         tools:listitem="@layout/item_event_card"
         tools:itemCount="5"/>
 
-
-    <!-- Bottom nav -->
-    <com.google.android.material.bottomnavigation.BottomNavigationView
-        android:id="@+id/bottom_nav"
-        android:layout_width="0dp"
-        android:layout_height="72dp"
-        android:background="@drawable/bottom_nav_bg"
-        android:elevation="12dp"
-        app:itemIconSize="24dp"
-        app:itemIconTint="@color/white"
-        app:itemTextColor="@color/white"
-        app:labelVisibilityMode="labeled"
-        app:menu="@menu/events_bottom_nav"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"/>
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -3,10 +3,12 @@ package com.example.eventease;
 import android.os.Bundle;
 import android.view.View;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.view.WindowCompat;
 import androidx.navigation.NavController;
+import androidx.navigation.NavDestination;
 import androidx.navigation.fragment.NavHostFragment;
 import androidx.navigation.ui.NavigationUI;
 
@@ -16,6 +18,7 @@ import com.google.firebase.auth.FirebaseAuth;
 public class MainActivity extends AppCompatActivity {
 
     private BottomNavigationView bottomNav;
+    private NavController nav;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -37,7 +40,30 @@ public class MainActivity extends AppCompatActivity {
             throw new IllegalStateException("nav_host_main not found or not a NavHostFragment.");
         }
 
-        NavController nav = host.getNavController();
+        nav = host.getNavController();
+        
+        // Setup back press handling for authenticated screens
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                NavDestination destination = nav.getCurrentDestination();
+                if (destination != null) {
+                    int id = destination.getId();
+                    // If we're on one of the authenticated main app screens, close the app
+                    // instead of going back to auth screens
+                    if (id == R.id.discoverFragment || id == R.id.myEventsFragment || id == R.id.accountFragment) {
+                        finish();
+                    } else {
+                        // Use the default back handling for other screens
+                        setEnabled(false);
+                        getOnBackPressedDispatcher().onBackPressed();
+                        setEnabled(true);
+                    }
+                } else {
+                    finish();
+                }
+            }
+        });
         
         // Check if user is already logged in
         FirebaseAuth auth = FirebaseAuth.getInstance();

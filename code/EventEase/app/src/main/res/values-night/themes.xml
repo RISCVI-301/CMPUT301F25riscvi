@@ -8,8 +8,13 @@
     </style>
 
     <style name="AppBottomNav" parent="Widget.Material3.BottomNavigationView">
+        <!-- background color for the bottom nav bar -->
+        <item name="android:background">@color/ee_bottombar_bg</item>
+        
         <item name="itemIconTint">@null</item>
-        <item name="itemTextColor">@color/bottom_nav_text</item>
+
+        <!-- all text should be bold and same color (dark blue) -->
+        <item name="itemTextAppearance">@style/TextAppearance.EventEase.BottomNav</item>
 
         <item name="itemActiveIndicatorStyle">@style/AppBottomNav.ActiveIndicator</item>
         <item name="itemRippleColor">@android:color/transparent</item>
@@ -20,6 +25,12 @@
     <style name="AppBottomNav.ActiveIndicator"
         parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
         <item name="android:color">@android:color/transparent</item>
+    </style>
+
+    <!-- Text appearance - dark blue and bold for all states -->
+    <style name="TextAppearance.EventEase.BottomNav" parent="TextAppearance.Material3.LabelMedium">
+        <item name="android:textColor">@color/ee_topbar_fg</item>
+        <item name="android:textStyle">bold</item>
     </style>
 
 </resources>
