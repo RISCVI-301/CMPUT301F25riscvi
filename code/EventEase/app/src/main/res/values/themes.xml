@@ -1,9 +1,45 @@
-<resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
-    <style name="Base.Theme.EventEase" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your light theme here. -->
-        <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
+<resources>
+
+    <style name="Theme.EventEase" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/ee_bg</item>
+        <item name="android:statusBarColor">@color/ee_topbar_bg</item>
+        <item name="android:navigationBarColor">@color/ee_bottombar_bg</item>
+
+        <item name="bottomNavigationStyle">@style/AppBottomNav</item>
     </style>
 
-    <style name="Theme.EventEase" parent="Base.Theme.EventEase" />
+    <style name="AppBottomNav" parent="Widget.Material3.BottomNavigationView">
+        <!-- icons are pre-colored selectors -->
+        <item name="itemIconTint">@null</item>
+
+        <!-- labels come from our theme-aware ColorStateList -->
+        <item name="itemTextColor">@color/bottom_nav_text</item>
+
+        <!-- ensure Material doesn't fade the inactive label -->
+        <item name="itemTextAppearanceActive">@style/TextAppearance.EventEase.BottomNav.Active</item>
+        <item name="itemTextAppearanceInactive">@style/TextAppearance.EventEase.BottomNav.Inactive</item>
+
+        <!-- no purple pill + no ripple wash + no overlay -->
+        <item name="itemActiveIndicatorStyle">@style/AppBottomNav.ActiveIndicator</item>
+        <item name="itemRippleColor">@android:color/transparent</item>
+        <item name="itemBackground">@drawable/bnv_item_bg_transparent</item>
+    </style>
+
+    <!-- Material 3 active-indicator override -->
+    <style name="AppBottomNav.ActiveIndicator"
+        parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
+        <item name="android:color">@android:color/transparent</item>
+    </style>
+
+    <!-- Text appearances just to lock opacity; sizes can match your design -->
+    <style name="TextAppearance.EventEase.BottomNav.Active" parent="TextAppearance.Material3.LabelMedium">
+        <item name="android:textColor">?attr/colorOnPrimary</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="TextAppearance.EventEase.BottomNav.Inactive" parent="TextAppearance.Material3.LabelMedium">
+        <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
+        <!-- keep full opacity; do NOT set alpha -->
+    </style>
+
 </resources>

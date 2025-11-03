@@ -8,7 +8,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.eventease"
+        applicationId = "com.example.EventEase"
         minSdk = 26
         targetSdk = 36
         versionCode = 1
@@ -41,6 +41,7 @@ dependencies {
     implementation(libs.navigation.fragment)
     implementation("com.google.android.material:material:1.12.0")
     implementation(libs.navigation.ui)
+    implementation(libs.firebase.firestore)
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
