@@ -1,45 +1,56 @@
 package com.EventEase.data.firebase;
 
 import com.EventEase.auth.AuthManager;
+import com.EventEase.auth.FirebaseAuthManager;
 import com.EventEase.data.*;
 import com.EventEase.model.*;
 
 import java.util.*;
 
 public final class FirebaseDevGraph {
-    public final AuthManager auth = new AuthManager() {
-        @Override
-        public String getUid() {
-            return "";
-        }
-    };
+    public final AuthManager auth; // init in ctor
     public final FirebaseEventRepository events;
     public final FirebaseWaitlistRepository waitlists;
     public final FirebaseProfileRepository profiles;
     public final FirebaseInvitationRepository invitations;
 
     public FirebaseDevGraph() {
-        profiles = new FirebaseProfileRepository(
-                new Profile("demo-uid-123", "Demo User", "demo@example.com", null)
-        );
+        this.auth = new FirebaseAuthManager("demo-uid-123"); // <-- pass fallback UID
 
-        Event e1 = new Event("e1","Swim Lessons","Kids group", futureHours(24), futureHours(26),20,"Pool A");
-        Event e2 = new Event("e2","Yoga","Adults", futureHours(48), futureHours(49),15,"Gym B");
-        events = new FirebaseEventRepository(Arrays.asList(e1, e2));
+        String uid = auth.getUid();
+        
+        // Create seed events with the new Event structure
+        Event swimEvent = new Event();
+        swimEvent.id = "e1";
+        swimEvent.title = "Swim Lessons";
+        swimEvent.location = "Pool A";
+        swimEvent.startsAtEpochMs = futureMillis(24);
+        swimEvent.capacity = 20;
+        swimEvent.organizerId = uid;
+        swimEvent.createdAtEpochMs = System.currentTimeMillis();
+        swimEvent.qrPayload = "event:e1";
 
+        Event yogaEvent = new Event();
+        yogaEvent.id = "e2";
+        yogaEvent.title = "Yoga";
+        yogaEvent.location = "Gym B";
+        yogaEvent.startsAtEpochMs = futureMillis(48);
+        yogaEvent.capacity = 15;
+        yogaEvent.organizerId = uid;
+        yogaEvent.createdAtEpochMs = System.currentTimeMillis();
+        yogaEvent.qrPayload = "event:e2";
+
+        List<Event> seedEvents = Arrays.asList(swimEvent, yogaEvent);
+        events = new FirebaseEventRepository(seedEvents);
         waitlists = new FirebaseWaitlistRepository(events);
-        // Make “My Events” show one row
-        waitlists.join("e1", auth.getUid());
 
-        // Show an INVITED badge on that row
-        Invitation inv = new Invitation("i1","e1", auth.getUid(),
-                Invitation.Status.PENDING, new Date(), futureHours(72));
-        invitations = new FirebaseInvitationRepository(Collections.singletonList(inv));
-
+        profiles = new FirebaseProfileRepository(new Profile(uid,"Demo User","demo@example.com", null));
+        invitations = new FirebaseInvitationRepository(Collections.singletonList(
+                new Invitation("i1","e1", uid, Invitation.Status.PENDING, new Date(), new Date(futureMillis(72)))
+        ));
     }
 
-    private static Date futureHours(int h) {
-        return new Date(System.currentTimeMillis() + h * 3600_000L);
+    private static long futureMillis(int h) {
+        return System.currentTimeMillis() + (h * 3_600_000L);
     }
 }
-

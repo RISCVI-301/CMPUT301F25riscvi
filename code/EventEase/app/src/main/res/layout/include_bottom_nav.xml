@@ -12,8 +12,6 @@
 
     app:itemIconTint="@null"
 
-    app:itemTextColor="@color/bottom_nav_text"
-
     app:itemActiveIndicatorStyle="@style/AppBottomNav.ActiveIndicator"
     app:itemBackground="@drawable/bnv_item_bg_transparent"
     app:itemRippleColor="@android:color/transparent"
