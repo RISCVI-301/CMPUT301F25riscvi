@@ -20,4 +20,6 @@
     <color name="bottom_nav_text_unselected">#7A8B9C</color>
     <color name="ee_bottombar_text_active">#FFFFFFFF</color>
     <color name="ee_bottombar_text_inactive">#223C65</color>
+    <color name="white">#FFFFFF</color>
+    <color name="ee_topbar_text">#114c43</color>
 </resources>
