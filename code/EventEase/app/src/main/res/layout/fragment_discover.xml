@@ -6,9 +6,15 @@
     android:id="@+id/events_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+<<<<<<< Updated upstream
     android:background="@android:color/transparent"
     android:padding="16dp"
     tools:context=".ui.discover.DiscoverFragment">
+=======
+    android:background="#142C52"
+    tools:context=".ui.discover.DiscoverFragment"
+    android:fitsSystemWindows="true">
+>>>>>>> Stashed changes
 
     <!-- "Events" pill -->
     <FrameLayout
