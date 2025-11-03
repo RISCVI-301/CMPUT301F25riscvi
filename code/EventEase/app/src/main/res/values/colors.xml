@@ -2,4 +2,12 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="ee_card">#496788</color>
+    <color name="ee_button_mint">#B9F6E9</color>
+    <color name="ee_text_light">#FFFFFF</color>
+    <color name="ee_accent">#6CA7FF</color>
+    <color name="ee_navy_dark">#223C65</color>
+    <color name="ee_mint_aqua">#9EFFF1</color>
+    <color name="toolbar_button">#C0D0E1</color>
+
 </resources>
