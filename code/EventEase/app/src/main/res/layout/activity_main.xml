@@ -1,24 +1,8 @@
-<?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
+<androidx.fragment.app.FragmentContainerView
     xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_host"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="#223C65"
-    android:fitsSystemWindows="true"
-    tools:context=".MainActivity">
-
-    <TextView
-        android:id="@+id/main"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="EventEase"
-        android:textColor="#223C65"
-        android:textSize="28sp"
-        android:textStyle="bold"
-        android:padding="16dp"
-        android:background="#9EFFF1" />
-
-
-</LinearLayout>
+    app:defaultNavHost="true"
+    app:navGraph="@navigation/nav_auth" />

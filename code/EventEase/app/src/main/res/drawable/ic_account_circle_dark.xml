@@ -6,6 +6,6 @@
         </shape>
     </item>
     <item>
-        <inset android:inset="8dp" android:drawable="@drawable/ic_account"/>
+        <inset android:inset="8dp" android:drawable="@drawable/ic_account_white"/>
     </item>
 </layer-list>
