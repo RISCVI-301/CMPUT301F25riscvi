@@ -1,20 +1,29 @@
 package com.EventEase.ui.entrant.myevents;
 
+import android.content.Intent;
 import android.content.res.Resources;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.ImageView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 import androidx.core.view.ViewCompat;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+
+import com.EventEase.ui.entrant.eventdetail.EventDetailActivity;
+import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions;
+import androidx.navigation.Navigation;
 
 import com.EventEase.auth.AuthManager;
 import com.EventEase.data.EventRepository;
@@ -67,26 +76,32 @@ public class MyEventsFragment extends Fragment {
                              @Nullable Bundle savedInstanceState) {
         View root = inflater.inflate(R.layout.fragment_my_events, container, false);
 
+        // Set status bar color to match top bar
+        if (getActivity() != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            Window window = getActivity().getWindow();
+            window.setStatusBarColor(ContextCompat.getColor(requireContext(), R.color.ee_topbar_bg));
+        }
+
         list = root.findViewById(R.id.my_events_list);
         emptyView = root.findViewById(R.id.my_events_empty);
         progress = root.findViewById(R.id.my_events_progress);
 
+        // Set up back button
+        View btnBack = root.findViewById(R.id.btnBack);
+        if (btnBack != null) {
+            btnBack.setOnClickListener(v -> {
+                try {
+                    Navigation.findNavController(v).navigateUp();
+                } catch (Exception e) {
+                    if (getActivity() != null) {
+                        getActivity().onBackPressed();
+                    }
+                }
+            });
+        }
+
         list.setLayoutManager(new LinearLayoutManager(getContext()));
         list.setAdapter(adapter);
-
-        // spacing
-        final int spacing = dp(8);
-        list.addItemDecoration(new RecyclerView.ItemDecoration() {
-            @Override
-            public void getItemOffsets(@NonNull android.graphics.Rect outRect,
-                                       @NonNull View view,
-                                       @NonNull RecyclerView parent,
-                                       @NonNull RecyclerView.State state) {
-                int pos = parent.getChildAdapterPosition(view);
-                outRect.bottom = spacing;
-                if (pos == 0) outRect.top = spacing;
-            }
-        });
 
         return root;
     }
@@ -142,7 +157,9 @@ public class MyEventsFragment extends Fragment {
         openTask.addOnSuccessListener(events -> {
             if (!isAdded()) return;
 
+            android.util.Log.d("MyEventsFragment", "Loaded events: " + (events != null ? events.size() : 0));
             if (events == null || events.isEmpty()) {
+                android.util.Log.d("MyEventsFragment", "No open events found in Firebase");
                 adapter.submit(new ArrayList<>());
                 setLoading(false);
                 showEmptyIfNeeded();
@@ -152,14 +169,19 @@ public class MyEventsFragment extends Fragment {
             bg.execute(() -> {
                 List<Event> mine = new ArrayList<>();
                 String uid = auth.getUid();
+                android.util.Log.d("MyEventsFragment", "Checking waitlists for user: " + uid);
                 for (Event e : events) {
                     try {
                         Boolean joined = Tasks.await(waitlistRepo.isJoined(e.getId(), uid));
+                        android.util.Log.d("MyEventsFragment", "Event " + e.getTitle() + " (ID: " + e.getId() + ") - Joined: " + joined);
                         if (Boolean.TRUE.equals(joined)) {
                             mine.add(e);
                         }
-                    } catch (Exception ignored) { }
+                    } catch (Exception ex) {
+                        android.util.Log.e("MyEventsFragment", "Error checking waitlist for event " + e.getId(), ex);
+                    }
                 }
+                android.util.Log.d("MyEventsFragment", "Found " + mine.size() + " waitlisted events for user");
                 if (!isAdded()) return;
                 ViewCompat.postOnAnimation(requireView(), () -> {
                     adapter.submit(mine);
@@ -170,6 +192,7 @@ public class MyEventsFragment extends Fragment {
 
         }).addOnFailureListener(e -> {
             if (!isAdded()) return;
+            android.util.Log.e("MyEventsFragment", "Failed to load events", e);
             adapter.submit(new ArrayList<>());
             setLoading(false);
             showEmptyIfNeeded();
@@ -183,7 +206,7 @@ public class MyEventsFragment extends Fragment {
 
     // ===== Adapter / ViewHolder using your IDs =====
 
-    private static class MyEventsAdapter extends RecyclerView.Adapter<MyEventVH> {
+    private class MyEventsAdapter extends RecyclerView.Adapter<MyEventVH> {
         private final List<Event> data = new ArrayList<>();
         private final Set<String> invited = new HashSet<>();
 
@@ -202,7 +225,22 @@ public class MyEventsFragment extends Fragment {
         @NonNull @Override public MyEventVH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             View v = LayoutInflater.from(parent.getContext())
                     .inflate(R.layout.item_my_event_row, parent, false);
-            return new MyEventVH(v);
+            return new MyEventVH(v, event -> {
+                // Launch EventDetailActivity when an event is clicked
+                Intent intent = new Intent(requireContext(), EventDetailActivity.class);
+                intent.putExtra("eventId", event.getId());
+                intent.putExtra("eventTitle", event.getTitle());
+                intent.putExtra("eventLocation", event.getLocation());
+                intent.putExtra("eventStartTime", event.getStartsAtEpochMs());
+                intent.putExtra("eventCapacity", event.getCapacity());
+                intent.putExtra("eventNotes", event.getNotes());
+                intent.putExtra("eventGuidelines", event.getGuidelines());
+                intent.putExtra("eventPosterUrl", event.getPosterUrl());
+                intent.putExtra("eventWaitlistCount", event.getWaitlistCount());
+                // Pass invitation status
+                intent.putExtra("hasInvitation", invited.contains(event.getId()));
+                startActivity(intent);
+            });
         }
 
         @Override public void onBindViewHolder(@NonNull MyEventVH h, int pos) {
@@ -217,18 +255,26 @@ public class MyEventsFragment extends Fragment {
         private final ImageView image;
         private final TextView name;
         private final TextView subtitle;   // reusing event_price id as subtitle
-        private final TextView invitedBadge;
+        private final View invitedBadge;
         private final SimpleDateFormat df = new SimpleDateFormat("MMM d, h:mma", Locale.getDefault());
+        private Event currentEvent;
 
-        MyEventVH(@NonNull View itemView) {
+        MyEventVH(@NonNull View itemView, EventClickListener listener) {
             super(itemView);
             image = itemView.findViewById(R.id.event_image);
             name = itemView.findViewById(R.id.event_name);
             subtitle = itemView.findViewById(R.id.event_price);
             invitedBadge = itemView.findViewById(R.id.invited_badge);
+
+            itemView.setOnClickListener(v -> {
+                if (currentEvent != null && listener != null) {
+                    listener.onEventClick(currentEvent);
+                }
+            });
         }
 
         void bind(Event e, boolean invited) {
+            this.currentEvent = e;
             name.setText(e.getTitle() != null ? e.getTitle() : "Untitled");
 
             String when = (e.getStartAt() != null) ? df.format(e.getStartAt()) : "TBD";
@@ -236,6 +282,23 @@ public class MyEventsFragment extends Fragment {
             subtitle.setText(where.isEmpty() ? when : (when + " • " + where));
 
             invitedBadge.setVisibility(invited ? View.VISIBLE : View.GONE);
+            
+            // Load event image using Glide
+            if (e.getPosterUrl() != null && !e.getPosterUrl().isEmpty()) {
+                Glide.with(itemView.getContext())
+                    .load(e.getPosterUrl())
+                    .placeholder(R.drawable.card_image_placeholder)
+                    .error(R.drawable.card_image_placeholder)
+                    .transition(DrawableTransitionOptions.withCrossFade())
+                    .centerCrop()
+                    .into(image);
+            } else {
+                image.setImageResource(R.drawable.card_image_placeholder);
+            }
         }
+    }
+
+    interface EventClickListener {
+        void onEventClick(Event event);
     }
 }
