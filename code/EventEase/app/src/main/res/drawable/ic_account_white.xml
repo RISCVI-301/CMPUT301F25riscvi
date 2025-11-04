@@ -2,6 +2,6 @@
 <bitmap xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:src="@drawable/ic_account"
+    android:gravity="center"
     android:tint="@color/ee_white"
     app:tint="@color/ee_white"/>
-

@@ -25,6 +25,48 @@
             android:paddingTop="12dp"
             android:paddingBottom="12dp"/>
 
+        <!-- Sticky Header with Title and actions -->
+        <RelativeLayout
+            android:id="@+id/header_section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="#2C4A6E"
+            android:padding="16dp">
+
+            <ImageButton
+                android:id="@+id/btnBack"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_alignParentStart="true"
+                android:layout_centerVertical="true"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Back"
+                android:padding="12dp"
+                android:src="@drawable/ic_back_arrow"/>
+
+            <TextView
+                android:id="@+id/tvEventName"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerInParent="true"
+                android:fontFamily="@font/fredoka_one"
+                android:text="Event Name"
+                android:textColor="@android:color/white"
+                android:textSize="28sp"/>
+
+            <ImageButton
+                android:id="@+id/btnShare"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Share"
+                android:padding="12dp"
+                android:src="@drawable/ic_share"/>
+
+        </RelativeLayout>
+
     </com.google.android.material.appbar.AppBarLayout>
 
     <!-- Main Content -->
@@ -38,48 +80,6 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical">
-
-            <!-- Header with Event Name -->
-            <RelativeLayout
-                android:id="@+id/header_section"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="#2C4A6E"
-                android:padding="16dp">
-
-                <ImageButton
-                    android:id="@+id/btnBack"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:layout_alignParentStart="true"
-                    android:layout_centerVertical="true"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="Back"
-                    android:padding="12dp"
-                    android:src="@drawable/ic_back_arrow"/>
-
-                <TextView
-                    android:id="@+id/tvEventName"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_centerInParent="true"
-                    android:fontFamily="@font/fredoka_one"
-                    android:text="Event Name"
-                    android:textColor="@android:color/white"
-                    android:textSize="28sp"/>
-
-                <ImageButton
-                    android:id="@+id/btnShare"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:layout_alignParentEnd="true"
-                    android:layout_centerVertical="true"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="Share"
-                    android:padding="12dp"
-                    android:src="@drawable/ic_share"/>
-
-            </RelativeLayout>
 
             <!-- Event Image Placeholder -->
             <androidx.cardview.widget.CardView
@@ -261,14 +261,12 @@
 
     </androidx.core.widget.NestedScrollView>
 
-    <!-- Bottom Navigation -->
-    <com.google.android.material.bottomnavigation.BottomNavigationView
-        android:id="@+id/bottomNavigation"
+    <!-- Bottom Navigation (custom glass style) -->
+    <include
+        android:id="@+id/include_bottom"
+        layout="@layout/include_bottom_nav"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="bottom"
-        android:background="@color/ee_bottombar_bg"
-        app:menu="@menu/menu_bottom_nav"
-        app:labelVisibilityMode="labeled"/>
+        android:layout_gravity="bottom"/>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

@@ -293,15 +293,13 @@
 
     </androidx.core.widget.NestedScrollView>
 
-    <!-- Bottom Navigation -->
-    <com.google.android.material.bottomnavigation.BottomNavigationView
-        android:id="@+id/bottomNavigation"
+    <!-- Bottom Navigation (custom glass style) -->
+    <include
+        android:id="@+id/include_bottom"
+        layout="@layout/include_bottom_nav"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="bottom"
-        android:background="@color/ee_bottombar_bg"
-        app:menu="@menu/menu_bottom_nav"
-        app:labelVisibilityMode="labeled"/>
+        android:layout_gravity="bottom"/>
 
     <ProgressBar
         android:id="@+id/eventDetailProgress"

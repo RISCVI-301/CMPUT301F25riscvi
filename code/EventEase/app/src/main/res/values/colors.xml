@@ -25,4 +25,6 @@
     <color name="ee_header_bg">#2C4A6E</color>
     <color name="ee_filter_circle">#203B66</color>
     <color name="ee_dialog_overlay">#331F2F4B</color>
+    <color name="transparent_nav">#00000000</color>
+
 </resources>

@@ -5,7 +5,7 @@
     android:id="@+id/main_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/ee_topbar_bg"
+    android:background="@color/ee_bg"
     android:fitsSystemWindows="true">
 
     <!-- Top bar (floats on top of NavHost) -->
