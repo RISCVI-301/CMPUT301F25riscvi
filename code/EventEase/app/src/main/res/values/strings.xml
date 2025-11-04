@@ -5,4 +5,12 @@
     <string name="no_open_events_right_now">No open events right now</string>
     <string name="events">Events</string>
     <string name="event_image">Event image</string>
+    <string name="overview">Overview</string>
+    <string name="number_of_entrants">Number of entrants\non wait-list</string>
+    <string name="guidelines_selection">Guidelines about selection process</string>
+    <string name="register_signup">Register/Sign up</string>
+    <string name="decline">Decline</string>
+    <string name="event_name_default">Event Name</string>
+    <string name="back">Back</string>
+    <string name="share">Share</string>
 </resources>
