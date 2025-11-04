@@ -16,8 +16,11 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.EventEase.auth.AuthManager;
+import com.EventEase.data.WaitlistRepository;
 import com.EventEase.model.Event;
 import com.bumptech.glide.Glide;
+import com.example.eventease.App;
 import com.example.eventease.R;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -46,14 +49,19 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
     private View contentContainer;
     private ProgressBar progressBar;
     private ImageButton shareButton;
+    private Button waitlistButton;
     private String guidelinesBody;
 
     private ListenerRegistration eventRegistration;
     private ListenerRegistration waitlistRegistration;
     private FirebaseFirestore firestore;
+    
+    private WaitlistRepository waitlistRepo;
+    private AuthManager authManager;
 
     private Event currentEvent;
     private String eventId;
+    private boolean isUserInWaitlist = false;
 
     @SuppressLint("SimpleDateFormat")
     private static final SimpleDateFormat DATE_FORMAT =
@@ -63,6 +71,10 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_event_details_discover);
+
+        // Initialize repositories
+        waitlistRepo = App.graph().waitlists;
+        authManager = App.graph().auth;
 
         bindViews();
 
@@ -81,6 +93,7 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
         firestore = FirebaseFirestore.getInstance();
 
         observeEvent();
+        checkWaitlistStatus();
     }
 
     @Override
@@ -105,18 +118,18 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
         progressBar = findViewById(R.id.eventDetailProgress);
         contentContainer = findViewById(R.id.eventDetailContent);
         shareButton = findViewById(R.id.btnShare);
-        Button waitlistButton = findViewById(R.id.waitlist_join);
+        waitlistButton = findViewById(R.id.waitlist_join);
         Button guidelinesButton = findViewById(R.id.btnGuidelines);
         ImageButton backButton = findViewById(R.id.btnBack);
 
         setLoading(true);
         shareButton.setEnabled(false);
+        waitlistButton.setEnabled(false);
         guidelinesBody = getString(R.string.event_details_guidelines_body);
 
         backButton.setOnClickListener(v -> getOnBackPressedDispatcher().onBackPressed());
         shareButton.setOnClickListener(v -> shareEvent());
-        waitlistButton.setOnClickListener(v ->
-                JoinWaitlistDialogFragment.show(getSupportFragmentManager()));
+        waitlistButton.setOnClickListener(v -> handleJoinWaitlist());
         guidelinesButton.setOnClickListener(v ->
                 GuidelinesDialogFragment.show(
                         getSupportFragmentManager(),
@@ -286,6 +299,81 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
         if (waitlistRegistration != null) {
             waitlistRegistration.remove();
             waitlistRegistration = null;
+        }
+    }
+
+    /**
+     * Check if the current user is already in the waitlist
+     */
+    private void checkWaitlistStatus() {
+        if (authManager == null || waitlistRepo == null || TextUtils.isEmpty(eventId)) {
+            return;
+        }
+
+        String uid = authManager.getUid();
+        waitlistRepo.isJoined(eventId, uid)
+                .addOnSuccessListener(joined -> {
+                    isUserInWaitlist = joined != null && joined;
+                    updateWaitlistButtonState();
+                })
+                .addOnFailureListener(e -> {
+                    // If check fails, assume not joined
+                    isUserInWaitlist = false;
+                    updateWaitlistButtonState();
+                });
+    }
+
+    /**
+     * Handle the join waitlist button click
+     */
+    private void handleJoinWaitlist() {
+        if (isUserInWaitlist) {
+            Toast.makeText(this, "You are already in the waitlist", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (authManager == null || waitlistRepo == null || TextUtils.isEmpty(eventId)) {
+            Toast.makeText(this, "Unable to join waitlist. Please try again.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Disable button to prevent multiple clicks
+        waitlistButton.setEnabled(false);
+
+        String uid = authManager.getUid();
+        waitlistRepo.join(eventId, uid)
+                .addOnSuccessListener(aVoid -> {
+                    isUserInWaitlist = true;
+                    updateWaitlistButtonState();
+                    Toast.makeText(this, "Successfully joined the waitlist!", Toast.LENGTH_SHORT).show();
+                    
+                    // Show the guidelines dialog after successful join
+                    JoinWaitlistDialogFragment.show(getSupportFragmentManager());
+                })
+                .addOnFailureListener(e -> {
+                    waitlistButton.setEnabled(true);
+                    String errorMessage = e.getMessage();
+                    if (TextUtils.isEmpty(errorMessage)) {
+                        errorMessage = "Failed to join waitlist. Please try again.";
+                    }
+                    Toast.makeText(this, errorMessage, Toast.LENGTH_LONG).show();
+                });
+    }
+
+    /**
+     * Update the waitlist button text and state based on whether user is already in waitlist
+     */
+    private void updateWaitlistButtonState() {
+        if (waitlistButton == null) {
+            return;
+        }
+
+        if (isUserInWaitlist) {
+            waitlistButton.setText("Already in Waitlist");
+            waitlistButton.setEnabled(false);
+        } else {
+            waitlistButton.setText("Join Waitlist");
+            waitlistButton.setEnabled(true);
         }
     }
 }
