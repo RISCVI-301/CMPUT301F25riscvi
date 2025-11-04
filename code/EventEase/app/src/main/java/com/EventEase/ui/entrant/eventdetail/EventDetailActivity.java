@@ -46,6 +46,10 @@ public class EventDetailActivity extends AppCompatActivity {
     private ImageButton btnBack;
     private ImageButton btnShare;
     private ImageView ivEventImage;
+    // Custom nav include controls
+    private android.widget.LinearLayout navButtonMyEvents;
+    private android.widget.LinearLayout navButtonDiscover;
+    private android.widget.LinearLayout navButtonAccount;
     private BottomNavigationView bottomNavigation;
     
     private String eventId;
@@ -100,7 +104,10 @@ public class EventDetailActivity extends AppCompatActivity {
         btnBack = findViewById(R.id.btnBack);
         btnShare = findViewById(R.id.btnShare);
         ivEventImage = findViewById(R.id.ivEventImage);
-        bottomNavigation = findViewById(R.id.bottomNavigation);
+        // Find custom nav include buttons
+        navButtonMyEvents = findViewById(R.id.nav_button_my_events);
+        navButtonDiscover = findViewById(R.id.nav_button_discover);
+        navButtonAccount = findViewById(R.id.nav_button_account);
 
         // Set up back button
         btnBack.setOnClickListener(v -> finish());
@@ -142,8 +149,16 @@ public class EventDetailActivity extends AppCompatActivity {
         // Listen to waitlist count updates from Firebase
         setupWaitlistCountListener();
 
-        // Set up bottom navigation
-        setupBottomNavigation();
+        // Wire bottom nav navigation to MainActivity destinations
+        if (navButtonDiscover != null) {
+            navButtonDiscover.setOnClickListener(v -> navigateToMain("discover"));
+        }
+        if (navButtonMyEvents != null) {
+            navButtonMyEvents.setOnClickListener(v -> navigateToMain("myEvents"));
+        }
+        if (navButtonAccount != null) {
+            navButtonAccount.setOnClickListener(v -> navigateToMain("account"));
+        }
     }
 
     private void loadEventData() {
@@ -244,6 +259,9 @@ public class EventDetailActivity extends AppCompatActivity {
         // Make the background clickable to dismiss
         blurBackground.setOnClickListener(v -> dialog.dismiss());
         
+        // Get the CardView for animation
+        androidx.cardview.widget.CardView cardView = dialog.findViewById(R.id.dialogCardView);
+        
         // Set up dialog views
         TextView tvContent = dialog.findViewById(R.id.tvDialogContent);
         android.widget.Button btnOk = dialog.findViewById(R.id.btnDialogOk);
@@ -259,6 +277,13 @@ public class EventDetailActivity extends AppCompatActivity {
         btnOk.setOnClickListener(v -> dialog.dismiss());
         
         dialog.show();
+        
+        // Apply animations after dialog is shown
+        android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.dialog_fade_in);
+        android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.dialog_zoom_in);
+        
+        blurBackground.startAnimation(fadeIn);
+        cardView.startAnimation(zoomIn);
     }
     
     private void showAcceptDialog() {
@@ -389,6 +414,14 @@ public class EventDetailActivity extends AppCompatActivity {
             e.printStackTrace();
             return bitmap;
         }
+    }
+
+    private void navigateToMain(String target) {
+        android.content.Intent intent = new android.content.Intent(this, com.example.eventease.MainActivity.class);
+        intent.putExtra("nav_target", target);
+        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP | android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        startActivity(intent);
+        finish();
     }
 
     /**

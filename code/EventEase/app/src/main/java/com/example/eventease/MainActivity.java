@@ -2,6 +2,8 @@ package com.example.eventease;
 
 import android.os.Bundle;
 import android.view.View;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.Nullable;
@@ -10,16 +12,25 @@ import androidx.core.view.WindowCompat;
 import androidx.navigation.NavController;
 import androidx.navigation.NavDestination;
 import androidx.navigation.fragment.NavHostFragment;
-import androidx.navigation.ui.NavigationUI;
 
-import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.firebase.auth.FirebaseAuth;
 
 public class MainActivity extends AppCompatActivity {
 
-    private BottomNavigationView bottomNav;
+    private View bottomNav;
     private NavController nav;
     private View topBar;
+    
+    // Custom navigation button references
+    private LinearLayout navButtonMyEvents;
+    private LinearLayout navButtonDiscover;
+    private LinearLayout navButtonAccount;
+    private ImageView navIconMyEvents;
+    private ImageView navIconDiscover;
+    private ImageView navIconAccount;
+    private android.widget.TextView navLabelMyEvents;
+    private android.widget.TextView navLabelDiscover;
+    private android.widget.TextView navLabelAccount;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -39,6 +50,17 @@ public class MainActivity extends AppCompatActivity {
         if (bottomNav == null) {
             throw new IllegalStateException("include_bottom not found. Check activity_mainfragments.xml include tag.");
         }
+        
+        // Find custom navigation button views
+        navButtonMyEvents = findViewById(R.id.nav_button_my_events);
+        navButtonDiscover = findViewById(R.id.nav_button_discover);
+        navButtonAccount = findViewById(R.id.nav_button_account);
+        navIconMyEvents = findViewById(R.id.nav_icon_my_events);
+        navIconDiscover = findViewById(R.id.nav_icon_discover);
+        navIconAccount = findViewById(R.id.nav_icon_account);
+        navLabelMyEvents = findViewById(R.id.nav_label_my_events);
+        navLabelDiscover = findViewById(R.id.nav_label_discover);
+        navLabelAccount = findViewById(R.id.nav_label_account);
         
         // Get top bar reference
         topBar = findViewById(R.id.include_top);
@@ -88,19 +110,22 @@ public class MainActivity extends AppCompatActivity {
             auth.signOut();
         }
         
+        // Setup custom navigation button click listeners
+        setupCustomNavigation();
+        
         if (isLoggedIn) {
-            // User is logged in and Remember Me is enabled - setup bottom nav and navigate to discover
-            NavigationUI.setupWithNavController(bottomNav, nav);
+            // User is logged in and Remember Me is enabled - show bars and navigate to Discover
             topBar.setVisibility(View.VISIBLE);
-            // Navigate to discover after the view is ready
-            bottomNav.post(() -> nav.navigate(R.id.discoverFragment));
+            bottomNav.setVisibility(View.VISIBLE);
+            // Navigate to discover after the view is ready and mark selected
+            bottomNav.post(() -> {
+                nav.navigate(R.id.discoverFragment);
+                updateNavigationSelection(R.id.discoverFragment);
+            });
         } else {
             // User not logged in - hide bottom nav and top bar initially
             bottomNav.setVisibility(View.GONE);
             topBar.setVisibility(View.GONE);
-            
-            // Track if NavigationUI has been set up
-            final boolean[] navUISetup = {false};
             
             // Show/hide bottom nav, top bar, and action bar based on destination
             nav.addOnDestinationChangedListener((controller, destination, arguments) -> {
@@ -110,10 +135,7 @@ public class MainActivity extends AppCompatActivity {
                     // User authenticated and on main app screen, show top bar and bottom nav
                     bottomNav.setVisibility(View.VISIBLE);
                     topBar.setVisibility(View.VISIBLE);
-                    if (!navUISetup[0]) {
-                        NavigationUI.setupWithNavController(bottomNav, nav);
-                        navUISetup[0] = true;
-                    }
+                    updateNavigationSelection(id);
                     // Keep action bar hidden
                     if (getSupportActionBar() != null) {
                         getSupportActionBar().hide();
@@ -136,6 +158,86 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
             });
+        }
+
+        // Handle external navigation intents (from detail activities)
+        handleExternalNav(getIntent());
+
+        // Always keep nav selection in sync with the current destination (covers both login paths)
+        nav.addOnDestinationChangedListener((controller, destination, arguments) -> {
+            if (destination != null) {
+                updateNavigationSelection(destination.getId());
+            }
+        });
+    }
+
+    @Override
+    protected void onNewIntent(android.content.Intent intent) {
+        super.onNewIntent(intent);
+        handleExternalNav(intent);
+    }
+
+    private void handleExternalNav(android.content.Intent intent) {
+        if (intent == null) return;
+        String target = intent.getStringExtra("nav_target");
+        if (target == null) return;
+        bottomNav.post(() -> {
+            switch (target) {
+                case "discover":
+                    nav.navigate(R.id.discoverFragment);
+                    break;
+                case "myEvents":
+                    nav.navigate(R.id.eventsSelectionFragment);
+                    break;
+                case "account":
+                    nav.navigate(R.id.accountFragment);
+                    break;
+            }
+        });
+    }
+    
+    private void setupCustomNavigation() {
+        navButtonMyEvents.setOnClickListener(v -> {
+            nav.navigate(R.id.eventsSelectionFragment);
+            updateNavigationSelection(R.id.eventsSelectionFragment);
+        });
+        
+        navButtonDiscover.setOnClickListener(v -> {
+            nav.navigate(R.id.discoverFragment);
+            updateNavigationSelection(R.id.discoverFragment);
+        });
+        
+        navButtonAccount.setOnClickListener(v -> {
+            nav.navigate(R.id.accountFragment);
+            updateNavigationSelection(R.id.accountFragment);
+        });
+    }
+    
+    private void updateNavigationSelection(int destinationId) {
+        // Dark blue for unselected items (brand color)
+        int unselectedColor = android.graphics.Color.parseColor("#223C65");
+        // iOS blue color for selected items
+        int selectedColor = android.graphics.Color.parseColor("#446EAF");
+        
+        // Reset all to unselected (dark circles and gray text)
+        navIconMyEvents.setImageResource(R.drawable.ic_my_events_circle_dark);
+        navIconDiscover.setImageResource(R.drawable.ic_discover_circle_dark);
+        navIconAccount.setImageResource(R.drawable.ic_account_circle_dark);
+        navLabelMyEvents.setTextColor(unselectedColor);
+        navLabelDiscover.setTextColor(unselectedColor);
+        navLabelAccount.setTextColor(unselectedColor);
+        
+        // Set selected (light circle and blue text) based on destination
+        if (destinationId == R.id.eventsSelectionFragment || destinationId == R.id.myEventsFragment 
+            || destinationId == R.id.previousEventsFragment || destinationId == R.id.upcomingEventsFragment) {
+            navIconMyEvents.setImageResource(R.drawable.ic_my_events_circle_light);
+            navLabelMyEvents.setTextColor(selectedColor);
+        } else if (destinationId == R.id.discoverFragment) {
+            navIconDiscover.setImageResource(R.drawable.ic_discover_circle_light);
+            navLabelDiscover.setTextColor(selectedColor);
+        } else if (destinationId == R.id.accountFragment) {
+            navIconAccount.setImageResource(R.drawable.ic_account_circle_light);
+            navLabelAccount.setTextColor(selectedColor);
         }
     }
 }
