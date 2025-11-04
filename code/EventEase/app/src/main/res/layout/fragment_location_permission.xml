@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#3D5A7A"
+    android:fillViewport="true">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="24dp">
+
+        <!-- Title -->
+        <TextView
+            android:id="@+id/tvTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Request Entrants Location"
+            android:textSize="24sp"
+            android:textColor="#000000"
+            android:fontFamily="@font/fredoka_one"
+            android:textStyle="bold"
+            android:gravity="center"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            android:layout_marginTop="32dp"/>
+
+        <!-- Permission Dialog Card -->
+        <androidx.cardview.widget.CardView
+            android:id="@+id/permissionCard"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            app:cardCornerRadius="24dp"
+            app:cardElevation="12dp"
+            app:cardBackgroundColor="#E8F4F8"
+            app:layout_constraintTop_toBottomOf="@id/tvTitle"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            android:layout_marginTop="80dp"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="16dp">
+
+            <androidx.constraintlayout.widget.ConstraintLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="32dp">
+
+                <!-- Location Icon Circle -->
+                <View
+                    android:id="@+id/iconCircle"
+                    android:layout_width="100dp"
+                    android:layout_height="100dp"
+                    android:background="@drawable/circle_location_icon_bg"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"/>
+
+                <!-- Location Icon -->
+                <ImageView
+                    android:id="@+id/iconLocation"
+                    android:layout_width="50dp"
+                    android:layout_height="50dp"
+                    android:src="@drawable/ic_location_pin"
+                    android:tint="#2C4A6E"
+                    app:layout_constraintTop_toTopOf="@id/iconCircle"
+                    app:layout_constraintBottom_toBottomOf="@id/iconCircle"
+                    app:layout_constraintStart_toStartOf="@id/iconCircle"
+                    app:layout_constraintEnd_toEndOf="@id/iconCircle"
+                    android:contentDescription="Location Icon"/>
+
+                <!-- Permission Text -->
+                <TextView
+                    android:id="@+id/tvPermissionText"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:text="Allow EventEase to access device location?"
+                    android:textSize="18sp"
+                    android:textColor="#2C4A6E"
+                    android:fontFamily="@font/fredoka_one"
+                    android:textStyle="bold"
+                    android:gravity="center"
+                    app:layout_constraintTop_toBottomOf="@id/iconCircle"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    android:layout_marginTop="24dp"/>
+
+                <!-- Allow Once Button -->
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/btnAllowOnce"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:text="Allow once"
+                    android:textSize="16sp"
+                    android:textColor="#FFFFFF"
+                    android:fontFamily="@font/fredoka_one"
+                    android:textStyle="bold"
+                    android:textAllCaps="false"
+                    android:background="@drawable/btn_location_permission"
+                    android:paddingTop="14dp"
+                    android:paddingBottom="14dp"
+                    android:elevation="4dp"
+                    app:layout_constraintTop_toBottomOf="@id/tvPermissionText"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    android:layout_marginTop="32dp"/>
+
+                <!-- While Using App Button -->
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/btnWhileUsingApp"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:text="While using the app"
+                    android:textSize="16sp"
+                    android:textColor="#FFFFFF"
+                    android:fontFamily="@font/fredoka_one"
+                    android:textStyle="bold"
+                    android:textAllCaps="false"
+                    android:background="@drawable/btn_location_permission"
+                    android:paddingTop="14dp"
+                    android:paddingBottom="14dp"
+                    android:elevation="4dp"
+                    app:layout_constraintTop_toBottomOf="@id/btnAllowOnce"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    android:layout_marginTop="16dp"/>
+
+                <!-- Don't Allow Button -->
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/btnDontAllow"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:text="Don't Allow"
+                    android:textSize="16sp"
+                    android:textColor="#FFFFFF"
+                    android:fontFamily="@font/fredoka_one"
+                    android:textStyle="bold"
+                    android:textAllCaps="false"
+                    android:background="@drawable/btn_location_permission"
+                    android:paddingTop="14dp"
+                    android:paddingBottom="14dp"
+                    android:elevation="4dp"
+                    app:layout_constraintTop_toBottomOf="@id/btnWhileUsingApp"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    android:layout_marginTop="16dp"
+                    android:layout_marginBottom="8dp"/>
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
+
+        </androidx.cardview.widget.CardView>
+
+        <!-- Progress Bar -->
+        <ProgressBar
+            android:id="@+id/progressBar"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="gone"
+            android:indeterminateTint="#8DD3D5"
+            app:layout_constraintTop_toBottomOf="@id/permissionCard"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            android:layout_marginTop="24dp"/>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</ScrollView>
+
