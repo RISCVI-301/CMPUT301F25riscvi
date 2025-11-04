@@ -1,15 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="#223C65"
-    android:fitsSystemWindows="true"
-    tools:context=".MainActivity">
+    android:fitsSystemWindows="true">
 
+<!--  Top Bar  -->
     <TextView
         android:id="@+id/main"
         android:layout_width="match_parent"
@@ -21,11 +20,11 @@
         android:padding="16dp"
         android:background="#9EFFF1" />
 
-    <!-- Admin pill at 80% of phone width -->
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
 
+        <!-- Admin Pill -->
         <TextView
             android:id="@+id/adminBadge"
             android:layout_width="0dp"
@@ -44,4 +43,11 @@
             app:layout_constraintWidth_percent="0.8"/>
     </androidx.constraintlayout.widget.ConstraintLayout>
 
+    <!--  Scrolling container to display the Images  -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/grid"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:padding="12dp"/>
 </LinearLayout>
