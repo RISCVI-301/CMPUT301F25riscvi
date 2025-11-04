@@ -1,13 +1,13 @@
-package com.example.eventease;
+package com.example.eventease.admin.image.ui;
 
 import android.os.Bundle;
-import android.util.Log;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.google.firebase.FirebaseApp;
+import com.example.eventease.admin.image.data.AdminImageDatabaseController;
+import com.example.eventease.R;
 
 import java.util.ArrayList;
 import java.util.Arrays;

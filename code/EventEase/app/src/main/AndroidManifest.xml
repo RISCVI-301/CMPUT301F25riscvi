@@ -23,7 +23,7 @@
             </intent-filter>
         </activity>
         <activity
-            android:name=".AdminImageManagementActivity"
+            android:name=".admin.image.ui.AdminImageManagementActivity"
             android:exported="false" />
     </application>
 

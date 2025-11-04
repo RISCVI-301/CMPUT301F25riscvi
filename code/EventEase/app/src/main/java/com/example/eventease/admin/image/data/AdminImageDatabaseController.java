@@ -1,4 +1,4 @@
-package com.example.eventease;
+package com.example.eventease.admin.image.data;
 
 import java.util.Collections;
 import java.util.List;
