@@ -5,13 +5,13 @@
     android:id="@+id/main_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/ee_bg"
+    android:background="@color/ee_topbar_bg"
     android:fitsSystemWindows="true">
 
     <!-- Top bar -->
     <include
         android:id="@+id/include_top"
-        layout="@layout/include_top_bar"
+        layout="@layout/include_eventease_topbar"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         app:layout_constraintTop_toTopOf="parent"
