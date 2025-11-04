@@ -16,17 +16,17 @@ import java.util.List;
 public class AdminImageManagementActivity extends AppCompatActivity {
 
     private AdminImageDatabaseController AIDC = new AdminImageDatabaseController();
-    List<String> demoData;
+    List<String> ImageData;
     private AdminImageControllingAdapter adapter;
 
+    // UI->Controller deleting interface. Calls Controller for deleting, while updates it's own View List.
     private void deleteImage(String url){
-        int pos = demoData.indexOf(url);       // or pass position directly
+        int pos = ImageData.indexOf(url);
         if (pos != -1) {
-            demoData.remove(pos);
+            ImageData.remove(pos);
             adapter.notifyItemRemoved(pos);
             AIDC.deleteImage(url);
         }
-        //Remaining to be Populated when DB logic Confirm
     }
 
     @Override
@@ -34,19 +34,13 @@ public class AdminImageManagementActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.admin_image_management);
 
-        // Images:
-        demoData = new ArrayList<>(Arrays.asList(
-                "https://picsum.photos/id/4/800/800",
-                "https://picsum.photos/id/10/800/800",
-                "https://picsum.photos/id/22/800/800",
-                "https://picsum.photos/id/22/800/800",
-                "https://picsum.photos/id/4/800/800"
-        ));
+        // Get Images by asking Controller:
+        ImageData = AIDC.getImageLinks();
 
         RecyclerView rv = findViewById(R.id.grid); //find the Recycler View Component
         rv.setLayoutManager(new GridLayoutManager(this, 2)); // Assign GridLayout Manager to Recycler View. It shows 2 tiles in each row.
 
-        adapter = new AdminImageControllingAdapter(this, demoData, (url, pos) -> deleteImage(url));
+        adapter = new AdminImageControllingAdapter(this, ImageData, (url, pos) -> deleteImage(url));
         rv.setAdapter(adapter); //Assigning Controller to Recycler View.
     }
 }
