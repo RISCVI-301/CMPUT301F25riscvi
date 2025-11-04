@@ -10,7 +10,7 @@ public class AdminImageDatabaseController {
         return urls;
     }
 
-    public boolean deleteImage() {
+    public boolean deleteImage(String url) {
         return true;
     }
 }

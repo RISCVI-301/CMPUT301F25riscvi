@@ -18,12 +18,18 @@ public class AdminImageControllingAdapter extends RecyclerView.Adapter<AdminImag
     private final List<String> urls; // List which hold's the URL
     private final int itemW, itemH, margin; // Holding Tile width, height, and margin.
 
+    public interface OnDelete {
+        void onDelete(String url, int pos); // void is fine
+    }
+
+    private final OnDelete onDelete;
+
     // Constructor
-    public AdminImageControllingAdapter(Context ctx, List<String> urls) {
+    public AdminImageControllingAdapter(Context ctx, List<String> urls, OnDelete onDelete) {
 
         // Assign URL
         this.urls = urls;
-
+        this.onDelete = onDelete;
         // Find Screen Width and Height
         DisplayMetrics dm = ctx.getResources().getDisplayMetrics();
         int screenW = dm.widthPixels;
@@ -69,7 +75,20 @@ public class AdminImageControllingAdapter extends RecyclerView.Adapter<AdminImag
                 .into(h.image);
 
         h.delete.setOnClickListener(v -> {
-            /* handle delete for position i */
+            int pos = h.getBindingAdapterPosition();
+            if (pos == RecyclerView.NO_POSITION) return;
+
+            new androidx.appcompat.app.AlertDialog.Builder(v.getContext())
+                    .setTitle("Delete image?")
+                    .setMessage("Delete image Number " + (pos + 1) + "?")
+                    .setPositiveButton("Yes", (d, w) -> {
+                        int p = h.getBindingAdapterPosition(); // re-check
+                        if (p != RecyclerView.NO_POSITION) {
+                            onDelete.onDelete(urls.get(p), p);
+                        }
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
         });
     }
 
