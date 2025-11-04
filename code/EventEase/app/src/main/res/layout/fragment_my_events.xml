@@ -1,20 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/my_events_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
     android:background="#223C65">
 
     <!-- Top bar with EventEase logo -->
     <com.google.android.material.appbar.AppBarLayout
         android:id="@+id/appBarLayout"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:background="@color/ee_topbar_bg"
-        app:elevation="0dp">
+        app:elevation="0dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
 
         <TextView
             android:layout_width="wrap_content"
@@ -32,10 +34,13 @@
     <!-- Header with Title -->
     <RelativeLayout
         android:id="@+id/relativeheader"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:background="#2C4A6E"
-        android:padding="16dp">
+        android:padding="16dp"
+        app:layout_constraintTop_toBottomOf="@id/appBarLayout"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
 
         <ImageButton
             android:id="@+id/btnBack"
@@ -59,43 +64,90 @@
 
     </RelativeLayout>
 
-    <!-- Content Area -->
-    <FrameLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
+    <!-- Content Area with Events Pill Header -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="@color/ee_bg"
+        android:paddingStart="10dp"
         android:paddingTop="4dp"
-        android:paddingBottom="16dp">
+        android:paddingEnd="10dp"
+        android:paddingBottom="12dp"
+        app:layout_constraintTop_toBottomOf="@id/relativeheader"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
 
+        <!-- Events Pill Header (matching discover) -->
+        <FrameLayout
+            android:id="@+id/my_events_pill"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/events_pill"
+            android:elevation="8dp"
+            android:paddingStart="22dp"
+            android:paddingTop="10dp"
+            android:paddingEnd="22dp"
+            android:paddingBottom="10dp"
+            android:layout_marginTop="12dp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <TextView
+                android:id="@+id/my_events_header"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:fontFamily="@font/fredoka_one"
+                android:letterSpacing="0.02"
+                android:text="@string/events"
+                android:textColor="@android:color/white"
+                android:textSize="26sp" />
+        </FrameLayout>
+
+        <!-- RecyclerView (matching discover spacing) -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/my_events_list"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
             android:clipToPadding="false"
             android:layout_marginTop="8dp"
             android:paddingTop="8dp"
             android:paddingBottom="8dp"
+            app:layout_constraintTop_toBottomOf="@id/my_events_pill"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
             tools:itemCount="5"
             tools:listitem="@layout/item_event_card"/>
 
         <ProgressBar
             android:id="@+id/my_events_progress"
-            style="?android:attr/progressBarStyle"
-            android:layout_gravity="center"
-            android:visibility="gone"
+            style="?android:attr/progressBarStyleLarge"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"/>
+            android:layout_height="wrap_content"
+            android:indeterminate="true"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="@id/my_events_list"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="@id/my_events_list"/>
 
         <TextView
             android:id="@+id/my_events_empty"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:text="You haven't joined any waitlists yet."
-            android:textColor="@android:color/white"
-            android:gravity="center"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:fontFamily="@font/fredoka_one"
+            android:padding="12dp"
             android:visibility="gone"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"/>
+            app:layout_constraintBottom_toBottomOf="@id/my_events_list"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="@id/my_events_list"/>
 
-    </FrameLayout>
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
-</LinearLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>
