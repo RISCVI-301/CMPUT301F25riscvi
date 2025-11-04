@@ -25,6 +25,9 @@
         <activity
             android:name=".admin.image.ui.AdminImageManagementActivity"
             android:exported="false" />
+        <activity
+            android:name=".admin.event.ui.AdminEventManagementActivity"
+            android:exported="false" />
     </application>
 
 </manifest>
