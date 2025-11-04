@@ -22,4 +22,7 @@
     <color name="ee_bottombar_text_inactive">#223C65</color>
     <color name="white">#FFFFFF</color>
     <color name="ee_topbar_text">#114c43</color>
+    <color name="ee_header_bg">#2C4A6E</color>
+    <color name="ee_filter_circle">#203B66</color>
+    <color name="ee_dialog_overlay">#331F2F4B</color>
 </resources>
