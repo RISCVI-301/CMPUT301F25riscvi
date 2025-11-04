@@ -12,7 +12,9 @@ public class Event {
     public long startsAtEpochMs;    // millis UTC
     public String location;
     public int capacity;
+    public int waitlistCount; // Current number of people on waitlist
     @Nullable public String notes;
+    @Nullable public String guidelines; // Event-specific rules and requirements
     @Nullable public String posterUrl;
     public String organizerId;
     public long createdAtEpochMs;
@@ -35,12 +37,45 @@ public class Event {
         m.put("startsAtEpochMs", startsAtEpochMs);
         m.put("location", location);
         m.put("capacity", capacity);
+        m.put("waitlistCount", waitlistCount);
         m.put("notes", notes);
+        m.put("guidelines", guidelines);
         m.put("posterUrl", posterUrl);
         m.put("organizerId", organizerId);
         m.put("createdAtEpochMs", createdAtEpochMs);
         m.put("qrPayload", qrPayload);
         return m;
+    }
+    
+    public static Event fromMap(Map<String, Object> m) {
+        if (m == null) return null;
+        
+        Event e = new Event();
+        e.id = (String) m.get("id");
+        e.title = (String) m.get("title");
+        
+        Object startsAt = m.get("startsAtEpochMs");
+        e.startsAtEpochMs = startsAt != null ? ((Number) startsAt).longValue() : 0;
+        
+        e.location = (String) m.get("location");
+        
+        Object cap = m.get("capacity");
+        e.capacity = cap != null ? ((Number) cap).intValue() : 0;
+        
+        Object wc = m.get("waitlistCount");
+        e.waitlistCount = wc != null ? ((Number) wc).intValue() : 0;
+        
+        e.notes = (String) m.get("notes");
+        e.guidelines = (String) m.get("guidelines");
+        e.posterUrl = (String) m.get("posterUrl");
+        e.organizerId = (String) m.get("organizerId");
+        
+        Object createdAt = m.get("createdAtEpochMs");
+        e.createdAtEpochMs = createdAt != null ? ((Number) createdAt).longValue() : 0;
+        
+        e.qrPayload = (String) m.get("qrPayload");
+        
+        return e;
     }
 
     // Getters and setters
@@ -61,11 +96,17 @@ public class Event {
     public int getCapacity() { return capacity; }
     public void setCapacity(int capacity) { this.capacity = capacity; }
 
+    public int getWaitlistCount() { return waitlistCount; }
+    public void setWaitlistCount(int waitlistCount) { this.waitlistCount = waitlistCount; }
+
     public String getLocation() { return location; }
     public void setLocation(String location) { this.location = location; }
 
     @Nullable public String getNotes() { return notes; }
     public void setNotes(@Nullable String notes) { this.notes = notes; }
+
+    @Nullable public String getGuidelines() { return guidelines; }
+    public void setGuidelines(@Nullable String guidelines) { this.guidelines = guidelines; }
 
     @Nullable public String getPosterUrl() { return posterUrl; }
     public void setPosterUrl(@Nullable String posterUrl) { this.posterUrl = posterUrl; }

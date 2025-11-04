@@ -41,13 +41,13 @@ public class AuthViewModel extends ViewModel {
     }
 
 
-    public void signup(String name, String email, String password, String confirm) {
+    public void signup(String name, String email, String password, String confirm, String phoneNumber) {
         if (name == null || name.trim().isEmpty()) { post(false, "Please enter your name", false); return; }
         if (!email.contains("@")) { post(false, "Enter a valid email", false); return; }
         if (password.length() < 6) { post(false, "Password must be ≥ 6 chars", false); return; }
         if (!password.equals(confirm)) { post(false, "Passwords do not match", false); return; }
         post(true, null, false);
-        repo.signup(name, email, password).addOnCompleteListener(t -> {
+        repo.signup(name, email, password, phoneNumber).addOnCompleteListener(t -> {
             if (t.isSuccessful()) post(false, null, true); else post(false, message(t.getException()), false);
         });
     }

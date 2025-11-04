@@ -22,7 +22,7 @@ public class AuthRepository {
     }
 
 
-    public Task<Void> signup(String name, String email, String password) {
+    public Task<Void> signup(String name, String email, String password, String phoneNumber) {
         return auth.createUserWithEmailAndPassword(email.trim(), password).onSuccessTask((SuccessContinuation<AuthResult, Void>) result -> {
                     if (auth.getCurrentUser() == null) {
                         throw new IllegalStateException("No user after sign up");
@@ -32,6 +32,9 @@ public class AuthRepository {
                     profile.put("uid", uid);
                     profile.put("email", email.trim());
                     profile.put("name", name.trim());
+                    if (phoneNumber != null && !phoneNumber.trim().isEmpty()) {
+                        profile.put("phoneNumber", phoneNumber.trim());
+                    }
                     profile.put("createdAt", System.currentTimeMillis());
                     return db.collection("users").document(uid).set(profile);
                 });
