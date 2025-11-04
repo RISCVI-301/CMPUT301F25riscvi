@@ -14,6 +14,8 @@ import java.util.List;
 
 public class AdminImageManagementActivity extends AppCompatActivity {
 
+    private AdminImageDatabaseController AIDC = new AdminImageDatabaseController();
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
