@@ -15,6 +15,9 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        
+        renderscriptTargetApi = 26
+        renderscriptSupportModeEnabled = true
     }
 
     buildTypes {
@@ -42,12 +45,13 @@ dependencies {
     implementation("com.google.android.material:material:1.12.0")
     implementation(libs.navigation.ui)
     implementation(libs.firebase.firestore)
-    implementation("com.github.bumptech.glide:glide:4.16.0")
-    annotationProcessor("com.github.bumptech.glide:compiler:4.16.0")
+    implementation(libs.glide)
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
     implementation(platform("com.google.firebase:firebase-bom:34.4.0"))
     implementation("com.google.firebase:firebase-analytics")
     implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-storage")
+    implementation("com.google.android.gms:play-services-location:21.1.0")
 }

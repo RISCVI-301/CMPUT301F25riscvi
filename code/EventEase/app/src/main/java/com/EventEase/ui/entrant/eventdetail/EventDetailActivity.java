@@ -1,21 +1,360 @@
 package com.EventEase.ui.entrant.eventdetail;
 
 import android.os.Bundle;
+import android.view.View;
+import android.widget.Button;
+import android.widget.ImageButton;
+import android.widget.ImageView;
+import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.eventease.R;
+import com.google.android.material.bottomnavigation.BottomNavigationView;
+import com.bumptech.glide.Glide;
+import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.drawable.BitmapDrawable;
+import android.renderscript.Allocation;
+import android.renderscript.Element;
+import android.renderscript.RenderScript;
+import android.renderscript.ScriptIntrinsicBlur;
+
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
 
 /**
- * Entrant — Event detail screen (placeholder Activity).
- * Keep minimal; navigation wiring happens later.
+ * Entrant — Event detail screen.
+ * Displays event information and allows user to register or decline.
  */
 public class EventDetailActivity extends AppCompatActivity {
+
+    private TextView tvEventName;
+    private TextView tvOverview;
+    private TextView tvWaitlistCount;
+    private Button btnRegister;
+    private Button btnDecline;
+    private Button btnGuidelines;
+    private ImageButton btnBack;
+    private ImageButton btnShare;
+    private ImageView ivEventImage;
+    private BottomNavigationView bottomNavigation;
+    
+    private String eventId;
+    private String eventTitle;
+    private String eventLocation;
+    private long eventStartTime;
+    private int eventCapacity;
+    private String eventNotes;
+    private String eventGuidelines;
+    private String eventPosterUrl;
+    private int eventWaitlistCount;
+    private boolean hasInvitation;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_event_details_discover);
+        setContentView(R.layout.activity_event_detail);
+
+        // Get event data from Intent
+        eventId = getIntent().getStringExtra("eventId");
+        eventTitle = getIntent().getStringExtra("eventTitle");
+        eventLocation = getIntent().getStringExtra("eventLocation");
+        eventStartTime = getIntent().getLongExtra("eventStartTime", 0);
+        eventCapacity = getIntent().getIntExtra("eventCapacity", 0);
+        eventNotes = getIntent().getStringExtra("eventNotes");
+        eventGuidelines = getIntent().getStringExtra("eventGuidelines");
+        eventPosterUrl = getIntent().getStringExtra("eventPosterUrl");
+        eventWaitlistCount = getIntent().getIntExtra("eventWaitlistCount", 0);
+        hasInvitation = getIntent().getBooleanExtra("hasInvitation", false);
+
+        // Initialize views
+        tvEventName = findViewById(R.id.tvEventName);
+        tvOverview = findViewById(R.id.tvOverview);
+        tvWaitlistCount = findViewById(R.id.tvWaitlistCount);
+        btnRegister = findViewById(R.id.btnRegister);
+        btnDecline = findViewById(R.id.btnDecline);
+        btnGuidelines = findViewById(R.id.btnGuidelines);
+        btnBack = findViewById(R.id.btnBack);
+        btnShare = findViewById(R.id.btnShare);
+        ivEventImage = findViewById(R.id.ivEventImage);
+        bottomNavigation = findViewById(R.id.bottomNavigation);
+
+        // Set up back button
+        btnBack.setOnClickListener(v -> finish());
+
+        // Set up share button
+        btnShare.setOnClickListener(v -> {
+            Toast.makeText(this, "Share functionality coming soon", Toast.LENGTH_SHORT).show();
+        });
+
+        // Set up guidelines button
+        btnGuidelines.setOnClickListener(v -> {
+            showGuidelinesDialog();
+        });
+
+        // Set up register button
+        btnRegister.setOnClickListener(v -> {
+            showAcceptDialog();
+            // TODO: Update invitation status to ACCEPTED
+        });
+
+        // Set up decline button
+        btnDecline.setOnClickListener(v -> {
+            showDeclineDialog();
+            // TODO: Update invitation status to DECLINED
+        });
+
+        // Show/hide buttons based on invitation status
+        if (hasInvitation) {
+            btnRegister.setVisibility(View.VISIBLE);
+            btnDecline.setVisibility(View.VISIBLE);
+        } else {
+            btnRegister.setVisibility(View.GONE);
+            btnDecline.setVisibility(View.GONE);
+        }
+
+        // Load event data (placeholder for now)
+        loadEventData();
+
+        // Set up bottom navigation
+        setupBottomNavigation();
+    }
+
+    private void loadEventData() {
+        // Display event name
+        tvEventName.setText(eventTitle != null ? eventTitle : "Event Name");
+        
+        // Display event overview/notes
+        if (eventNotes != null && !eventNotes.isEmpty()) {
+            tvOverview.setText(eventNotes);
+        } else {
+            tvOverview.setText("No description available for this event.");
+        }
+        
+        // Display waitlist count from Firebase
+        tvWaitlistCount.setText(String.valueOf(eventWaitlistCount));
+        
+        // Load event image using Glide
+        if (eventPosterUrl != null && !eventPosterUrl.isEmpty()) {
+            Glide.with(this)
+                .load(eventPosterUrl)
+                .placeholder(R.drawable.card_image_placeholder)
+                .error(R.drawable.card_image_placeholder)
+                .transition(DrawableTransitionOptions.withCrossFade())
+                .centerCrop()
+                .into(ivEventImage);
+        } else {
+            ivEventImage.setImageResource(R.drawable.card_image_placeholder);
+        }
+        
+        // Update button text based on event details
+        SimpleDateFormat sdf = new SimpleDateFormat("MMM d, h:mma", Locale.getDefault());
+        String dateStr = eventStartTime > 0 ? sdf.format(new Date(eventStartTime)) : "TBD";
+        
+        // You can show more event details in a toast or update UI as needed
+        Toast.makeText(this, "Event at " + eventLocation + " on " + dateStr, Toast.LENGTH_SHORT).show();
+    }
+
+    private void setupBottomNavigation() {
+        bottomNavigation.setSelectedItemId(R.id.myEventsFragment);
+        bottomNavigation.setOnItemSelectedListener(item -> {
+            int itemId = item.getItemId();
+            if (itemId == R.id.discoverFragment) {
+                finish(); // Go back to main activity which will show discover
+                return true;
+            } else if (itemId == R.id.myEventsFragment) {
+                finish(); // Go back to main activity which will show my events
+                return true;
+            } else if (itemId == R.id.accountFragment) {
+                finish(); // Go back to main activity which will show account
+                return true;
+            }
+            return false;
+        });
+    }
+
+    private void showGuidelinesDialog() {
+        // Capture screenshot and blur it
+        Bitmap screenshot = captureScreenshot();
+        Bitmap blurredBitmap = blurBitmap(screenshot, 25f);
+        
+        // Create custom dialog with full screen to show blur background
+        android.app.Dialog dialog = new android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        dialog.setContentView(R.layout.dialog_guidelines);
+        
+        // Set window properties
+        android.view.Window window = dialog.getWindow();
+        if (window != null) {
+            window.setLayout(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT
+            );
+            window.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+            
+            // Disable dim since we have our own blur background
+            android.view.WindowManager.LayoutParams layoutParams = window.getAttributes();
+            layoutParams.dimAmount = 0f;
+            window.setAttributes(layoutParams);
+            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+        }
+        
+        // Apply blurred background
+        android.view.View blurBackground = dialog.findViewById(R.id.dialogBlurBackground);
+        if (blurredBitmap != null) {
+            blurBackground.setBackground(new BitmapDrawable(getResources(), blurredBitmap));
+        }
+        
+        // Make the background clickable to dismiss
+        blurBackground.setOnClickListener(v -> dialog.dismiss());
+        
+        // Set up dialog views
+        TextView tvContent = dialog.findViewById(R.id.tvDialogContent);
+        android.widget.Button btnOk = dialog.findViewById(R.id.btnDialogOk);
+        
+        // Set guidelines content
+        if (eventGuidelines != null && !eventGuidelines.isEmpty()) {
+            tvContent.setText(eventGuidelines);
+        } else {
+            tvContent.setText("No specific guidelines have been set for this event.");
+        }
+        
+        // Set OK button click listener
+        btnOk.setOnClickListener(v -> dialog.dismiss());
+        
+        dialog.show();
+    }
+    
+    private void showAcceptDialog() {
+        // Capture screenshot and blur it
+        Bitmap screenshot = captureScreenshot();
+        Bitmap blurredBitmap = blurBitmap(screenshot, 25f);
+        
+        // Create custom dialog with full screen to show blur background
+        android.app.Dialog dialog = new android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        dialog.setContentView(R.layout.dialog_accept_invitation);
+        
+        // Set window properties
+        android.view.Window window = dialog.getWindow();
+        if (window != null) {
+            window.setLayout(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT
+            );
+            window.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+            
+            // Disable dim since we have our own blur background
+            android.view.WindowManager.LayoutParams layoutParams = window.getAttributes();
+            layoutParams.dimAmount = 0f;
+            window.setAttributes(layoutParams);
+            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+        }
+        
+        // Apply blurred background
+        android.view.View blurBackground = dialog.findViewById(R.id.dialogAcceptBlurBackground);
+        if (blurredBitmap != null) {
+            blurBackground.setBackground(new BitmapDrawable(getResources(), blurredBitmap));
+        }
+        
+        // Make the background clickable to dismiss
+        blurBackground.setOnClickListener(v -> dialog.dismiss());
+        
+        // Set up dialog views
+        android.widget.Button btnDone = dialog.findViewById(R.id.btnAcceptDone);
+        
+        // Set Done button click listener
+        btnDone.setOnClickListener(v -> dialog.dismiss());
+        
+        dialog.show();
+    }
+    
+    private void showDeclineDialog() {
+        // Capture screenshot and blur it
+        Bitmap screenshot = captureScreenshot();
+        Bitmap blurredBitmap = blurBitmap(screenshot, 25f);
+        
+        // Create custom dialog with full screen to show blur background
+        android.app.Dialog dialog = new android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        dialog.setContentView(R.layout.dialog_decline_invitation);
+        
+        // Set window properties
+        android.view.Window window = dialog.getWindow();
+        if (window != null) {
+            window.setLayout(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT
+            );
+            window.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+            
+            // Disable dim since we have our own blur background
+            android.view.WindowManager.LayoutParams layoutParams = window.getAttributes();
+            layoutParams.dimAmount = 0f;
+            window.setAttributes(layoutParams);
+            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+        }
+        
+        // Apply blurred background
+        android.view.View blurBackground = dialog.findViewById(R.id.dialogDeclineBlurBackground);
+        if (blurredBitmap != null) {
+            blurBackground.setBackground(new BitmapDrawable(getResources(), blurredBitmap));
+        }
+        
+        // Make the background clickable to dismiss
+        blurBackground.setOnClickListener(v -> dialog.dismiss());
+        
+        // Set up dialog views
+        android.widget.Button btnDone = dialog.findViewById(R.id.btnDeclineDone);
+        
+        // Set Done button click listener
+        btnDone.setOnClickListener(v -> dialog.dismiss());
+        
+        dialog.show();
+    }
+    
+    private Bitmap captureScreenshot() {
+        android.view.View rootView = getWindow().getDecorView().getRootView();
+        rootView.setDrawingCacheEnabled(true);
+        Bitmap bitmap = Bitmap.createBitmap(rootView.getDrawingCache());
+        rootView.setDrawingCacheEnabled(false);
+        return bitmap;
+    }
+    
+    private Bitmap blurBitmap(Bitmap bitmap, float radius) {
+        if (bitmap == null) return null;
+        
+        try {
+            // Scale down for better performance
+            int width = Math.round(bitmap.getWidth() * 0.4f);
+            int height = Math.round(bitmap.getHeight() * 0.4f);
+            Bitmap inputBitmap = Bitmap.createScaledBitmap(bitmap, width, height, false);
+            Bitmap outputBitmap = Bitmap.createBitmap(inputBitmap);
+            
+            RenderScript rs = RenderScript.create(this);
+            ScriptIntrinsicBlur blurScript = ScriptIntrinsicBlur.create(rs, Element.U8_4(rs));
+            Allocation tmpIn = Allocation.createFromBitmap(rs, inputBitmap);
+            Allocation tmpOut = Allocation.createFromBitmap(rs, outputBitmap);
+            
+            blurScript.setRadius(radius);
+            blurScript.setInput(tmpIn);
+            blurScript.forEach(tmpOut);
+            tmpOut.copyTo(outputBitmap);
+            
+            rs.destroy();
+            
+            // Scale back up
+            return Bitmap.createScaledBitmap(outputBitmap, bitmap.getWidth(), bitmap.getHeight(), true);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return bitmap;
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
     }
 }

@@ -1,43 +1,99 @@
 package com.EventEase.data.firebase;
 
+import android.util.Log;
+
 import com.EventEase.data.EventRepository;
 import com.EventEase.data.ListenerRegistration;
 import com.EventEase.data.WaitlistCountListener;
 import com.EventEase.model.Event;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * FirebaseEventRepository
- * Prod name. Currently uses in-memory storage for Step 1 contracts.
- * TODO(salaar): Replace in-memory store with Firebase (Firestore/RTDB).
+ * Now loads events from Firestore for persistence.
  */
 public class FirebaseEventRepository implements EventRepository {
 
+    private static final String TAG = "EventRepository";
     private final Map<String, Event> events = new ConcurrentHashMap<>();
     private final Map<String, Integer> waitlistCounts = new ConcurrentHashMap<>();
     private final Map<String, List<WaitlistCountListener>> listeners = new ConcurrentHashMap<>();
+    private final FirebaseFirestore db;
 
     public FirebaseEventRepository(List<Event> seed) {
+        this.db = FirebaseFirestore.getInstance();
+        
+        // Load seed events into memory
         for (Event e : seed) {
             events.put(e.getId(), e);
             waitlistCounts.put(e.getId(), 0);
         }
+        
+        // Also load all events from Firestore
+        loadEventsFromFirestore();
+    }
+    
+    private void loadEventsFromFirestore() {
+        db.collection("events")
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    for (DocumentSnapshot doc : querySnapshot.getDocuments()) {
+                        try {
+                            Event event = Event.fromMap(doc.getData());
+                            if (event != null && event.getId() != null) {
+                                events.put(event.getId(), event);
+                                if (!waitlistCounts.containsKey(event.getId())) {
+                                    waitlistCounts.put(event.getId(), event.getWaitlistCount());
+                                }
+                                Log.d(TAG, "Loaded event from Firestore: " + event.getTitle());
+                            }
+                        } catch (Exception e) {
+                            Log.e(TAG, "Error parsing event from Firestore", e);
+                        }
+                    }
+                    Log.d(TAG, "Total events loaded: " + events.size());
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to load events from Firestore", e);
+                });
     }
 
     @Override
     public Task<List<Event>> getOpenEvents(Date now) {
-        List<Event> result = new ArrayList<>();
-        for (Event e : events.values()) {
-            if (e.getStartAt() == null || e.getStartAt().after(now)) {
-                result.add(e);
-            }
-        }
-        result.sort(Comparator.comparing(Event::getStartAt, Comparator.nullsLast(Comparator.naturalOrder())));
-        return Tasks.forResult(Collections.unmodifiableList(result));
+        // Return cached events first, but also refresh from Firestore
+        return db.collection("events")
+                .get()
+                .continueWith(task -> {
+                    // Update cache with latest Firestore data
+                    if (task.isSuccessful() && task.getResult() != null) {
+                        for (DocumentSnapshot doc : task.getResult().getDocuments()) {
+                            try {
+                                Event event = Event.fromMap(doc.getData());
+                                if (event != null && event.getId() != null) {
+                                    events.put(event.getId(), event);
+                                }
+                            } catch (Exception e) {
+                                Log.e(TAG, "Error parsing event", e);
+                            }
+                        }
+                    }
+                    
+                    // Filter open events
+                    List<Event> result = new ArrayList<>();
+                    for (Event e : events.values()) {
+                        if (e.getStartAt() == null || e.getStartAt().after(now)) {
+                            result.add(e);
+                        }
+                    }
+                    result.sort(Comparator.comparing(Event::getStartAt, Comparator.nullsLast(Comparator.naturalOrder())));
+                    return Collections.unmodifiableList(result);
+                });
     }
 
     @Override
@@ -64,6 +120,29 @@ public class FirebaseEventRepository implements EventRepository {
 
     /* package */ void incrementWaitlist(String eventId) {
         waitlistCounts.merge(eventId, 1, Integer::sum);
+        
+        // Also update Firestore
+        db.collection("events").document(eventId)
+                .update("waitlistCount", com.google.firebase.firestore.FieldValue.increment(1))
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "Waitlist count incremented in Firestore for event " + eventId);
+                    // Refresh the event from Firestore to get the updated count
+                    db.collection("events").document(eventId).get()
+                            .addOnSuccessListener(documentSnapshot -> {
+                                if (documentSnapshot.exists()) {
+                                    Event event = Event.fromMap(documentSnapshot.getData());
+                                    if (event != null) {
+                                        events.put(eventId, event);
+                                        waitlistCounts.put(eventId, event.getWaitlistCount());
+                                        notifyCount(eventId);
+                                    }
+                                }
+                            });
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error incrementing waitlist count in Firestore", e);
+                });
+        
         notifyCount(eventId);
     }
 

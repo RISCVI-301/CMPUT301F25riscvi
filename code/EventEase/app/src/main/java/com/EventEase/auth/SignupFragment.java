@@ -46,16 +46,18 @@ public class SignupFragment extends Fragment {
         vm = new ViewModelProvider(this).get(com.EventEase.auth.AuthViewModel.class);
 
 
-        final TextInputEditText name = view.findViewById(R.id.displayName);
-        final TextInputEditText email = view.findViewById(R.id.email);
-        final TextInputEditText password = view.findViewById(R.id.password);
-        final TextInputEditText confirm = view.findViewById(R.id.confirm);
-        final MaterialButton btnSignup = view.findViewById(R.id.btnSignup);
+        final android.widget.EditText firstName = view.findViewById(R.id.firstName);
+        final android.widget.EditText lastName = view.findViewById(R.id.lastName);
+        final android.widget.EditText email = view.findViewById(R.id.email);
+        final android.widget.EditText password = view.findViewById(R.id.password);
+        final android.widget.EditText confirm = view.findViewById(R.id.confirm);
+        final android.widget.EditText phoneNumber = view.findViewById(R.id.phoneNumber);
+        final android.view.View btnSignup = view.findViewById(R.id.btnSignup);
         final MaterialButton btnToLogin = view.findViewById(R.id.btnToLogin);
         final ProgressBar progress = view.findViewById(R.id.progress);
         
-        if (btnToLogin == null) {
-            Toast.makeText(requireContext(), "Button not found", Toast.LENGTH_SHORT).show();
+        if (btnSignup == null) {
+            Toast.makeText(requireContext(), "Signup button not found", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -68,10 +70,10 @@ public class SignupFragment extends Fragment {
                 Toast.makeText(requireContext(), s.error, Toast.LENGTH_LONG).show();
             }
             if (s.success) {
-// Successful sign up → go to Discover
+// Successful sign up → go to Upload Profile Picture
                 try {
                     if (isAdded() && getView() != null) {
-                        NavHostFragment.findNavController(SignupFragment.this).navigate(R.id.action_signup_to_discover);
+                        NavHostFragment.findNavController(SignupFragment.this).navigate(R.id.action_signup_to_upload);
                     }
                 } catch (Exception e) {
                     Toast.makeText(requireContext(), "Navigation error: " + e.getMessage(), Toast.LENGTH_LONG).show();
@@ -82,11 +84,15 @@ public class SignupFragment extends Fragment {
 
 
         btnSignup.setOnClickListener(v -> {
-            String n = name.getText() == null ? "" : name.getText().toString().trim();
+            String first = firstName.getText() == null ? "" : firstName.getText().toString().trim();
+            String last = lastName.getText() == null ? "" : lastName.getText().toString().trim();
+            String fullName = (first + " " + last).trim();
             String e = email.getText() == null ? "" : email.getText().toString().trim();
             String p = password.getText() == null ? "" : password.getText().toString();
             String c = confirm.getText() == null ? "" : confirm.getText().toString();
-            vm.signup(n, e, p, c);
+            String phone = phoneNumber.getText() == null ? "" : phoneNumber.getText().toString().trim();
+            
+            vm.signup(fullName, e, p, c, phone);
         });
 
 
