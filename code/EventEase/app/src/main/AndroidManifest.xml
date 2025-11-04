@@ -21,6 +21,9 @@
             android:name="com.EventEase.ui.entrant.eventdetail.EventDetailActivity"
             android:exported="false" />
         <activity
+            android:name="com.EventEase.ui.entrant.discover.EventDetailsDiscoverActivity"
+            android:exported="false" />
+        <activity
             android:name=".MainActivity"
             android:exported="true">
             <intent-filter>

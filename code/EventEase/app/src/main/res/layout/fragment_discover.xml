@@ -3,42 +3,68 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/events_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/transparent"
-    android:padding="16dp"
-    tools:context=".ui.discover.DiscoverFragment">
+    android:background="@color/ee_bg"
+    android:paddingStart="10dp"
+    android:paddingTop="4dp"
+    android:paddingEnd="10dp"
+    android:paddingBottom="12dp"
+    tools:context="com.EventEase.ui.entrant.discover.DiscoverFragment">
 
-    <!-- "Events" pill -->
-    <FrameLayout
-        android:id="@+id/events_pill"
-        android:layout_width="221dp"
-        android:layout_height="57dp"
-        android:layout_marginTop="8dp"
-        android:background="@drawable/events_pill"
-        android:elevation="8dp"
-        android:paddingStart="20dp"
-        android:paddingTop="12dp"
-        android:paddingEnd="20dp"
-        android:paddingBottom="12dp"
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/discover_header"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintHorizontal_bias="0.0"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
-        <TextView
-            android:id="@+id/events_header"
+        <FrameLayout
+            android:id="@+id/events_pill"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:fontFamily="@font/fredoka_one"
-            android:gravity="center"
-            android:letterSpacing="0.02"
-            android:text="@string/events"
-            android:textAlignment="center"
-            android:textColor="#FFFFFF"
-            android:textSize="30sp" />
-    </FrameLayout>
+            android:background="@drawable/events_pill"
+            android:elevation="8dp"
+            android:paddingStart="22dp"
+            android:paddingTop="10dp"
+            android:paddingEnd="22dp"
+            android:paddingBottom="10dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/discover_filter"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintVertical_bias="0.0"
+            android:layout_marginEnd="12dp">
+
+            <TextView
+                android:id="@+id/events_header"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:fontFamily="@font/fredoka_one"
+                android:letterSpacing="0.02"
+                android:text="@string/events"
+                android:textColor="@android:color/white"
+                android:textSize="26sp" />
+        </FrameLayout>
+
+        <ImageButton
+            android:id="@+id/discover_filter"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginEnd="2dp"
+            android:background="@drawable/bg_filter_button"
+            android:contentDescription="@string/filter_events"
+            android:padding="10dp"
+            android:src="@drawable/ic_filter"
+            app:tint="@android:color/white"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
 
     <!-- RecyclerView -->
     <androidx.recyclerview.widget.RecyclerView
@@ -46,12 +72,40 @@
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:clipToPadding="false"
-        android:paddingTop="16dp"
-        app:layout_constraintTop_toBottomOf="@id/events_pill"
+        android:layout_marginTop="8dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        app:layout_constraintTop_toBottomOf="@id/discover_header"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        tools:listitem="@layout/item_event_card"
-        tools:itemCount="5"/>
+        tools:itemCount="5"
+        tools:listitem="@layout/item_event_card" />
+
+    <ProgressBar
+        android:id="@+id/discoverProgress"
+        style="?android:attr/progressBarStyleLarge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:indeterminate="true"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="@id/rvDiscover"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="@id/rvDiscover" />
+
+    <TextView
+        android:id="@+id/discoverEmpty"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:padding="12dp"
+        android:textColor="#FFFFFF"
+        android:textSize="16sp"
+        android:fontFamily="@font/fredoka_one"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="@id/rvDiscover"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="@id/rvDiscover" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
