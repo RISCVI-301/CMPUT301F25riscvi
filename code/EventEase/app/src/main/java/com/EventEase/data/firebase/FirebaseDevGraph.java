@@ -117,6 +117,10 @@ public final class FirebaseDevGraph {
         seedInvitations.add(new Invitation("i4","e4", firebaseUserId, Invitation.Status.PENDING, new Date(), new Date(futureMillis(72))));
         seedInvitations.add(new Invitation("i5","e5", firebaseUserId, Invitation.Status.PENDING, new Date(), new Date(futureMillis(72))));
         
+        // Add invitation for UID pE10ntPBfAeplK3UnYQOfufDVU32 to Summer Pool Party (e1) for testing
+        String testUserId = "pE10ntPBfAeplK3UnYQOfufDVU32";
+        seedInvitations.add(new Invitation("i6","e1", testUserId, Invitation.Status.PENDING, new Date(), new Date(futureMillis(72))));
+        
         invitations = new FirebaseInvitationRepository(seedInvitations);
         
         // Link admitted repository to invitations

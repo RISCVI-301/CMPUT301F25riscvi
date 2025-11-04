@@ -69,7 +69,7 @@
                     android:id="@+id/editProfilePicture"
                     android:layout_width="32dp"
                     android:layout_height="32dp"
-                    android:src="@drawable/icon"
+                    android:src="@drawable/edit_pencil"
                     android:background="@drawable/ellipse"
                     android:padding="6dp"
                     android:layout_gravity="bottom|end"/>
@@ -96,27 +96,7 @@
                 android:textColorHint="#80FFFFFF"
                 android:layout_marginBottom="24dp"/>
 
-            <!-- Email Input -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Email"
-                android:textSize="24sp"
-                android:textColor="#FFFFFF"
-                android:fontFamily="@font/fredoka_one"
-                android:layout_marginBottom="8dp"/>
-
-            <EditText
-                android:id="@+id/editEmailField"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="@drawable/edit_text_background"
-                android:padding="16dp"
-                android:textSize="18sp"
-                android:enabled="false"
-                android:textColor="#FFFFFF"
-                android:textColorHint="#80FFFFFF"
-                android:layout_marginBottom="24dp"/>
+            
 
             <!-- Phone Number Input -->
             <TextView
@@ -139,6 +119,30 @@
                 android:textColor="#FFFFFF"
                 android:textColorHint="#80FFFFFF"
                 android:layout_marginBottom="32dp"/>
+
+            <!-- Change Email Button -->
+            <androidx.cardview.widget.CardView
+                android:id="@+id/changeEmailButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="16dp"
+                app:cardBackgroundColor="#536C8C"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?android:attr/selectableItemBackground"
+                android:elevation="8dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Change Email"
+                    android:textSize="24sp"
+                    android:textColor="#FFFFFF"
+                    android:fontFamily="@font/fredoka_one"
+                    android:gravity="center"
+                    android:padding="16dp"/>
+            </androidx.cardview.widget.CardView>
 
             <!-- Change Password Button -->
             <androidx.cardview.widget.CardView

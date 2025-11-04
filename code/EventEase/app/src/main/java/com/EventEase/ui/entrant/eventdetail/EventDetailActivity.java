@@ -320,6 +320,9 @@ public class EventDetailActivity extends AppCompatActivity {
         // Make the background clickable to dismiss
         blurBackground.setOnClickListener(v -> dialog.dismiss());
         
+        // Get the CardView for animation
+        androidx.cardview.widget.CardView cardView = dialog.findViewById(R.id.dialogCard);
+        
         // Set up dialog views
         android.widget.Button btnDone = dialog.findViewById(R.id.btnAcceptDone);
         
@@ -330,6 +333,15 @@ public class EventDetailActivity extends AppCompatActivity {
         });
         
         dialog.show();
+        
+        // Apply animations after dialog is shown
+        if (blurBackground != null && cardView != null) {
+            android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.dialog_fade_in);
+            android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.dialog_zoom_in);
+            
+            blurBackground.startAnimation(fadeIn);
+            cardView.startAnimation(zoomIn);
+        }
     }
     
     private void showDeclineDialog() {

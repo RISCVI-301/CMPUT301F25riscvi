@@ -99,58 +99,71 @@ public class ForgotPasswordFragment extends Fragment {
     }
 
     private void showConfirmationDialog() {
-        Dialog dialog = new Dialog(requireContext(), android.R.style.Theme_Translucent_NoTitleBar);
+        Dialog dialog = new Dialog(requireContext(), android.R.style.Theme_Black_NoTitleBar_Fullscreen);
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
         dialog.setContentView(R.layout.dialog_password_reset_confirmation);
         
-        // Apply blur to background
+        // Set window properties for full screen blur
         if (dialog.getWindow() != null) {
-            // Capture and blur the background
-            View rootView = getView();
-            if (rootView != null) {
-                Bitmap blurredBitmap = captureAndBlurView(rootView);
-                if (blurredBitmap != null) {
-                    BitmapDrawable blurredDrawable = new BitmapDrawable(getResources(), blurredBitmap);
-                    dialog.getWindow().setBackgroundDrawable(blurredDrawable);
-                } else {
-                    // Fallback to transparent with dim
-                    dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-                }
-            } else {
-                dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            }
-            
-            // Add dim overlay
-            dialog.getWindow().addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
-            dialog.getWindow().setDimAmount(0.3f); // Light dim since we have blur
-            
-            // Set dialog to fill screen
-            WindowManager.LayoutParams layoutParams = new WindowManager.LayoutParams();
-            layoutParams.copyFrom(dialog.getWindow().getAttributes());
-            layoutParams.width = WindowManager.LayoutParams.MATCH_PARENT;
-            layoutParams.height = WindowManager.LayoutParams.MATCH_PARENT;
+            dialog.getWindow().setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            WindowManager.LayoutParams layoutParams = dialog.getWindow().getAttributes();
+            layoutParams.dimAmount = 0f;
             dialog.getWindow().setAttributes(layoutParams);
+            dialog.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+        }
+        
+        // Capture screenshot and blur it for the background
+        Bitmap screenshot = captureScreenshot();
+        if (screenshot != null) {
+            Bitmap blurredBitmap = blurBitmap(screenshot, 25f);
+            if (blurredBitmap != null) {
+                View blurBackground = dialog.findViewById(R.id.dialogBlurBackground);
+                if (blurBackground != null) {
+                    blurBackground.setBackground(new BitmapDrawable(getResources(), blurredBitmap));
+                }
+            }
+        }
+
+        // Make the background clickable to dismiss
+        View blurBackground = dialog.findViewById(R.id.dialogBlurBackground);
+        if (blurBackground != null) {
+            blurBackground.setOnClickListener(v -> {
+                dialog.dismiss();
+                navigateToLogin();
+            });
         }
 
         Button btnOk = dialog.findViewById(R.id.btnDialogOk);
-        btnOk.setOnClickListener(v -> {
-            dialog.dismiss();
-            // Navigate back to login
-            navigateToLogin();
-        });
+        if (btnOk != null) {
+            btnOk.setOnClickListener(v -> {
+                dialog.dismiss();
+                // Navigate back to login
+                navigateToLogin();
+            });
+        }
 
         dialog.show();
-    }
-
-    private Bitmap captureAndBlurView(View view) {
-        try {
-            // Create bitmap from view
-            Bitmap bitmap = Bitmap.createBitmap(view.getWidth(), view.getHeight(), Bitmap.Config.ARGB_8888);
-            Canvas canvas = new Canvas(bitmap);
-            view.draw(canvas);
+        
+        // Apply animations after dialog is shown
+        View card = dialog.findViewById(R.id.dialogCard);
+        if (blurBackground != null && card != null) {
+            android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(requireContext(), R.anim.dialog_fade_in);
+            android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(requireContext(), R.anim.dialog_zoom_in);
             
-            // Apply blur
-            return blurBitmap(bitmap, 25f);
+            blurBackground.startAnimation(fadeIn);
+            card.startAnimation(zoomIn);
+        }
+    }
+    
+    private Bitmap captureScreenshot() {
+        try {
+            if (getActivity() == null || getActivity().getWindow() == null) return null;
+            View rootView = getActivity().getWindow().getDecorView().getRootView();
+            rootView.setDrawingCacheEnabled(true);
+            Bitmap bitmap = Bitmap.createBitmap(rootView.getDrawingCache());
+            rootView.setDrawingCacheEnabled(false);
+            return bitmap;
         } catch (Exception e) {
             e.printStackTrace();
             return null;
@@ -158,15 +171,18 @@ public class ForgotPasswordFragment extends Fragment {
     }
 
     private Bitmap blurBitmap(Bitmap bitmap, float radius) {
+        if (bitmap == null || requireContext() == null) return null;
+        
         try {
-            // Create output bitmap
-            Bitmap outputBitmap = Bitmap.createBitmap(bitmap);
+            // Scale down for better performance
+            int width = Math.round(bitmap.getWidth() * 0.4f);
+            int height = Math.round(bitmap.getHeight() * 0.4f);
+            Bitmap inputBitmap = Bitmap.createScaledBitmap(bitmap, width, height, false);
+            Bitmap outputBitmap = Bitmap.createBitmap(inputBitmap);
             
-            // Use RenderScript for blur
             RenderScript rs = RenderScript.create(requireContext());
             ScriptIntrinsicBlur blurScript = ScriptIntrinsicBlur.create(rs, Element.U8_4(rs));
-            
-            Allocation tmpIn = Allocation.createFromBitmap(rs, bitmap);
+            Allocation tmpIn = Allocation.createFromBitmap(rs, inputBitmap);
             Allocation tmpOut = Allocation.createFromBitmap(rs, outputBitmap);
             
             blurScript.setRadius(radius);
@@ -174,10 +190,10 @@ public class ForgotPasswordFragment extends Fragment {
             blurScript.forEach(tmpOut);
             tmpOut.copyTo(outputBitmap);
             
-            // Cleanup
             rs.destroy();
             
-            return outputBitmap;
+            // Scale back up
+            return Bitmap.createScaledBitmap(outputBitmap, bitmap.getWidth(), bitmap.getHeight(), true);
         } catch (Exception e) {
             e.printStackTrace();
             return bitmap;

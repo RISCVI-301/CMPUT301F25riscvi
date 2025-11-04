@@ -24,7 +24,6 @@ public class EditProfileFragment extends Fragment {
     private ShapeableImageView profileImageEdit;
     private ImageView editProfilePicture;
     private EditText editNameField;
-    private EditText editEmailField;
     private EditText editPhoneField;
     private CardView changePasswordButton;
     private CardView saveButton;
@@ -51,7 +50,6 @@ public class EditProfileFragment extends Fragment {
         profileImageEdit = view.findViewById(R.id.profileImageEdit);
         editProfilePicture = view.findViewById(R.id.editProfilePicture);
         editNameField = view.findViewById(R.id.editNameField);
-        editEmailField = view.findViewById(R.id.editEmailField);
         editPhoneField = view.findViewById(R.id.editPhoneField);
         changePasswordButton = view.findViewById(R.id.changePasswordButton);
         saveButton = view.findViewById(R.id.saveButton);
@@ -96,7 +94,7 @@ public class EditProfileFragment extends Fragment {
             String phone = user.getPhoneNumber();
 
             if (name != null) editNameField.setText(name);
-            if (email != null) editEmailField.setText(email);
+            // email field removed from layout; email change is handled via separate flow
             if (phone != null) editPhoneField.setText(phone);
 
             // TODO: Load profile picture

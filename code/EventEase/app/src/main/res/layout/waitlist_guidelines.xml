@@ -12,7 +12,9 @@
         android:id="@+id/dialogBlurBackground"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@color/ee_dialog_overlay" />
+        android:background="@drawable/dialog_blur_background"
+        android:clickable="true"
+        android:focusable="true" />
 
     <androidx.cardview.widget.CardView
         android:id="@+id/dialogCard"

@@ -99,15 +99,23 @@ public class MainActivity extends AppCompatActivity {
             }
         });
         
-        // Check if user is already logged in AND Remember Me is enabled
+        // Check if user is already logged in AND Remember Me is enabled (using UID for persistence)
         FirebaseAuth auth = FirebaseAuth.getInstance();
         android.content.SharedPreferences prefs = getSharedPreferences("EventEasePrefs", MODE_PRIVATE);
         boolean rememberMe = prefs.getBoolean("rememberMe", false);
-        boolean isLoggedIn = auth.getCurrentUser() != null && rememberMe;
+        String savedUid = prefs.getString("savedUid", null);
+        com.google.firebase.auth.FirebaseUser currentUser = auth.getCurrentUser();
         
-        // If user is logged in but Remember Me is off, sign them out
-        if (auth.getCurrentUser() != null && !rememberMe) {
+        // Check if Remember Me is enabled and UID matches (this persists even if email/password changes)
+        boolean isLoggedIn = rememberMe && savedUid != null && currentUser != null && savedUid.equals(currentUser.getUid());
+        
+        // If user is logged in but Remember Me is off or UID doesn't match, sign them out
+        if (currentUser != null && (!rememberMe || savedUid == null || !savedUid.equals(currentUser.getUid()))) {
             auth.signOut();
+            // Clear Remember Me if UID doesn't match
+            if (savedUid != null && !savedUid.equals(currentUser.getUid())) {
+                prefs.edit().putBoolean("rememberMe", false).remove("savedUid").apply();
+            }
         }
         
         // Setup custom navigation button click listeners

@@ -4,4 +4,10 @@
         <item name="cornerFamily">rounded</item>
         <item name="cornerSize">50%</item>
     </style>
+
+    <!-- Dialog window animations: zoom in + fade in on enter, fade in for subtle overlay -->
+    <style name="DialogAnimation">
+        <item name="android:windowEnterAnimation">@anim/dialog_zoom_in</item>
+        <item name="android:windowExitAnimation">@anim/dialog_fade_in</item>
+    </style>
 </resources>
