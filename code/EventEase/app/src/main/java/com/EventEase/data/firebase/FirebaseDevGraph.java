@@ -14,6 +14,7 @@ public final class FirebaseDevGraph {
     public final FirebaseWaitlistRepository waitlists;
     public final FirebaseProfileRepository profiles;
     public final FirebaseInvitationRepository invitations;
+    public final FirebaseAdmittedRepository admitted;
 
     public FirebaseDevGraph() {
         this.auth = new FirebaseAuthManager("demo-uid-123"); // <-- pass fallback UID
@@ -98,30 +99,31 @@ public final class FirebaseDevGraph {
         // Write events to Firestore
         writeEventsToFirestore(seedEvents);
 
-        // Automatically join the user to all events so they show up in My Events
-        waitlists.join("e1", uid);
-        waitlists.join("e2", uid);
-        waitlists.join("e3", uid);
-        waitlists.join("e4", uid);
-        waitlists.join("e5", uid);
-        
-        // Join the specific user from Firebase Console to only 4 events (not e5)
-        // This will make 4 events show 1 entrant and e5 show 0 entrants
-        String firebaseUserId = "0VxL5aKTM2NpDi8NVYh3Y32VgBs2";
-        waitlists.join("e1", firebaseUserId);
-        waitlists.join("e2", firebaseUserId);
-        waitlists.join("e3", firebaseUserId);
-        waitlists.join("e4", firebaseUserId);
-        // NOT joining e5 - so it will show 0 entrants for gamestart734@gmail.com
-
-        // Waitlist counts are now stored directly in the Event objects and Firebase
-
         profiles = new FirebaseProfileRepository(new Profile(uid,"Demo User","demo@example.com", null));
         
-        // Create invitation only for the first event (Summer Pool Party)
-        invitations = new FirebaseInvitationRepository(Collections.singletonList(
-                new Invitation("i1","e1", uid, Invitation.Status.PENDING, new Date(), new Date(futureMillis(72)))
-        ));
+        // Initialize admitted repository
+        admitted = new FirebaseAdmittedRepository(events);
+        
+        // Create invitations
+        List<Invitation> seedInvitations = new ArrayList<>();
+        
+        // Demo user invitation for first event (Summer Pool Party)
+        seedInvitations.add(new Invitation("i1","e1", uid, Invitation.Status.PENDING, new Date(), new Date(futureMillis(72))));
+        
+        // Firebase user (gamestari734@gmail.com) invitations for events e2, e3, e4, e5 (NOT e1)
+        String firebaseUserId = "gN8jla0HwJdMT45SMzvHsNkiLPT2";
+        seedInvitations.add(new Invitation("i2","e2", firebaseUserId, Invitation.Status.PENDING, new Date(), new Date(futureMillis(72))));
+        seedInvitations.add(new Invitation("i3","e3", firebaseUserId, Invitation.Status.PENDING, new Date(), new Date(futureMillis(72))));
+        seedInvitations.add(new Invitation("i4","e4", firebaseUserId, Invitation.Status.PENDING, new Date(), new Date(futureMillis(72))));
+        seedInvitations.add(new Invitation("i5","e5", firebaseUserId, Invitation.Status.PENDING, new Date(), new Date(futureMillis(72))));
+        
+        invitations = new FirebaseInvitationRepository(seedInvitations);
+        
+        // Link admitted repository to invitations
+        invitations.setAdmittedRepository(admitted);
+        
+        // Write invitations to Firestore
+        writeInvitationsToFirestore(seedInvitations);
     }
 
     private void writeEventsToFirestore(List<Event> events) {
@@ -135,6 +137,30 @@ public final class FirebaseDevGraph {
                 })
                 .addOnFailureListener(e -> {
                     // Handle error
+                    e.printStackTrace();
+                });
+        }
+    }
+
+    private void writeInvitationsToFirestore(List<Invitation> invitations) {
+        FirebaseFirestore db = FirebaseFirestore.getInstance();
+        for (Invitation invitation : invitations) {
+            Map<String, Object> invData = new HashMap<>();
+            invData.put("id", invitation.getId());
+            invData.put("eventId", invitation.getEventId());
+            invData.put("uid", invitation.getUid());
+            invData.put("status", invitation.getStatus().toString());
+            invData.put("issuedAt", invitation.getIssuedAt() != null ? invitation.getIssuedAt().getTime() : System.currentTimeMillis());
+            invData.put("expiresAt", invitation.getExpiresAt() != null ? invitation.getExpiresAt().getTime() : null);
+            
+            db.collection("invitations")
+                .document(invitation.getId())
+                .set(invData)
+                .addOnSuccessListener(aVoid -> {
+                    android.util.Log.d("FirebaseDevGraph", "Invitation " + invitation.getId() + " written successfully");
+                })
+                .addOnFailureListener(e -> {
+                    android.util.Log.e("FirebaseDevGraph", "Failed to write invitation " + invitation.getId(), e);
                     e.printStackTrace();
                 });
         }

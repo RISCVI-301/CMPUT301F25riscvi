@@ -82,4 +82,31 @@ public class FirebaseWaitlistRepository implements WaitlistRepository {
                     return false;
                 });
     }
+
+    @Override
+    public Task<Void> leave(String eventId, String uid) {
+        String docId = eventId + "_" + uid;
+        
+        Log.d(TAG, "Attempting to remove user " + uid + " from waitlist for event " + eventId + " with docId: " + docId);
+        
+        return db.collection("waitlists")
+                .document(docId)
+                .delete()
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "✅ SUCCESS: User " + uid + " removed from waitlist for event " + eventId);
+                    membership.remove(key(eventId, uid));
+                    eventRepo.decrementWaitlist(eventId);
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "❌ FAILED to remove user " + uid + " from waitlist for event " + eventId, e);
+                })
+                .continueWith(task -> {
+                    if (task.isSuccessful()) {
+                        Log.d(TAG, "Task completed successfully for leave operation");
+                    } else {
+                        Log.e(TAG, "Task failed for leave operation", task.getException());
+                    }
+                    return null;
+                });
+    }
 }

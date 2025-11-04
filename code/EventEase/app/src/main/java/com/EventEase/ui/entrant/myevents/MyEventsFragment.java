@@ -41,9 +41,11 @@ import com.google.android.gms.tasks.Tasks;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -56,6 +58,7 @@ public class MyEventsFragment extends Fragment {
     private WaitlistRepository waitlistRepo;
     private InvitationRepository invitationRepo;
     private AuthManager auth;
+    private com.EventEase.data.AdmittedRepository admittedRepo;
 
     private RecyclerView list;
     private TextView emptyView;
@@ -65,6 +68,7 @@ public class MyEventsFragment extends Fragment {
     private ListenerRegistration inviteReg;
 
     private final Set<String> invitedEventIds = new HashSet<>();
+    private final Map<String, String> eventIdToInvitationId = new HashMap<>();
     private final ExecutorService bg = Executors.newSingleThreadExecutor();
 
     public MyEventsFragment() {}
@@ -115,6 +119,7 @@ public class MyEventsFragment extends Fragment {
         waitlistRepo   = App.graph().waitlists;
         invitationRepo = App.graph().invitations;
         auth           = App.graph().auth;
+        admittedRepo   = App.graph().admitted;
 
         setLoading(true);
         loadMyEvents();
@@ -123,12 +128,26 @@ public class MyEventsFragment extends Fragment {
             @Override
             public void onChanged(List<Invitation> activeInvites) {
                 invitedEventIds.clear();
+                eventIdToInvitationId.clear();
                 if (activeInvites != null) {
-                    for (Invitation inv : activeInvites) invitedEventIds.add(inv.getEventId());
+                    for (Invitation inv : activeInvites) {
+                        invitedEventIds.add(inv.getEventId());
+                        eventIdToInvitationId.put(inv.getEventId(), inv.getId());
+                    }
                 }
                 adapter.setInvitedEventIds(invitedEventIds);
             }
         });
+    }
+    
+    @Override
+    public void onResume() {
+        super.onResume();
+        // Refresh event list when returning to fragment (e.g., after accepting invitation)
+        if (eventRepo != null && waitlistRepo != null && auth != null) {
+            setLoading(true);
+            loadMyEvents();
+        }
     }
 
     @Override
@@ -173,15 +192,19 @@ public class MyEventsFragment extends Fragment {
                 for (Event e : events) {
                     try {
                         Boolean joined = Tasks.await(waitlistRepo.isJoined(e.getId(), uid));
-                        android.util.Log.d("MyEventsFragment", "Event " + e.getTitle() + " (ID: " + e.getId() + ") - Joined: " + joined);
-                        if (Boolean.TRUE.equals(joined)) {
+                        // Also check if user has already been admitted/accepted
+                        Boolean admitted = Tasks.await(admittedRepo.isAdmitted(e.getId(), uid));
+                        android.util.Log.d("MyEventsFragment", "Event " + e.getTitle() + " - Joined: " + joined + ", Admitted: " + admitted);
+                        
+                        // Only show if in waitlist AND NOT admitted
+                        if (Boolean.TRUE.equals(joined) && !Boolean.TRUE.equals(admitted)) {
                             mine.add(e);
                         }
                     } catch (Exception ex) {
                         android.util.Log.e("MyEventsFragment", "Error checking waitlist for event " + e.getId(), ex);
                     }
                 }
-                android.util.Log.d("MyEventsFragment", "Found " + mine.size() + " waitlisted events for user");
+                android.util.Log.d("MyEventsFragment", "Found " + mine.size() + " waitlisted events (excluding admitted) for user");
                 if (!isAdded()) return;
                 ViewCompat.postOnAnimation(requireView(), () -> {
                     adapter.submit(mine);
@@ -224,7 +247,7 @@ public class MyEventsFragment extends Fragment {
 
         @NonNull @Override public MyEventVH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             View v = LayoutInflater.from(parent.getContext())
-                    .inflate(R.layout.item_my_event_row, parent, false);
+                    .inflate(R.layout.item_event_card, parent, false);
             return new MyEventVH(v, event -> {
                 // Launch EventDetailActivity when an event is clicked
                 Intent intent = new Intent(requireContext(), EventDetailActivity.class);
@@ -237,8 +260,12 @@ public class MyEventsFragment extends Fragment {
                 intent.putExtra("eventGuidelines", event.getGuidelines());
                 intent.putExtra("eventPosterUrl", event.getPosterUrl());
                 intent.putExtra("eventWaitlistCount", event.getWaitlistCount());
-                // Pass invitation status
-                intent.putExtra("hasInvitation", invited.contains(event.getId()));
+                // Pass invitation status and ID
+                boolean hasInvite = invited.contains(event.getId());
+                intent.putExtra("hasInvitation", hasInvite);
+                if (hasInvite && eventIdToInvitationId.containsKey(event.getId())) {
+                    intent.putExtra("invitationId", eventIdToInvitationId.get(event.getId()));
+                }
                 startActivity(intent);
             });
         }
@@ -254,17 +281,17 @@ public class MyEventsFragment extends Fragment {
     private static class MyEventVH extends RecyclerView.ViewHolder {
         private final ImageView image;
         private final TextView name;
-        private final TextView subtitle;   // reusing event_price id as subtitle
-        private final View invitedBadge;
+        private final TextView subtitle;
+        private final View accentDot;
         private final SimpleDateFormat df = new SimpleDateFormat("MMM d, h:mma", Locale.getDefault());
         private Event currentEvent;
 
         MyEventVH(@NonNull View itemView, EventClickListener listener) {
             super(itemView);
-            image = itemView.findViewById(R.id.event_image);
-            name = itemView.findViewById(R.id.event_name);
-            subtitle = itemView.findViewById(R.id.event_price);
-            invitedBadge = itemView.findViewById(R.id.invited_badge);
+            image = itemView.findViewById(R.id.ivPoster);
+            name = itemView.findViewById(R.id.tvTitle);
+            subtitle = itemView.findViewById(R.id.tvMeta);
+            accentDot = itemView.findViewById(R.id.eventAccent);
 
             itemView.setOnClickListener(v -> {
                 if (currentEvent != null && listener != null) {
@@ -277,23 +304,38 @@ public class MyEventsFragment extends Fragment {
             this.currentEvent = e;
             name.setText(e.getTitle() != null ? e.getTitle() : "Untitled");
 
-            String when = (e.getStartAt() != null) ? df.format(e.getStartAt()) : "TBD";
+            // Use getStartsAtEpochMs() instead of getStartAt()
+            String when = (e.getStartsAtEpochMs() > 0) ? df.format(new Date(e.getStartsAtEpochMs())) : "TBD";
             String where = e.getLocation() != null ? e.getLocation() : "";
             subtitle.setText(where.isEmpty() ? when : (when + " • " + where));
 
-            invitedBadge.setVisibility(invited ? View.VISIBLE : View.GONE);
+            // Show accent dot ONLY if user has been invited (teal color with drop shadow)
+            if (accentDot != null) {
+                if (invited) {
+                    accentDot.setVisibility(View.VISIBLE);
+                    accentDot.setElevation(8f); // Add drop shadow
+                    android.graphics.drawable.Drawable bg = accentDot.getBackground();
+                    if (bg != null) {
+                        // Teal/cyan color for invited events
+                        androidx.core.graphics.drawable.DrawableCompat.setTint(bg.mutate(), android.graphics.Color.parseColor("#7FE8F5"));
+                    }
+                } else {
+                    // Hide dot for events without invitation
+                    accentDot.setVisibility(View.GONE);
+                }
+            }
             
             // Load event image using Glide
             if (e.getPosterUrl() != null && !e.getPosterUrl().isEmpty()) {
                 Glide.with(itemView.getContext())
                     .load(e.getPosterUrl())
-                    .placeholder(R.drawable.card_image_placeholder)
-                    .error(R.drawable.card_image_placeholder)
+                    .placeholder(R.drawable.image_placeholder_event)
+                    .error(R.drawable.image_placeholder_event)
                     .transition(DrawableTransitionOptions.withCrossFade())
                     .centerCrop()
                     .into(image);
             } else {
-                image.setImageResource(R.drawable.card_image_placeholder);
+                image.setImageResource(R.drawable.image_placeholder_event);
             }
         }
     }

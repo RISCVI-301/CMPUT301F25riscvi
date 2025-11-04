@@ -11,6 +11,10 @@ import android.widget.Toast;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.EventEase.auth.AuthManager;
+import com.EventEase.data.InvitationRepository;
+import com.EventEase.data.WaitlistRepository;
+import com.example.eventease.App;
 import com.example.eventease.R;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.bumptech.glide.Glide;
@@ -54,6 +58,13 @@ public class EventDetailActivity extends AppCompatActivity {
     private String eventPosterUrl;
     private int eventWaitlistCount;
     private boolean hasInvitation;
+    private String invitationId;
+    
+    private InvitationRepository invitationRepo;
+    private WaitlistRepository waitlistRepo;
+    private AuthManager authManager;
+    private com.EventEase.data.EventRepository eventRepo;
+    private com.EventEase.data.ListenerRegistration waitlistCountReg;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -71,6 +82,13 @@ public class EventDetailActivity extends AppCompatActivity {
         eventPosterUrl = getIntent().getStringExtra("eventPosterUrl");
         eventWaitlistCount = getIntent().getIntExtra("eventWaitlistCount", 0);
         hasInvitation = getIntent().getBooleanExtra("hasInvitation", false);
+        invitationId = getIntent().getStringExtra("invitationId");
+        
+        // Initialize repositories
+        invitationRepo = App.graph().invitations;
+        waitlistRepo = App.graph().waitlists;
+        authManager = App.graph().auth;
+        eventRepo = App.graph().events;
 
         // Initialize views
         tvEventName = findViewById(R.id.tvEventName);
@@ -120,6 +138,9 @@ public class EventDetailActivity extends AppCompatActivity {
 
         // Load event data (placeholder for now)
         loadEventData();
+        
+        // Listen to waitlist count updates from Firebase
+        setupWaitlistCountListener();
 
         // Set up bottom navigation
         setupBottomNavigation();
@@ -136,8 +157,8 @@ public class EventDetailActivity extends AppCompatActivity {
             tvOverview.setText("No description available for this event.");
         }
         
-        // Display waitlist count from Firebase
-        tvWaitlistCount.setText(String.valueOf(eventWaitlistCount));
+        // Waitlist count will be updated by the listener (see setupWaitlistCountListener)
+        tvWaitlistCount.setText("Loading...");
         
         // Load event image using Glide
         if (eventPosterUrl != null && !eventPosterUrl.isEmpty()) {
@@ -158,6 +179,17 @@ public class EventDetailActivity extends AppCompatActivity {
         
         // You can show more event details in a toast or update UI as needed
         Toast.makeText(this, "Event at " + eventLocation + " on " + dateStr, Toast.LENGTH_SHORT).show();
+    }
+    
+    private void setupWaitlistCountListener() {
+        if (eventId != null && eventRepo != null) {
+            waitlistCountReg = eventRepo.listenWaitlistCount(eventId, count -> {
+                if (tvWaitlistCount != null) {
+                    tvWaitlistCount.setText(String.valueOf(count));
+                    android.util.Log.d("EventDetailActivity", "Waitlist count updated: " + count + " for event: " + eventId);
+                }
+            });
+        }
     }
 
     private void setupBottomNavigation() {
@@ -266,8 +298,11 @@ public class EventDetailActivity extends AppCompatActivity {
         // Set up dialog views
         android.widget.Button btnDone = dialog.findViewById(R.id.btnAcceptDone);
         
-        // Set Done button click listener
-        btnDone.setOnClickListener(v -> dialog.dismiss());
+        // Set Done button click listener - accept the invitation
+        btnDone.setOnClickListener(v -> {
+            dialog.dismiss();
+            acceptInvitation();
+        });
         
         dialog.show();
     }
@@ -309,8 +344,11 @@ public class EventDetailActivity extends AppCompatActivity {
         // Set up dialog views
         android.widget.Button btnDone = dialog.findViewById(R.id.btnDeclineDone);
         
-        // Set Done button click listener
-        btnDone.setOnClickListener(v -> dialog.dismiss());
+        // Set Done button click listener - decline the invitation
+        btnDone.setOnClickListener(v -> {
+            dialog.dismiss();
+            declineInvitation();
+        });
         
         dialog.show();
     }
@@ -353,8 +391,90 @@ public class EventDetailActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * Accept the invitation and move user to upcoming events
+     */
+    private void acceptInvitation() {
+        if (invitationId == null || invitationId.isEmpty()) {
+            android.util.Log.e("EventDetailActivity", "Invitation ID is null or empty");
+            Toast.makeText(this, "Invitation not found", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        String uid = authManager.getUid();
+        android.util.Log.d("EventDetailActivity", "Accepting invitation: " + invitationId + " for event: " + eventId + " by user: " + uid);
+        
+        // Show loading state
+        btnRegister.setEnabled(false);
+        btnDecline.setEnabled(false);
+        btnRegister.setText("Processing...");
+        
+        // Accept the invitation
+        invitationRepo.accept(invitationId, eventId, uid)
+                .addOnSuccessListener(aVoid -> {
+                    android.util.Log.d("EventDetailActivity", "✅ Invitation accepted successfully in UI");
+                    Toast.makeText(this, "Invitation accepted! Event added to upcoming.", Toast.LENGTH_LONG).show();
+                    // Hide the buttons since invitation is now accepted
+                    btnRegister.setVisibility(View.GONE);
+                    btnDecline.setVisibility(View.GONE);
+                    // Finish the activity to return to previous screen
+                    finish();
+                })
+                .addOnFailureListener(e -> {
+                    android.util.Log.e("EventDetailActivity", "❌ Failed to accept invitation", e);
+                    Toast.makeText(this, "Failed to accept invitation: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    // Restore buttons
+                    btnRegister.setEnabled(true);
+                    btnDecline.setEnabled(true);
+                    btnRegister.setText("Register");
+                });
+    }
+
+    /**
+     * Decline the invitation (keeps user in waitlist for future rerolls)
+     */
+    private void declineInvitation() {
+        if (invitationId == null || invitationId.isEmpty()) {
+            android.util.Log.e("EventDetailActivity", "Invitation ID is null or empty");
+            Toast.makeText(this, "Invitation not found", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        String uid = authManager.getUid();
+        android.util.Log.d("EventDetailActivity", "Declining invitation: " + invitationId + " for event: " + eventId + " by user: " + uid);
+        
+        // Show loading state
+        btnRegister.setEnabled(false);
+        btnDecline.setEnabled(false);
+        btnDecline.setText("Processing...");
+        
+        // Decline the invitation (but keep user in waitlist)
+        invitationRepo.decline(invitationId, eventId, uid)
+                .addOnSuccessListener(aVoid -> {
+                    android.util.Log.d("EventDetailActivity", "✅ Invitation declined successfully (user remains in waitlist)");
+                    Toast.makeText(this, "Invitation declined. You remain on the waitlist.", Toast.LENGTH_LONG).show();
+                    // Hide the buttons since invitation is now declined
+                    btnRegister.setVisibility(View.GONE);
+                    btnDecline.setVisibility(View.GONE);
+                    // Finish the activity to return to previous screen
+                    finish();
+                })
+                .addOnFailureListener(e -> {
+                    android.util.Log.e("EventDetailActivity", "❌ Failed to decline invitation", e);
+                    Toast.makeText(this, "Failed to decline invitation: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    // Restore buttons
+                    btnRegister.setEnabled(true);
+                    btnDecline.setEnabled(true);
+                    btnDecline.setText("Decline");
+                });
+    }
+
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        if (waitlistCountReg != null) {
+            waitlistCountReg.remove();
+            waitlistCountReg = null;
+        }
     }
 }
