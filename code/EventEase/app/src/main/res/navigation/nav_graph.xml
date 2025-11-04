@@ -116,7 +116,16 @@
     <fragment
         android:id="@+id/accountFragment"
         android:name="com.EventEase.ui.entrant.profile.AccountFragment"
-        android:label="Account" />
+        android:label="Account">
+        <action
+            android:id="@+id/action_accountFragment_to_editProfileFragment"
+            app:destination="@id/editProfileFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/editProfileFragment"
+        android:name="com.EventEase.ui.entrant.profile.EditProfileFragment"
+        android:label="Edit Profile" />
 
     <!-- Activity placeholders (IDs only); actual navigation to these may be via intents later -->
     <activity

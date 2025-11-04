@@ -8,6 +8,7 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.navigation.Navigation;
 import com.bumptech.glide.Glide;
 import com.google.android.material.imageview.ShapeableImageView;
 import com.google.firebase.auth.FirebaseAuth;
@@ -52,9 +53,8 @@ public class AccountFragment extends Fragment {
             // Handle delete profile click
         });
 
-        root.findViewById(R.id.settingsButton).setOnClickListener(v -> {
-            // Handle settings click
-        });
+        root.findViewById(R.id.settingsButton).setOnClickListener(v -> 
+            Navigation.findNavController(v).navigate(R.id.action_accountFragment_to_editProfileFragment));
         
         // Load user data with real-time updates
         loadUserData();
