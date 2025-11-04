@@ -140,6 +140,30 @@
                 android:textColorHint="#80FFFFFF"
                 android:layout_marginBottom="32dp"/>
 
+            <!-- Change Password Button -->
+            <androidx.cardview.widget.CardView
+                android:id="@+id/changePasswordButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                app:cardCornerRadius="16dp"
+                app:cardBackgroundColor="#536C8C"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?android:attr/selectableItemBackground"
+                android:elevation="8dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Change Password"
+                    android:textSize="24sp"
+                    android:textColor="#FFFFFF"
+                    android:fontFamily="@font/fredoka_one"
+                    android:gravity="center"
+                    android:padding="16dp"/>
+            </androidx.cardview.widget.CardView>
+
             <!-- Save Button -->
             <androidx.cardview.widget.CardView
                 android:id="@+id/saveButton"

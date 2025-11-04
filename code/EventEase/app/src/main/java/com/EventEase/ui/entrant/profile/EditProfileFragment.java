@@ -1,5 +1,8 @@
 package com.EventEase.ui.entrant.profile;
 
+import android.app.Dialog;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -13,10 +16,15 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.navigation.Navigation;
+import androidx.appcompat.widget.AppCompatButton;
 import com.bumptech.glide.Glide;
+import com.google.android.material.textfield.TextInputEditText;
+import com.google.android.material.textfield.TextInputLayout;
 import com.google.android.material.imageview.ShapeableImageView;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.auth.EmailAuthProvider;
+import com.google.firebase.auth.AuthCredential;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.storage.FirebaseStorage;
@@ -74,6 +82,7 @@ public class EditProfileFragment extends Fragment {
             pickImage.launch("image/*"));
         
         root.findViewById(R.id.saveButton).setOnClickListener(v -> saveChanges());
+        root.findViewById(R.id.changePasswordButton).setOnClickListener(v -> showChangePasswordDialog());
         
         return root;
     }
@@ -159,5 +168,108 @@ public class EditProfileFragment extends Fragment {
         } else {
             Navigation.findNavController(requireView()).navigateUp();
         }
+    }
+
+    private void showChangePasswordDialog() {
+        if (getContext() == null) {
+            return;
+        }
+
+        FirebaseUser currentUser = mAuth.getCurrentUser();
+        if (currentUser == null || currentUser.getEmail() == null) {
+            Toast.makeText(getContext(), "Unable to change password right now", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        Dialog dialog = new Dialog(requireContext());
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
+        dialog.setContentView(R.layout.dialog_change_password);
+        dialog.setCanceledOnTouchOutside(false);
+
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        }
+
+        TextInputLayout currentPasswordLayout = dialog.findViewById(R.id.currentPasswordLayout);
+        TextInputLayout newPasswordLayout = dialog.findViewById(R.id.newPasswordLayout);
+        TextInputLayout confirmPasswordLayout = dialog.findViewById(R.id.confirmNewPasswordLayout);
+
+        TextInputEditText currentPasswordInput = dialog.findViewById(R.id.currentPasswordInput);
+        TextInputEditText newPasswordInput = dialog.findViewById(R.id.newPasswordInput);
+        TextInputEditText confirmPasswordInput = dialog.findViewById(R.id.confirmNewPasswordInput);
+
+        AppCompatButton cancelButton = dialog.findViewById(R.id.btnCancel);
+        AppCompatButton saveButton = dialog.findViewById(R.id.btnSaveChanges);
+
+        if (cancelButton != null) {
+            cancelButton.setOnClickListener(v -> dialog.dismiss());
+        }
+
+        if (saveButton != null) {
+            saveButton.setOnClickListener(v -> {
+                if (currentPasswordLayout != null) currentPasswordLayout.setError(null);
+                if (newPasswordLayout != null) newPasswordLayout.setError(null);
+                if (confirmPasswordLayout != null) confirmPasswordLayout.setError(null);
+
+                String currentPassword = currentPasswordInput != null && currentPasswordInput.getText() != null
+                    ? currentPasswordInput.getText().toString().trim()
+                    : "";
+                String newPassword = newPasswordInput != null && newPasswordInput.getText() != null
+                    ? newPasswordInput.getText().toString().trim()
+                    : "";
+                String confirmPassword = confirmPasswordInput != null && confirmPasswordInput.getText() != null
+                    ? confirmPasswordInput.getText().toString().trim()
+                    : "";
+
+                boolean hasError = false;
+
+                if (currentPassword.isEmpty()) {
+                    if (currentPasswordLayout != null) currentPasswordLayout.setError("Current password required");
+                    hasError = true;
+                }
+
+                if (newPassword.isEmpty()) {
+                    if (newPasswordLayout != null) newPasswordLayout.setError("New password required");
+                    hasError = true;
+                } else if (newPassword.length() < 6) {
+                    if (newPasswordLayout != null) newPasswordLayout.setError("Password must be at least 6 characters");
+                    hasError = true;
+                } else if (newPassword.equals(currentPassword)) {
+                    if (newPasswordLayout != null) newPasswordLayout.setError("Use a different password");
+                    hasError = true;
+                }
+
+                if (!newPassword.equals(confirmPassword)) {
+                    if (confirmPasswordLayout != null) confirmPasswordLayout.setError("Passwords do not match");
+                    hasError = true;
+                }
+
+                if (hasError) {
+                    return;
+                }
+
+                saveButton.setEnabled(false);
+
+                AuthCredential credential = EmailAuthProvider.getCredential(currentUser.getEmail(), currentPassword);
+
+                currentUser.reauthenticate(credential)
+                    .addOnSuccessListener(unused -> currentUser.updatePassword(newPassword)
+                        .addOnSuccessListener(updateUnused -> {
+                            Toast.makeText(getContext(), "Password updated successfully", Toast.LENGTH_SHORT).show();
+                            dialog.dismiss();
+                        })
+                        .addOnFailureListener(e -> {
+                            if (newPasswordLayout != null) newPasswordLayout.setError("Failed to update password");
+                            saveButton.setEnabled(true);
+                        }))
+                    .addOnFailureListener(e -> {
+                        if (currentPasswordLayout != null) currentPasswordLayout.setError("Current password is incorrect");
+                        saveButton.setEnabled(true);
+                    });
+            });
+        }
+
+        dialog.show();
     }
 }
