@@ -36,4 +36,5 @@
     <string name="event_details_back">Navigate back</string>
     <string name="event_details_guidelines_title">Guidelines</string>
     <string name="event_details_guidelines_body">Please review the event guidelines. Thank you for your interest!</string>
+    <string name="delete_profile">Delete Profile</string>
 </resources>
