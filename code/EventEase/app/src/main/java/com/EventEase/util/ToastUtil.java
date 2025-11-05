@@ -27,7 +27,7 @@ public class ToastUtil {
         
         // Inflate custom toast layout
         LayoutInflater inflater = LayoutInflater.from(context);
-        View toastView = inflater.inflate(R.layout.custom_toast, null);
+        View toastView = inflater.inflate(R.layout.entrant_custom_toast, null);
         
         // Set message text
         TextView textView = toastView.findViewById(R.id.toast_message);
@@ -39,7 +39,7 @@ public class ToastUtil {
         ImageView logoView = toastView.findViewById(R.id.toast_logo);
         if (logoView != null) {
             Glide.with(context)
-                .load(R.drawable.logo)
+                .load(R.drawable.entrant_logo)
                 .into(logoView);
         }
         

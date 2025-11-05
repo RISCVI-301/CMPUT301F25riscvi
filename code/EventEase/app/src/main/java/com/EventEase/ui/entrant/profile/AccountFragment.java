@@ -50,7 +50,7 @@ public class AccountFragment extends Fragment {
     public View onCreateView(@NonNull LayoutInflater inflater,
                            @Nullable ViewGroup container,
                            @Nullable Bundle savedInstanceState) {
-        View root = inflater.inflate(R.layout.fragment_account, container, false);
+        View root = inflater.inflate(R.layout.entrant_fragment_account, container, false);
         
         // Initialize Firebase instances
         mAuth = FirebaseAuth.getInstance();
@@ -108,8 +108,8 @@ public class AccountFragment extends Fragment {
                         // Use Glide to load and cache the image
                         Glide.with(getContext())
                             .load(photoUrl)
-                            .placeholder(R.drawable.icon)
-                            .error(R.drawable.icon)
+                            .placeholder(R.drawable.entrant_icon)
+                            .error(R.drawable.entrant_icon)
                             .into(profileImage);
                     }
                 }
@@ -164,7 +164,7 @@ public class AccountFragment extends Fragment {
 
         Dialog dialog = new Dialog(requireContext(), android.R.style.Theme_Black_NoTitleBar_Fullscreen);
         dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
-        dialog.setContentView(R.layout.dialog_delete_profile_confirmation);
+        dialog.setContentView(R.layout.entrant_dialog_delete_profile_confirmation);
         dialog.setCanceledOnTouchOutside(false);
 
         // Set window properties for full screen blur
@@ -214,8 +214,8 @@ public class AccountFragment extends Fragment {
         // Apply animations after dialog is shown
         View card = dialog.findViewById(R.id.dialogCard);
         if (blurBackground != null && card != null) {
-            android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(getContext(), R.anim.dialog_fade_in);
-            android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(getContext(), R.anim.dialog_zoom_in);
+            android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(getContext(), R.anim.entrant_dialog_fade_in);
+            android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(getContext(), R.anim.entrant_dialog_zoom_in);
             
             blurBackground.startAnimation(fadeIn);
             card.startAnimation(zoomIn);
@@ -288,14 +288,13 @@ public class AccountFragment extends Fragment {
     }
 
     private void deleteUserReferences(String uid, Runnable onComplete) {
-        // Delete all waitlist entries
-        Task<QuerySnapshot> waitlistTask = db.collection("waitlists")
-            .whereEqualTo("uid", uid)
+        // Query all events where user is in waitlist or admitted arrays
+        Task<QuerySnapshot> waitlistEventsTask = db.collection("events")
+            .whereArrayContains("waitlist", uid)
             .get();
 
-        // Delete all admitted entries
-        Task<QuerySnapshot> admittedTask = db.collection("admitted")
-            .whereEqualTo("uid", uid)
+        Task<QuerySnapshot> admittedEventsTask = db.collection("events")
+            .whereArrayContains("admitted", uid)
             .get();
 
         // Delete all invitations
@@ -303,41 +302,43 @@ public class AccountFragment extends Fragment {
             .whereEqualTo("uid", uid)
             .get();
 
-        // Wait for all queries to complete, then delete all documents
-        Tasks.whenAllComplete(waitlistTask, admittedTask, invitationsTask)
+        // Wait for all queries to complete, then remove UID from all events
+        Tasks.whenAllComplete(waitlistEventsTask, admittedEventsTask, invitationsTask)
             .addOnSuccessListener(results -> {
-                List<Task<Void>> deleteTasks = new ArrayList<>();
+                List<Task<Void>> updateTasks = new ArrayList<>();
 
-                // Collect delete tasks from waitlist results
-                if (waitlistTask.isSuccessful() && waitlistTask.getResult() != null) {
-                    for (QueryDocumentSnapshot document : waitlistTask.getResult()) {
-                        deleteTasks.add(document.getReference().delete());
+                // Remove UID from waitlist arrays
+                if (waitlistEventsTask.isSuccessful() && waitlistEventsTask.getResult() != null) {
+                    for (QueryDocumentSnapshot document : waitlistEventsTask.getResult()) {
+                        updateTasks.add(document.getReference().update("waitlist", 
+                            com.google.firebase.firestore.FieldValue.arrayRemove(uid)));
                     }
                 }
 
-                // Collect delete tasks from admitted results
-                if (admittedTask.isSuccessful() && admittedTask.getResult() != null) {
-                    for (QueryDocumentSnapshot document : admittedTask.getResult()) {
-                        deleteTasks.add(document.getReference().delete());
+                // Remove UID from admitted arrays
+                if (admittedEventsTask.isSuccessful() && admittedEventsTask.getResult() != null) {
+                    for (QueryDocumentSnapshot document : admittedEventsTask.getResult()) {
+                        updateTasks.add(document.getReference().update("admitted", 
+                            com.google.firebase.firestore.FieldValue.arrayRemove(uid)));
                     }
                 }
 
                 // Collect delete tasks from invitations results
                 if (invitationsTask.isSuccessful() && invitationsTask.getResult() != null) {
                     for (QueryDocumentSnapshot document : invitationsTask.getResult()) {
-                        deleteTasks.add(document.getReference().delete());
+                        updateTasks.add(document.getReference().delete());
                     }
                 }
 
-                // Execute all delete tasks
-                if (!deleteTasks.isEmpty()) {
-                    Tasks.whenAll(deleteTasks)
+                // Execute all update/delete tasks
+                if (!updateTasks.isEmpty()) {
+                    Tasks.whenAll(updateTasks)
                         .addOnSuccessListener(aVoid -> {
                             onComplete.run();
                         })
                         .addOnFailureListener(e -> {
-                            // Even if some deletes fail, continue with user deletion
-                            android.util.Log.e("AccountFragment", "Some cascade deletes failed", e);
+                            // Even if some updates fail, continue with user deletion
+                            android.util.Log.e("AccountFragment", "Some cascade updates failed", e);
                             onComplete.run();
                         });
                 } else {

@@ -125,29 +125,33 @@ public class FirebaseEventRepository implements EventRepository {
     }
     
     private void queryWaitlistCount(String eventId) {
-        // Query the waitlists collection to count actual entries
-        db.collection("waitlists")
-                .whereEqualTo("eventId", eventId)
+        // Get event document and count waitlist array size
+        db.collection("events")
+                .document(eventId)
                 .get()
-                .addOnSuccessListener(querySnapshot -> {
-                    int actualCount = querySnapshot != null ? querySnapshot.size() : 0;
-                    Log.d(TAG, "Queried waitlist count for event " + eventId + ": " + actualCount);
-                    
-                    // Update cached count
-                    waitlistCounts.put(eventId, actualCount);
-                    
-                    // Also update the event's waitlistCount in Firestore
-                    db.collection("events").document(eventId)
-                            .update("waitlistCount", actualCount)
-                            .addOnSuccessListener(aVoid -> {
-                                Log.d(TAG, "Updated waitlistCount in event document for " + eventId);
-                            })
-                            .addOnFailureListener(e -> {
-                                Log.e(TAG, "Failed to update waitlistCount in event document", e);
-                            });
-                    
-                    // Notify all listeners
-                    notifyCount(eventId);
+                .addOnSuccessListener(documentSnapshot -> {
+                    if (documentSnapshot != null && documentSnapshot.exists()) {
+                        @SuppressWarnings("unchecked")
+                        List<String> waitlist = (List<String>) documentSnapshot.get("waitlist");
+                        int actualCount = waitlist != null ? waitlist.size() : 0;
+                        Log.d(TAG, "Queried waitlist count for event " + eventId + ": " + actualCount);
+                        
+                        // Update cached count
+                        waitlistCounts.put(eventId, actualCount);
+                        
+                        // Also update the event's waitlistCount in Firestore for backward compatibility
+                        db.collection("events").document(eventId)
+                                .update("waitlistCount", actualCount)
+                                .addOnSuccessListener(aVoid -> {
+                                    Log.d(TAG, "Updated waitlistCount in event document for " + eventId);
+                                })
+                                .addOnFailureListener(e -> {
+                                    Log.e(TAG, "Failed to update waitlistCount in event document", e);
+                                });
+                        
+                        // Notify all listeners
+                        notifyCount(eventId);
+                    }
                 })
                 .addOnFailureListener(e -> {
                     Log.e(TAG, "Failed to query waitlist count for event " + eventId, e);
@@ -155,62 +159,13 @@ public class FirebaseEventRepository implements EventRepository {
     }
 
     /* package */ void incrementWaitlist(String eventId) {
-        waitlistCounts.merge(eventId, 1, Integer::sum);
-        
-        // Also update Firestore
-        db.collection("events").document(eventId)
-                .update("waitlistCount", com.google.firebase.firestore.FieldValue.increment(1))
-                .addOnSuccessListener(aVoid -> {
-                    Log.d(TAG, "Waitlist count incremented in Firestore for event " + eventId);
-                    // Refresh the event from Firestore to get the updated count
-                    db.collection("events").document(eventId).get()
-                            .addOnSuccessListener(documentSnapshot -> {
-                                if (documentSnapshot.exists()) {
-                                    Event event = Event.fromMap(documentSnapshot.getData());
-                                    if (event != null) {
-                                        events.put(eventId, event);
-                                        waitlistCounts.put(eventId, event.getWaitlistCount());
-                                        notifyCount(eventId);
-                                    }
-                                }
-                            });
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Error incrementing waitlist count in Firestore", e);
-                });
-        
-        notifyCount(eventId);
+        // Waitlist count is now managed by the array size, so we just refresh from Firestore
+        queryWaitlistCount(eventId);
     }
 
     /* package */ void decrementWaitlist(String eventId) {
-        Integer current = waitlistCounts.get(eventId);
-        if (current != null && current > 0) {
-            waitlistCounts.put(eventId, current - 1);
-        }
-        
-        // Also update Firestore
-        db.collection("events").document(eventId)
-                .update("waitlistCount", com.google.firebase.firestore.FieldValue.increment(-1))
-                .addOnSuccessListener(aVoid -> {
-                    Log.d(TAG, "Waitlist count decremented in Firestore for event " + eventId);
-                    // Refresh the event from Firestore to get the updated count
-                    db.collection("events").document(eventId).get()
-                            .addOnSuccessListener(documentSnapshot -> {
-                                if (documentSnapshot.exists()) {
-                                    Event event = Event.fromMap(documentSnapshot.getData());
-                                    if (event != null) {
-                                        events.put(eventId, event);
-                                        waitlistCounts.put(eventId, event.getWaitlistCount());
-                                        notifyCount(eventId);
-                                    }
-                                }
-                            });
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Error decrementing waitlist count in Firestore", e);
-                });
-        
-        notifyCount(eventId);
+        // Waitlist count is now managed by the array size, so we just refresh from Firestore
+        queryWaitlistCount(eventId);
     }
 
     /* package */ boolean isKnown(String eventId) {

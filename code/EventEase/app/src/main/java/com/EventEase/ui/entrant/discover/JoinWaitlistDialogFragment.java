@@ -49,7 +49,7 @@ public class JoinWaitlistDialogFragment extends DialogFragment {
     public View onCreateView(@NonNull LayoutInflater inflater,
                              @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.waitlist_guidelines, container, false);
+        return inflater.inflate(R.layout.entrant_waitlist_guidelines, container, false);
     }
 
     @Override
@@ -156,8 +156,8 @@ public class JoinWaitlistDialogFragment extends DialogFragment {
             View card = view.findViewById(R.id.dialogCard);
             
             if (blurBackground != null && card != null) {
-                android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(getContext(), R.anim.dialog_fade_in);
-                android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(getContext(), R.anim.dialog_zoom_in);
+                android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(getContext(), R.anim.entrant_dialog_fade_in);
+                android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(getContext(), R.anim.entrant_dialog_zoom_in);
                 
                 blurBackground.startAnimation(fadeIn);
                 card.startAnimation(zoomIn);

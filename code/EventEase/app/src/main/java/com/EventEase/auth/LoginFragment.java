@@ -39,7 +39,7 @@ public class LoginFragment extends Fragment {
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_login, container, false);
+        return inflater.inflate(R.layout.entrant_fragment_login, container, false);
     }
 
     @Override
@@ -72,12 +72,12 @@ public class LoginFragment extends Fragment {
             if (isPasswordVisible) {
                 // Hide password
                 password.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-                btnTogglePassword.setImageResource(R.drawable.ic_eye_off);
+                btnTogglePassword.setImageResource(R.drawable.entrant_ic_eye_off);
                 isPasswordVisible = false;
             } else {
                 // Show password
                 password.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
-                btnTogglePassword.setImageResource(R.drawable.ic_eye_on);
+                btnTogglePassword.setImageResource(R.drawable.entrant_ic_eye_on);
                 isPasswordVisible = true;
             }
             // Move cursor to end of text

@@ -8,8 +8,8 @@ import com.EventEase.model.Event;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
 import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
-import com.google.firebase.firestore.QueryDocumentSnapshot;
 
 import java.util.ArrayList;
 import java.util.Date;
@@ -30,44 +30,76 @@ public class FirebaseAdmittedRepository implements AdmittedRepository {
 
     @Override
     public Task<Void> admit(String eventId, String uid) {
-        String docId = eventId + "_" + uid;
+        Log.d(TAG, "Attempting to admit user " + uid + " to event " + eventId);
         
-        Map<String, Object> admittedData = new HashMap<>();
-        admittedData.put("eventId", eventId);
-        admittedData.put("uid", uid);
-        admittedData.put("admittedAt", System.currentTimeMillis());
-        admittedData.put("acceptedAt", System.currentTimeMillis());
-        
-        Log.d(TAG, "Attempting to admit user " + uid + " to event " + eventId + " with docId: " + docId);
-        
-        return db.collection("admitted")
-                .document(docId)
-                .set(admittedData)
-                .addOnSuccessListener(aVoid -> {
-                    Log.d(TAG, "✅ SUCCESS: User " + uid + " admitted to event " + eventId + " in Firebase");
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "❌ FAILED to admit user " + uid + " to event " + eventId, e);
-                })
-                .continueWith(task -> {
-                    if (task.isSuccessful()) {
-                        Log.d(TAG, "Task completed successfully for admit operation");
-                    } else {
-                        Log.e(TAG, "Task failed for admit operation", task.getException());
+        // First, check capacity and remove from waitlist if present, then add to admitted array
+        return db.collection("events")
+                .document(eventId)
+                .get()
+                .continueWithTask(task -> {
+                    if (!task.isSuccessful() || task.getResult() == null || !task.getResult().exists()) {
+                        Log.e(TAG, "Event " + eventId + " not found");
+                        return Tasks.forException(new Exception("Event not found"));
                     }
-                    return null;
+                    
+                    DocumentSnapshot eventDoc = task.getResult();
+                    
+                    // Get event capacity
+                    Object capacityObj = eventDoc.get("capacity");
+                    int capacity = capacityObj != null ? ((Number) capacityObj).intValue() : 0;
+                    
+                    // Get current admitted list
+                    @SuppressWarnings("unchecked")
+                    List<String> admitted = (List<String>) eventDoc.get("admitted");
+                    int currentAdmittedCount = admitted != null ? admitted.size() : 0;
+                    
+                    // Check if already admitted
+                    if (admitted != null && admitted.contains(uid)) {
+                        Log.d(TAG, "User " + uid + " is already admitted to event " + eventId);
+                        return Tasks.forResult(null);
+                    }
+                    
+                    // Check capacity (only enforce if capacity > 0)
+                    if (capacity > 0 && currentAdmittedCount >= capacity) {
+                        Log.e(TAG, "❌ Event " + eventId + " is at full capacity (" + capacity + "). Cannot admit user " + uid);
+                        return Tasks.forException(new Exception("Event is at full capacity"));
+                    }
+                    
+                    Map<String, Object> updates = new HashMap<>();
+                    
+                    // Remove from waitlist if present (using arrayRemove)
+                    updates.put("waitlist", FieldValue.arrayRemove(uid));
+                    
+                    // Add to admitted array (using arrayUnion)
+                    updates.put("admitted", FieldValue.arrayUnion(uid));
+                    
+                    return db.collection("events")
+                            .document(eventId)
+                            .update(updates)
+                            .addOnSuccessListener(aVoid -> {
+                                Log.d(TAG, "✅ SUCCESS: User " + uid + " admitted to event " + eventId + " (" + (currentAdmittedCount + 1) + "/" + capacity + ")");
+                            })
+                            .addOnFailureListener(e -> {
+                                Log.e(TAG, "❌ FAILED to admit user " + uid + " to event " + eventId, e);
+                            })
+                            .continueWith(t -> null);
                 });
     }
 
     @Override
     public Task<Boolean> isAdmitted(String eventId, String uid) {
-        String docId = eventId + "_" + uid;
-        return db.collection("admitted")
-                .document(docId)
+        // Get event document and check if admitted array contains uid
+        return db.collection("events")
+                .document(eventId)
                 .get()
                 .continueWith(task -> {
                     if (task.isSuccessful() && task.getResult() != null) {
-                        return task.getResult().exists();
+                        DocumentSnapshot doc = task.getResult();
+                        if (doc.exists()) {
+                            @SuppressWarnings("unchecked")
+                            List<String> admitted = (List<String>) doc.get("admitted");
+                            return admitted != null && admitted.contains(uid);
+                        }
                     }
                     return false;
                 });
@@ -75,53 +107,35 @@ public class FirebaseAdmittedRepository implements AdmittedRepository {
 
     @Override
     public Task<List<Event>> getUpcomingEvents(String uid) {
-        return db.collection("admitted")
-                .whereEqualTo("uid", uid)
+        // Query events where admitted array contains uid
+        return db.collection("events")
+                .whereArrayContains("admitted", uid)
                 .get()
-                .continueWithTask(task -> {
+                .continueWith(task -> {
                     if (!task.isSuccessful() || task.getResult() == null) {
-                        return Tasks.forResult(new ArrayList<>());
+                        return new ArrayList<>();
                     }
 
-                    List<String> eventIds = new ArrayList<>();
-                    for (QueryDocumentSnapshot doc : task.getResult()) {
-                        String eventId = doc.getString("eventId");
-                        if (eventId != null) {
-                            eventIds.add(eventId);
-                        }
-                    }
-
-                    if (eventIds.isEmpty()) {
-                        return Tasks.forResult(new ArrayList<>());
-                    }
-
-                    // Fetch all events
-                    List<Task<DocumentSnapshot>> eventTasks = new ArrayList<>();
-                    for (String eventId : eventIds) {
-                        eventTasks.add(db.collection("events").document(eventId).get());
-                    }
-
-                    return Tasks.whenAllSuccess(eventTasks).continueWith(allTask -> {
-                        List<Event> events = new ArrayList<>();
-                        for (Object result : allTask.getResult()) {
-                            if (result instanceof DocumentSnapshot) {
-                                DocumentSnapshot snapshot = (DocumentSnapshot) result;
-                                if (snapshot.exists()) {
-                                    Event event = snapshot.toObject(Event.class);
-                                    if (event != null) {
-                                        if (event.getId() == null || event.getId().isEmpty()) {
-                                            event.setId(snapshot.getId());
-                                        }
-                                        // Only include future events
-                                        if (event.getStartsAtEpochMs() > System.currentTimeMillis()) {
-                                            events.add(event);
-                                        }
+                    List<Event> events = new ArrayList<>();
+                    for (DocumentSnapshot doc : task.getResult().getDocuments()) {
+                        try {
+                            if (doc.exists()) {
+                                Event event = Event.fromMap(doc.getData());
+                                if (event != null) {
+                                    if (event.getId() == null || event.getId().isEmpty()) {
+                                        event.setId(doc.getId());
+                                    }
+                                    // Only include future events
+                                    if (event.getStartsAtEpochMs() > System.currentTimeMillis()) {
+                                        events.add(event);
                                     }
                                 }
                             }
+                        } catch (Exception e) {
+                            Log.e(TAG, "Error parsing event", e);
                         }
-                        return events;
-                    });
+                    }
+                    return events;
                 });
     }
 }

@@ -1,6 +1,8 @@
 package com.EventEase.ui.entrant.profile;
 
+import android.Manifest;
 import android.app.Dialog;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.drawable.BitmapDrawable;
@@ -16,10 +18,14 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
+import androidx.core.content.FileProvider;
 import androidx.fragment.app.Fragment;
 import androidx.navigation.Navigation;
 import androidx.appcompat.widget.AppCompatButton;
 import androidx.appcompat.app.AlertDialog;
+import java.io.File;
+import java.io.IOException;
 import com.bumptech.glide.Glide;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
@@ -49,6 +55,7 @@ public class EditProfileFragment extends Fragment {
     private FirebaseAuth mAuth;
     private FirebaseStorage storage;
     private Uri selectedImageUri;
+    private File photoFile;
     
     private final ActivityResultLauncher<String> pickImage = registerForActivityResult(
         new ActivityResultContracts.GetContent(),
@@ -59,13 +66,33 @@ public class EditProfileFragment extends Fragment {
             }
         }
     );
+    
+    private final ActivityResultLauncher<String> requestCameraPermission = registerForActivityResult(
+        new ActivityResultContracts.RequestPermission(),
+        isGranted -> {
+            if (isGranted) {
+                openCameraInternal();
+            } else {
+                ToastUtil.showShort(getContext(), "Camera permission is required to take photos");
+            }
+        }
+    );
+    
+    private final ActivityResultLauncher<Uri> takePicture = registerForActivityResult(
+        new ActivityResultContracts.TakePicture(),
+        success -> {
+            if (success && selectedImageUri != null) {
+                profileImage.setImageURI(selectedImageUri);
+            }
+        }
+    );
 
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
                            @Nullable ViewGroup container,
                            @Nullable Bundle savedInstanceState) {
-        View root = inflater.inflate(R.layout.fragment_edit_profile, container, false);
+        View root = inflater.inflate(R.layout.entrant_fragment_edit_profile, container, false);
         
         // Initialize Firebase
         mAuth = FirebaseAuth.getInstance();
@@ -89,7 +116,7 @@ public class EditProfileFragment extends Fragment {
         });
         
         root.findViewById(R.id.editProfilePicture).setOnClickListener(v -> 
-            pickImage.launch("image/*"));
+            showImageSourceDialog());
         
         root.findViewById(R.id.saveButton).setOnClickListener(v -> saveChanges());
         root.findViewById(R.id.changeEmailButton).setOnClickListener(v -> showChangeEmailDialog());
@@ -166,8 +193,8 @@ public class EditProfileFragment extends Fragment {
                     if (photoUrl != null && !photoUrl.isEmpty() && getContext() != null) {
                         Glide.with(getContext())
                             .load(photoUrl)
-                            .placeholder(R.drawable.icon)
-                            .error(R.drawable.icon)
+                            .placeholder(R.drawable.entrant_icon)
+                            .error(R.drawable.entrant_icon)
                             .into(profileImage);
                     }
                 }
@@ -300,7 +327,7 @@ public class EditProfileFragment extends Fragment {
 
         Dialog dialog = new Dialog(requireContext(), android.R.style.Theme_Black_NoTitleBar_Fullscreen);
         dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
-        dialog.setContentView(R.layout.dialog_change_email);
+        dialog.setContentView(R.layout.entrant_dialog_change_email);
         dialog.setCanceledOnTouchOutside(false);
 
         // Set window properties for full screen blur
@@ -369,8 +396,8 @@ public class EditProfileFragment extends Fragment {
         // Apply animations after dialog is shown
         View card = dialog.findViewById(R.id.dialogCard);
         if (blurBackground != null && card != null) {
-            android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(getContext(), R.anim.dialog_fade_in);
-            android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(getContext(), R.anim.dialog_zoom_in);
+            android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(getContext(), R.anim.entrant_dialog_fade_in);
+            android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(getContext(), R.anim.entrant_dialog_zoom_in);
             
             blurBackground.startAnimation(fadeIn);
             card.startAnimation(zoomIn);
@@ -524,7 +551,7 @@ public class EditProfileFragment extends Fragment {
 
         Dialog dialog = new Dialog(requireContext(), android.R.style.Theme_Black_NoTitleBar_Fullscreen);
         dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
-        dialog.setContentView(R.layout.dialog_change_password);
+        dialog.setContentView(R.layout.entrant_dialog_change_password);
         dialog.setCanceledOnTouchOutside(false);
 
         // Set window properties for full screen blur
@@ -639,8 +666,8 @@ public class EditProfileFragment extends Fragment {
         // Apply animations after dialog is shown
         View card = dialog.findViewById(R.id.dialogCard);
         if (blurBackground != null && card != null) {
-            android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(getContext(), R.anim.dialog_fade_in);
-            android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(getContext(), R.anim.dialog_zoom_in);
+            android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(getContext(), R.anim.entrant_dialog_fade_in);
+            android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(getContext(), R.anim.entrant_dialog_zoom_in);
             
             blurBackground.startAnimation(fadeIn);
             card.startAnimation(zoomIn);
@@ -688,6 +715,115 @@ public class EditProfileFragment extends Fragment {
         } catch (Exception e) {
             e.printStackTrace();
             return bitmap;
+        }
+    }
+    
+    private void showImageSourceDialog() {
+        if (getContext() == null) return;
+        
+        Dialog dialog = new Dialog(requireContext(), android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
+        dialog.setContentView(R.layout.entrant_dialog_image_source);
+        dialog.setCanceledOnTouchOutside(false);
+
+        // Set window properties for full screen blur
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            WindowManager.LayoutParams layoutParams = dialog.getWindow().getAttributes();
+            layoutParams.dimAmount = 0f;
+            dialog.getWindow().setAttributes(layoutParams);
+            dialog.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+        }
+        
+        // Capture screenshot and blur it for the background
+        Bitmap screenshot = captureScreenshot();
+        if (screenshot != null) {
+            Bitmap blurredBitmap = blurBitmap(screenshot, 25f);
+            if (blurredBitmap != null) {
+                android.view.View blurBackground = dialog.findViewById(R.id.dialogBlurBackground);
+                if (blurBackground != null) {
+                    blurBackground.setBackground(new BitmapDrawable(getResources(), blurredBitmap));
+                }
+            }
+        }
+        
+        // Make the background clickable to dismiss
+        android.view.View blurBackground = dialog.findViewById(R.id.dialogBlurBackground);
+        if (blurBackground != null) {
+            blurBackground.setOnClickListener(v -> dialog.dismiss());
+        }
+
+        AppCompatButton cameraButton = dialog.findViewById(R.id.btnCamera);
+        AppCompatButton galleryButton = dialog.findViewById(R.id.btnGallery);
+
+        if (cameraButton != null) {
+            cameraButton.setOnClickListener(v -> {
+                dialog.dismiss();
+                openCamera();
+            });
+        }
+
+        if (galleryButton != null) {
+            galleryButton.setOnClickListener(v -> {
+                dialog.dismiss();
+                pickImage.launch("image/*");
+            });
+        }
+
+        dialog.show();
+        
+        // Apply animations after dialog is shown
+        View card = dialog.findViewById(R.id.dialogCard);
+        if (blurBackground != null && card != null) {
+            android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(getContext(), R.anim.entrant_dialog_fade_in);
+            android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(getContext(), R.anim.entrant_dialog_zoom_in);
+            
+            blurBackground.startAnimation(fadeIn);
+            card.startAnimation(zoomIn);
+        }
+    }
+    
+    private void openCamera() {
+        if (getContext() == null) return;
+        
+        // Check camera permission first
+        if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.CAMERA) 
+                != PackageManager.PERMISSION_GRANTED) {
+            // Request camera permission
+            requestCameraPermission.launch(Manifest.permission.CAMERA);
+        } else {
+            // Permission already granted, open camera
+            openCameraInternal();
+        }
+    }
+    
+    private void openCameraInternal() {
+        if (getContext() == null) return;
+        
+        try {
+            // Create a File object for the photo
+            photoFile = File.createTempFile(
+                "profile_photo_" + System.currentTimeMillis(),
+                ".jpg",
+                getContext().getCacheDir()
+            );
+            
+            // Create a content URI for the file using FileProvider
+            selectedImageUri = FileProvider.getUriForFile(
+                getContext(),
+                getContext().getPackageName() + ".fileprovider",
+                photoFile
+            );
+            
+            // Launch the camera intent
+            takePicture.launch(selectedImageUri);
+        } catch (IOException e) {
+            e.printStackTrace();
+            ToastUtil.showShort(getContext(), "Failed to create image file");
+        } catch (Exception e) {
+            e.printStackTrace();
+            ToastUtil.showShort(getContext(), "Failed to open camera: " + e.getMessage());
         }
     }
 }

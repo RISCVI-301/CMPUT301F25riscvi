@@ -78,7 +78,7 @@ public class MyEventsFragment extends Fragment {
     public View onCreateView(@NonNull LayoutInflater inflater,
                              @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
-        View root = inflater.inflate(R.layout.fragment_my_events, container, false);
+        View root = inflater.inflate(R.layout.entrant_fragment_my_events, container, false);
 
         // Set status bar color to match top bar
         if (getActivity() != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -247,7 +247,7 @@ public class MyEventsFragment extends Fragment {
 
         @NonNull @Override public MyEventVH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             View v = LayoutInflater.from(parent.getContext())
-                    .inflate(R.layout.item_event_card, parent, false);
+                    .inflate(R.layout.entrant_item_event_card, parent, false);
             return new MyEventVH(v, event -> {
                 // Launch EventDetailActivity when an event is clicked
                 Intent intent = new Intent(requireContext(), EventDetailActivity.class);
@@ -329,13 +329,13 @@ public class MyEventsFragment extends Fragment {
             if (e.getPosterUrl() != null && !e.getPosterUrl().isEmpty()) {
                 Glide.with(itemView.getContext())
                     .load(e.getPosterUrl())
-                    .placeholder(R.drawable.image_placeholder_event)
-                    .error(R.drawable.image_placeholder_event)
+                    .placeholder(R.drawable.entrant_image_placeholder_event)
+                    .error(R.drawable.entrant_image_placeholder_event)
                     .transition(DrawableTransitionOptions.withCrossFade())
                     .centerCrop()
                     .into(image);
             } else {
-                image.setImageResource(R.drawable.image_placeholder_event);
+                image.setImageResource(R.drawable.entrant_image_placeholder_event);
             }
         }
     }

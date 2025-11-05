@@ -35,7 +35,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_mainfragments);
+        setContentView(R.layout.entrant_activity_mainfragments);
 
         // Don't draw behind system bars
         WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
@@ -121,8 +121,58 @@ public class MainActivity extends AppCompatActivity {
         // Setup custom navigation button click listeners
         setupCustomNavigation();
         
+        // Single unified listener that handles visibility and selection for all navigation
+        nav.addOnDestinationChangedListener((controller, destination, arguments) -> {
+            if (destination == null) return;
+            
+            int id = destination.getId();
+            
+            // Check if user is authenticated (check dynamically each time)
+            FirebaseAuth authCheck = FirebaseAuth.getInstance();
+            android.content.SharedPreferences prefsCheck = getSharedPreferences("EventEasePrefs", MODE_PRIVATE);
+            boolean rememberMeCheck = prefsCheck.getBoolean("rememberMe", false);
+            String savedUidCheck = prefsCheck.getString("savedUid", null);
+            com.google.firebase.auth.FirebaseUser currentUserCheck = authCheck.getCurrentUser();
+            boolean isAuthenticated = rememberMeCheck && savedUidCheck != null && currentUserCheck != null && savedUidCheck.equals(currentUserCheck.getUid());
+            
+            // Main app screens (discover, my events, account) - show bars if authenticated
+            if (id == R.id.discoverFragment || id == R.id.myEventsFragment || id == R.id.accountFragment 
+                || id == R.id.eventsSelectionFragment || id == R.id.previousEventsFragment || id == R.id.upcomingEventsFragment) {
+                if (isAuthenticated) {
+                    // User is authenticated, show top bar and bottom nav
+                    bottomNav.setVisibility(View.VISIBLE);
+                    topBar.setVisibility(View.VISIBLE);
+                    updateNavigationSelection(id);
+                } else {
+                    // User not authenticated, hide bars
+                    bottomNav.setVisibility(View.GONE);
+                    topBar.setVisibility(View.GONE);
+                }
+                // Keep action bar hidden
+                if (getSupportActionBar() != null) {
+                    getSupportActionBar().hide();
+                }
+            } else if (id == R.id.welcomeFragment || id == R.id.signupFragment 
+                       || id == R.id.loginFragment || id == R.id.uploadProfilePictureFragment
+                       || id == R.id.forgotPasswordFragment || id == R.id.locationPermissionFragment) {
+                // On auth screens, hide all bars
+                bottomNav.setVisibility(View.GONE);
+                topBar.setVisibility(View.GONE);
+                if (getSupportActionBar() != null) {
+                    getSupportActionBar().hide();
+                }
+            } else {
+                // Default: hide bars for any other screens
+                bottomNav.setVisibility(View.GONE);
+                topBar.setVisibility(View.GONE);
+                if (getSupportActionBar() != null) {
+                    getSupportActionBar().hide();
+                }
+            }
+        });
+        
         if (isLoggedIn) {
-            // User is logged in and Remember Me is enabled - show bars and navigate to Discover
+            // User is logged in on startup - show bars and navigate to Discover
             topBar.setVisibility(View.VISIBLE);
             bottomNav.setVisibility(View.VISIBLE);
             // Navigate to discover after the view is ready and mark selected
@@ -131,52 +181,13 @@ public class MainActivity extends AppCompatActivity {
                 updateNavigationSelection(R.id.discoverFragment);
             });
         } else {
-            // User not logged in - hide bottom nav and top bar initially
+            // User not logged in on startup - hide bars initially
             bottomNav.setVisibility(View.GONE);
             topBar.setVisibility(View.GONE);
-            
-            // Show/hide bottom nav, top bar, and action bar based on destination
-            nav.addOnDestinationChangedListener((controller, destination, arguments) -> {
-                int id = destination.getId();
-                if (id == R.id.discoverFragment || id == R.id.myEventsFragment || id == R.id.accountFragment 
-                    || id == R.id.eventsSelectionFragment || id == R.id.previousEventsFragment) {
-                    // User authenticated and on main app screen, show top bar and bottom nav
-                    bottomNav.setVisibility(View.VISIBLE);
-                    topBar.setVisibility(View.VISIBLE);
-                    updateNavigationSelection(id);
-                    // Keep action bar hidden
-                    if (getSupportActionBar() != null) {
-                        getSupportActionBar().hide();
-                    }
-                } else if (id == R.id.welcomeFragment || id == R.id.signupFragment 
-                           || id == R.id.loginFragment || id == R.id.uploadProfilePictureFragment
-                           || id == R.id.forgotPasswordFragment || id == R.id.locationPermissionFragment) {
-                    // On auth screens (welcome, signup, login, forgot password, upload picture, location permission), hide all bars
-                    bottomNav.setVisibility(View.GONE);
-                    topBar.setVisibility(View.GONE);
-                    if (getSupportActionBar() != null) {
-                        getSupportActionBar().hide();
-                    }
-                } else {
-                    // Default: hide bars for any other screens
-                    bottomNav.setVisibility(View.GONE);
-                    topBar.setVisibility(View.GONE);
-                    if (getSupportActionBar() != null) {
-                        getSupportActionBar().hide();
-                    }
-                }
-            });
         }
 
         // Handle external navigation intents (from detail activities)
         handleExternalNav(getIntent());
-
-        // Always keep nav selection in sync with the current destination (covers both login paths)
-        nav.addOnDestinationChangedListener((controller, destination, arguments) -> {
-            if (destination != null) {
-                updateNavigationSelection(destination.getId());
-            }
-        });
     }
 
     @Override
@@ -228,9 +239,9 @@ public class MainActivity extends AppCompatActivity {
         int selectedColor = android.graphics.Color.parseColor("#446EAF");
         
         // Reset all to unselected (dark circles and gray text)
-        navIconMyEvents.setImageResource(R.drawable.ic_my_events_circle_dark);
-        navIconDiscover.setImageResource(R.drawable.ic_discover_circle_dark);
-        navIconAccount.setImageResource(R.drawable.ic_account_circle_dark);
+        navIconMyEvents.setImageResource(R.drawable.entrant_ic_my_events_circle_dark);
+        navIconDiscover.setImageResource(R.drawable.entrant_ic_discover_circle_dark);
+        navIconAccount.setImageResource(R.drawable.entrant_ic_account_circle_dark);
         navLabelMyEvents.setTextColor(unselectedColor);
         navLabelDiscover.setTextColor(unselectedColor);
         navLabelAccount.setTextColor(unselectedColor);
@@ -238,13 +249,13 @@ public class MainActivity extends AppCompatActivity {
         // Set selected (light circle and blue text) based on destination
         if (destinationId == R.id.eventsSelectionFragment || destinationId == R.id.myEventsFragment 
             || destinationId == R.id.previousEventsFragment || destinationId == R.id.upcomingEventsFragment) {
-            navIconMyEvents.setImageResource(R.drawable.ic_my_events_circle_light);
+            navIconMyEvents.setImageResource(R.drawable.entrant_ic_my_events_circle_light);
             navLabelMyEvents.setTextColor(selectedColor);
         } else if (destinationId == R.id.discoverFragment) {
-            navIconDiscover.setImageResource(R.drawable.ic_discover_circle_light);
+            navIconDiscover.setImageResource(R.drawable.entrant_ic_discover_circle_light);
             navLabelDiscover.setTextColor(selectedColor);
         } else if (destinationId == R.id.accountFragment) {
-            navIconAccount.setImageResource(R.drawable.ic_account_circle_light);
+            navIconAccount.setImageResource(R.drawable.entrant_ic_account_circle_light);
             navLabelAccount.setTextColor(selectedColor);
         }
     }

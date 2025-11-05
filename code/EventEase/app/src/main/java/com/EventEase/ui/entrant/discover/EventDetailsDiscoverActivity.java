@@ -28,6 +28,7 @@ import com.google.firebase.firestore.FirebaseFirestoreException;
 import com.google.firebase.firestore.ListenerRegistration;
 
 import java.text.SimpleDateFormat;
+import java.util.List;
 import java.util.Date;
 import java.util.Locale;
 
@@ -70,7 +71,7 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_event_details_discover);
+        setContentView(R.layout.entrant_activity_event_details_discover);
 
         // Initialize repositories
         waitlistRepo = App.graph().waitlists;
@@ -154,7 +155,7 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
 
         // Create custom dialog with full screen to show blur background
         android.app.Dialog dialog = new android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
-        dialog.setContentView(R.layout.dialog_guidelines);
+        dialog.setContentView(R.layout.entrant_dialog_guidelines);
 
         // Set window properties
         android.view.Window window = dialog.getWindow();
@@ -188,8 +189,8 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
         dialog.show();
 
         // Animations
-        android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.dialog_fade_in);
-        android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.dialog_zoom_in);
+        android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_fade_in);
+        android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_zoom_in);
         blurBackground.startAnimation(fadeIn);
         cardView.startAnimation(zoomIn);
     }
@@ -304,11 +305,11 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
         if (!TextUtils.isEmpty(event.getPosterUrl())) {
             Glide.with(this)
                     .load(event.getPosterUrl())
-                    .placeholder(R.drawable.ic_launcher_foreground)
-                    .error(R.drawable.ic_launcher_foreground)
+                    .placeholder(R.drawable.entrant_ic_launcher_foreground)
+                    .error(R.drawable.entrant_ic_launcher_foreground)
                     .into(posterView);
         } else {
-            posterView.setImageResource(R.drawable.ic_launcher_foreground);
+            posterView.setImageResource(R.drawable.entrant_ic_launcher_foreground);
         }
 
         shareButton.setEnabled(true);
@@ -377,9 +378,9 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
 
     private void observeWaitlistCollection() {
         if (waitlistRegistration != null) return;
+        // Listen to the event document to get waitlist array size
         waitlistRegistration = firestore.collection("events")
                 .document(eventId)
-                .collection("waitlist")
                 .addSnapshotListener((snapshot, error) -> {
                     if (error != null) {
                         if (waitlistCountView != null) {
@@ -387,8 +388,14 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
                         }
                         return;
                     }
-                    int count = snapshot != null ? snapshot.size() : 0;
-                    updateWaitlistCount(count);
+                    if (snapshot != null && snapshot.exists()) {
+                        @SuppressWarnings("unchecked")
+                        List<String> waitlist = (List<String>) snapshot.get("waitlist");
+                        int count = waitlist != null ? waitlist.size() : 0;
+                        updateWaitlistCount(count);
+                    } else {
+                        updateWaitlistCount(0);
+                    }
                 });
     }
 

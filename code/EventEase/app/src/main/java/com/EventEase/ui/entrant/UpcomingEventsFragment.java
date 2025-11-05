@@ -49,7 +49,7 @@ public class UpcomingEventsFragment extends Fragment {
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        View root = inflater.inflate(R.layout.fragment_upcoming_events, container, false);
+        View root = inflater.inflate(R.layout.entrant_fragment_upcoming_events, container, false);
 
         // Set status bar color to match top bar
         if (getActivity() != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
@@ -151,7 +151,7 @@ public class UpcomingEventsFragment extends Fragment {
         @Override
         public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
             View view = LayoutInflater.from(parent.getContext())
-                    .inflate(R.layout.item_event_card, parent, false);
+                    .inflate(R.layout.entrant_item_event_card, parent, false);
             return new VH(view);
         }
 
@@ -226,8 +226,8 @@ public class UpcomingEventsFragment extends Fragment {
 
                 Glide.with(poster.getContext())
                         .load(event.getPosterUrl())
-                        .placeholder(R.drawable.image_placeholder_event)
-                        .error(R.drawable.image_placeholder_event)
+                        .placeholder(R.drawable.entrant_image_placeholder_event)
+                        .error(R.drawable.entrant_image_placeholder_event)
                         .centerCrop()
                         .into(poster);
 

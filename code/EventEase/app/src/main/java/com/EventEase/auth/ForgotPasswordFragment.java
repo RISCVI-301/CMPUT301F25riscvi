@@ -20,7 +20,8 @@ import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ProgressBar;
-import android.widget.Toast;
+
+import com.EventEase.util.ToastUtil;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -29,6 +30,9 @@ import androidx.navigation.fragment.NavHostFragment;
 
 import com.example.eventease.R;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.FirebaseFirestore;
+
+import java.util.regex.Pattern;
 
 public class ForgotPasswordFragment extends Fragment {
 
@@ -36,11 +40,17 @@ public class ForgotPasswordFragment extends Fragment {
     private Button btnRecoverPassword;
     private ProgressBar progress;
     private FirebaseAuth auth;
+    private FirebaseFirestore db;
+    
+    // Email validation pattern
+    private static final Pattern EMAIL_PATTERN = Pattern.compile(
+        "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+    );
 
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_forgot_password, container, false);
+        return inflater.inflate(R.layout.entrant_fragment_forgot_password, container, false);
     }
 
     @Override
@@ -48,6 +58,7 @@ public class ForgotPasswordFragment extends Fragment {
         super.onViewCreated(view, savedInstanceState);
 
         auth = FirebaseAuth.getInstance();
+        db = FirebaseFirestore.getInstance();
 
         emailInput = view.findViewById(R.id.emailInput);
         btnRecoverPassword = view.findViewById(R.id.btnRecoverPassword);
@@ -57,22 +68,78 @@ public class ForgotPasswordFragment extends Fragment {
             String email = emailInput.getText().toString().trim();
             
             if (email.isEmpty()) {
-                Toast.makeText(requireContext(), "Please enter your email address", Toast.LENGTH_SHORT).show();
+                ToastUtil.showShort(requireContext(), "Please enter your email address");
                 return;
             }
             
-            if (!email.contains("@")) {
-                Toast.makeText(requireContext(), "Please enter a valid email address", Toast.LENGTH_SHORT).show();
+            // Validate email format
+            if (!isValidEmailFormat(email)) {
+                ToastUtil.showShort(requireContext(), "Please enter a valid email address");
                 return;
             }
 
-            sendPasswordResetEmail(email);
+            // Check if email exists in Firebase Auth and then send reset email
+            validateAndSendResetEmail(email);
         });
     }
 
-    private void sendPasswordResetEmail(String email) {
+    /**
+     * Validates email format
+     */
+    private boolean isValidEmailFormat(String email) {
+        return EMAIL_PATTERN.matcher(email).matches();
+    }
+    
+    /**
+     * Checks if email exists in Firestore users collection, then sends reset email if valid
+     * Since Firestore queries are case-sensitive but emails should be matched case-insensitively,
+     * we query all users and check in memory, or use Firebase Auth's fetchSignInMethodsForEmail
+     * which handles case-insensitive email matching.
+     */
+    private void validateAndSendResetEmail(String email) {
         setLoading(true);
         
+        String trimmedEmail = email.trim();
+        
+        // Use Firebase Auth's fetchSignInMethodsForEmail which handles case-insensitive matching
+        // Note: Some Firebase projects may have email enumeration disabled, which can cause this to fail
+        // even for valid emails. In that case, we'll fall back to trying to send the reset email.
+        auth.fetchSignInMethodsForEmail(trimmedEmail)
+            .addOnSuccessListener(signInMethods -> {
+                // If signInMethods is not null, email exists
+                // Even if methods list is empty, the email exists (might be a disabled account)
+                // Proceed to send reset email
+                sendPasswordResetEmail(trimmedEmail);
+            })
+            .addOnFailureListener(e -> {
+                // Check the error message to determine if it's a "user not found" error
+                String errorMsg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
+                
+                // Check for explicit "user not found" errors
+                boolean isUserNotFound = errorMsg.contains("there is no user record") || 
+                                        errorMsg.contains("no user record") ||
+                                        errorMsg.contains("user not found") ||
+                                        errorMsg.contains("invalid-user") ||
+                                        (e instanceof com.google.firebase.auth.FirebaseAuthInvalidUserException);
+                
+                if (isUserNotFound) {
+                    // Definitely no user found
+                    setLoading(false);
+                    ToastUtil.showLong(requireContext(), "No account found with this email address");
+                } else {
+                    // For other errors (might be privacy settings preventing email enumeration),
+                    // try sending the reset email anyway - Firebase will validate it
+                    // If email doesn't exist, sendPasswordResetEmail will fail with appropriate error
+                    android.util.Log.d("ForgotPasswordFragment", "fetchSignInMethodsForEmail failed (possibly due to privacy settings), trying to send reset email anyway: " + e.getMessage());
+                    sendPasswordResetEmail(trimmedEmail);
+                }
+            });
+    }
+    
+    /**
+     * Sends password reset email to the validated email address
+     */
+    private void sendPasswordResetEmail(String email) {
         auth.sendPasswordResetEmail(email)
             .addOnSuccessListener(aVoid -> {
                 setLoading(false);
@@ -85,23 +152,26 @@ public class ForgotPasswordFragment extends Fragment {
                 // Parse Firebase errors
                 if (e.getMessage() != null) {
                     String msg = e.getMessage().toLowerCase();
-                    if (msg.contains("no user record")) {
+                    if (msg.contains("no user record") || 
+                        msg.contains("there is no user record") || 
+                        msg.contains("invalid-user") ||
+                        msg.contains("user not found")) {
                         errorMessage = "No account found with this email address";
-                    } else if (msg.contains("badly formatted")) {
-                        errorMessage = "Invalid email format";
-                    } else if (msg.contains("network")) {
+                    } else if (msg.contains("network") || msg.contains("unavailable")) {
                         errorMessage = "Network error. Please check your connection";
+                    } else if (msg.contains("badly formatted") || msg.contains("invalid-email")) {
+                        errorMessage = "Invalid email format";
                     }
                 }
                 
-                Toast.makeText(requireContext(), errorMessage, Toast.LENGTH_LONG).show();
+                ToastUtil.showLong(requireContext(), errorMessage);
             });
     }
 
     private void showConfirmationDialog() {
         Dialog dialog = new Dialog(requireContext(), android.R.style.Theme_Black_NoTitleBar_Fullscreen);
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-        dialog.setContentView(R.layout.dialog_password_reset_confirmation);
+        dialog.setContentView(R.layout.entrant_dialog_password_reset_confirmation);
         
         // Set window properties for full screen blur
         if (dialog.getWindow() != null) {
@@ -148,8 +218,8 @@ public class ForgotPasswordFragment extends Fragment {
         // Apply animations after dialog is shown
         View card = dialog.findViewById(R.id.dialogCard);
         if (blurBackground != null && card != null) {
-            android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(requireContext(), R.anim.dialog_fade_in);
-            android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(requireContext(), R.anim.dialog_zoom_in);
+            android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(requireContext(), R.anim.entrant_dialog_fade_in);
+            android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(requireContext(), R.anim.entrant_dialog_zoom_in);
             
             blurBackground.startAnimation(fadeIn);
             card.startAnimation(zoomIn);

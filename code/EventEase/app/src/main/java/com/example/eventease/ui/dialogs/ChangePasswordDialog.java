@@ -40,7 +40,7 @@ public class ChangePasswordDialog extends Dialog {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         requestWindowFeature(Window.FEATURE_NO_TITLE);
-        setContentView(R.layout.dialog_change_password);
+        setContentView(R.layout.entrant_dialog_change_password);
 
         // Set window properties for full screen blur
         Window window = getWindow();
@@ -89,8 +89,8 @@ public class ChangePasswordDialog extends Dialog {
         View card = findViewById(R.id.dialogCard);
         
         if (blurBackground != null && card != null) {
-            android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(getContext(), R.anim.dialog_fade_in);
-            android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(getContext(), R.anim.dialog_zoom_in);
+            android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(getContext(), R.anim.entrant_dialog_fade_in);
+            android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(getContext(), R.anim.entrant_dialog_zoom_in);
             
             blurBackground.startAnimation(fadeIn);
             card.startAnimation(zoomIn);

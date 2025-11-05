@@ -73,7 +73,7 @@ public class EventDetailActivity extends AppCompatActivity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_event_detail);
+        setContentView(R.layout.entrant_activity_event_detail);
 
         // Get event data from Intent
         eventId = getIntent().getStringExtra("eventId");
@@ -179,13 +179,13 @@ public class EventDetailActivity extends AppCompatActivity {
         if (eventPosterUrl != null && !eventPosterUrl.isEmpty()) {
             Glide.with(this)
                 .load(eventPosterUrl)
-                .placeholder(R.drawable.card_image_placeholder)
-                .error(R.drawable.card_image_placeholder)
+                .placeholder(R.drawable.entrant_card_image_placeholder)
+                .error(R.drawable.entrant_card_image_placeholder)
                 .transition(DrawableTransitionOptions.withCrossFade())
                 .centerCrop()
                 .into(ivEventImage);
         } else {
-            ivEventImage.setImageResource(R.drawable.card_image_placeholder);
+            ivEventImage.setImageResource(R.drawable.entrant_card_image_placeholder);
         }
         
         // Update button text based on event details
@@ -232,7 +232,7 @@ public class EventDetailActivity extends AppCompatActivity {
         
         // Create custom dialog with full screen to show blur background
         android.app.Dialog dialog = new android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
-        dialog.setContentView(R.layout.dialog_guidelines);
+        dialog.setContentView(R.layout.entrant_dialog_guidelines);
         
         // Set window properties
         android.view.Window window = dialog.getWindow();
@@ -279,8 +279,8 @@ public class EventDetailActivity extends AppCompatActivity {
         dialog.show();
         
         // Apply animations after dialog is shown
-        android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.dialog_fade_in);
-        android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.dialog_zoom_in);
+        android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_fade_in);
+        android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_zoom_in);
         
         blurBackground.startAnimation(fadeIn);
         cardView.startAnimation(zoomIn);
@@ -293,7 +293,7 @@ public class EventDetailActivity extends AppCompatActivity {
         
         // Create custom dialog with full screen to show blur background
         android.app.Dialog dialog = new android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
-        dialog.setContentView(R.layout.dialog_accept_invitation);
+        dialog.setContentView(R.layout.entrant_dialog_accept_invitation);
         
         // Set window properties
         android.view.Window window = dialog.getWindow();
@@ -336,8 +336,8 @@ public class EventDetailActivity extends AppCompatActivity {
         
         // Apply animations after dialog is shown
         if (blurBackground != null && cardView != null) {
-            android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.dialog_fade_in);
-            android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.dialog_zoom_in);
+            android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_fade_in);
+            android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_zoom_in);
             
             blurBackground.startAnimation(fadeIn);
             cardView.startAnimation(zoomIn);
@@ -351,7 +351,7 @@ public class EventDetailActivity extends AppCompatActivity {
         
         // Create custom dialog with full screen to show blur background
         android.app.Dialog dialog = new android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
-        dialog.setContentView(R.layout.dialog_decline_invitation);
+        dialog.setContentView(R.layout.entrant_dialog_decline_invitation);
         
         // Set window properties
         android.view.Window window = dialog.getWindow();
@@ -467,11 +467,23 @@ public class EventDetailActivity extends AppCompatActivity {
                 })
                 .addOnFailureListener(e -> {
                     android.util.Log.e("EventDetailActivity", "❌ Failed to accept invitation", e);
-                    Toast.makeText(this, "Failed to accept invitation: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                    // Restore buttons
+                    // Restore button state
                     btnRegister.setEnabled(true);
                     btnDecline.setEnabled(true);
-                    btnRegister.setText("Register");
+                    btnRegister.setText("Accept");
+                    
+                    // Show appropriate error message
+                    String errorMessage = "Failed to accept invitation";
+                    if (e != null && e.getMessage() != null) {
+                        if (e.getMessage().contains("full capacity")) {
+                            errorMessage = "Event is at full capacity. Please contact the organizer.";
+                        } else if (e.getMessage().contains("Event not found")) {
+                            errorMessage = "Event not found";
+                        } else {
+                            errorMessage = e.getMessage();
+                        }
+                    }
+                    Toast.makeText(this, errorMessage, Toast.LENGTH_LONG).show();
                 });
     }
 

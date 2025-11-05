@@ -29,6 +29,8 @@ public final class FirebaseDevGraph {
         swimEvent.startsAtEpochMs = futureMillis(24);
         swimEvent.capacity = 50;
         swimEvent.waitlistCount = 0; // Start at 0, will be incremented as users join
+        swimEvent.waitlist = new ArrayList<>();
+        swimEvent.admitted = new ArrayList<>();
         swimEvent.notes = "Join us for a fun-filled summer pool party! Bring your swimwear, sunscreen, and get ready for games, music, and refreshments. This event is perfect for families and friends looking to cool off and enjoy the summer sunshine.";
         swimEvent.guidelines = "• All ages welcome - children must be supervised by an adult\n• Bring your own towel and swimwear\n• No glass containers allowed in pool area\n• Pool rules and lifeguard instructions must be followed\n• Event is weather dependent - check for updates";
         swimEvent.posterUrl = "https://images.unsplash.com/photo-1519046904884-53103b34b206?w=400";
@@ -43,6 +45,8 @@ public final class FirebaseDevGraph {
         yogaEvent.startsAtEpochMs = futureMillis(48);
         yogaEvent.capacity = 30;
         yogaEvent.waitlistCount = 0; // Start at 0, will be incremented as users join
+        yogaEvent.waitlist = new ArrayList<>();
+        yogaEvent.admitted = new ArrayList<>();
         yogaEvent.notes = "Experience tranquility with our outdoor sunset yoga session. Suitable for all levels, this class focuses on mindfulness, breathing techniques, and gentle stretches. Please bring your own mat and water bottle.";
         yogaEvent.guidelines = "• Must be 18+ years old to participate\n• Bring your own yoga mat and water bottle\n• Wear comfortable athletic clothing\n• Arrive 10 minutes early for check-in\n• No photography during the session\n• Session will be cancelled if weather is poor";
         yogaEvent.posterUrl = "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=400";
@@ -57,6 +61,8 @@ public final class FirebaseDevGraph {
         concertEvent.startsAtEpochMs = futureMillis(72);
         concertEvent.capacity = 150;
         concertEvent.waitlistCount = 0; // Start at 0, will be incremented as users join
+        concertEvent.waitlist = new ArrayList<>();
+        concertEvent.admitted = new ArrayList<>();
         concertEvent.notes = "Enjoy an evening of smooth jazz with local talented musicians. The concert features a variety of jazz styles from bebop to contemporary fusion. Light refreshments will be available for purchase.";
         concertEvent.guidelines = "• Valid photo ID required at entrance\n• Doors open 30 minutes before showtime\n• No outside food or beverages allowed\n• Photography allowed but no flash or video recording\n• Reserved seating - tickets non-transferable\n• Late arrivals will be seated during intermission";
         concertEvent.posterUrl = "https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=400";
@@ -71,6 +77,8 @@ public final class FirebaseDevGraph {
         foodEvent.startsAtEpochMs = futureMillis(96);
         foodEvent.capacity = 200;
         foodEvent.waitlistCount = 0; // Start at 0, will be incremented as users join
+        foodEvent.waitlist = new ArrayList<>();
+        foodEvent.admitted = new ArrayList<>();
         foodEvent.notes = "A culinary adventure awaits! Sample delicious food from over 20 local food trucks featuring cuisines from around the world. Live entertainment, kids activities, and family-friendly atmosphere. Don't miss this gastronomic celebration!";
         foodEvent.guidelines = "• Family-friendly event - all ages welcome\n• Cash and card payment accepted at all vendors\n• No outside food or alcohol permitted\n• Pets must be leashed at all times\n• Please dispose of trash in designated bins\n• Free parking available at nearby lots";
         foodEvent.posterUrl = "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400";
@@ -85,6 +93,8 @@ public final class FirebaseDevGraph {
         workshopEvent.startsAtEpochMs = futureMillis(120);
         workshopEvent.capacity = 25;
         workshopEvent.waitlistCount = 0; // Start at 0, will be incremented as users join
+        workshopEvent.waitlist = new ArrayList<>();
+        workshopEvent.admitted = new ArrayList<>();
         workshopEvent.notes = "Learn professional photography techniques in this hands-on workshop. Topics include composition, lighting, and post-processing. Suitable for beginners and intermediate photographers. Please bring your own camera (DSLR or mirrorless preferred).";
         workshopEvent.guidelines = "• Must be 16+ years old to attend\n• Bring your own camera (DSLR, mirrorless, or advanced compact)\n• Laptop optional for editing portion\n• Limited to 25 participants for personalized instruction\n• Refreshments will be provided\n• Participants will receive a certificate upon completion";
         workshopEvent.posterUrl = "https://images.unsplash.com/photo-1542038784456-1ea8e935640e?w=400";
@@ -120,6 +130,10 @@ public final class FirebaseDevGraph {
         // Add invitation for UID pE10ntPBfAeplK3UnYQOfufDVU32 to Summer Pool Party (e1) for testing
         String testUserId = "pE10ntPBfAeplK3UnYQOfufDVU32";
         seedInvitations.add(new Invitation("i6","e1", testUserId, Invitation.Status.PENDING, new Date(), new Date(futureMillis(72))));
+        
+        // Add invitation for UID gCvsIC90AkdCZWFiEEnWZN8CR3C3 to Sunset Yoga Session (e2) for waitlist testing
+        String waitlistUserId = "gCvsIC90AkdCZWFiEEnWZN8CR3C3";
+        seedInvitations.add(new Invitation("i7","e2", waitlistUserId, Invitation.Status.PENDING, new Date(), new Date(futureMillis(72))));
         
         invitations = new FirebaseInvitationRepository(seedInvitations);
         
