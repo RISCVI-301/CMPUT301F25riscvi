@@ -21,7 +21,7 @@ public class AccountFragment extends Fragment {
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-        View view = inflater.inflate(R.layout.fragment_account, container, false);
+        View view = inflater.inflate(R.layout.entrant_fragment_account, container, false);
         
         // Initialize Firebase
         mAuth = FirebaseAuth.getInstance();
@@ -57,8 +57,8 @@ public class AccountFragment extends Fragment {
                         // Load image using Glide
                         Glide.with(this)
                             .load(photoUrl)
-                            .placeholder(R.drawable.icon)
-                            .error(R.drawable.icon)
+                            .placeholder(R.drawable.entrant_icon)
+                            .error(R.drawable.entrant_icon)
                             .into(profileImage);
                     }
                 }

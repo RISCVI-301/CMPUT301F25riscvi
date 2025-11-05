@@ -18,6 +18,8 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.EventEase.model.Event;
 import com.example.eventease.R;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.FirebaseFirestoreException;
@@ -40,7 +42,7 @@ public class DiscoverFragment extends Fragment {
     public View onCreateView(@NonNull LayoutInflater inflater,
                              @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_discover, container, false);
+        return inflater.inflate(R.layout.entrant_fragment_discover, container, false);
     }
 
     @Override
@@ -63,6 +65,36 @@ public class DiscoverFragment extends Fragment {
         rv.setAdapter(adapter);
 
         listenForEvents();
+    }
+    
+    @Override
+    public void onResume() {
+        super.onResume();
+        // Ensure bottom nav is visible when this fragment is shown (safety check)
+        ensureBottomNavVisible();
+    }
+    
+    private void ensureBottomNavVisible() {
+        if (getActivity() == null) return;
+        
+        // Check if user is authenticated
+        FirebaseAuth auth = FirebaseAuth.getInstance();
+        android.content.SharedPreferences prefs = getActivity().getSharedPreferences("EventEasePrefs", android.content.Context.MODE_PRIVATE);
+        boolean rememberMe = prefs.getBoolean("rememberMe", false);
+        String savedUid = prefs.getString("savedUid", null);
+        FirebaseUser currentUser = auth.getCurrentUser();
+        boolean isAuthenticated = rememberMe && savedUid != null && currentUser != null && savedUid.equals(currentUser.getUid());
+        
+        if (isAuthenticated) {
+            View bottomNav = getActivity().findViewById(R.id.include_bottom);
+            View topBar = getActivity().findViewById(R.id.include_top);
+            if (bottomNav != null) {
+                bottomNav.setVisibility(View.VISIBLE);
+            }
+            if (topBar != null) {
+                topBar.setVisibility(View.VISIBLE);
+            }
+        }
     }
 
     @Override

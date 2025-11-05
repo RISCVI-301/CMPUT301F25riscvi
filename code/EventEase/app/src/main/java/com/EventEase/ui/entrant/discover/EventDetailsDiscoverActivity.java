@@ -28,6 +28,7 @@ import com.google.firebase.firestore.FirebaseFirestoreException;
 import com.google.firebase.firestore.ListenerRegistration;
 
 import java.text.SimpleDateFormat;
+import java.util.List;
 import java.util.Date;
 import java.util.Locale;
 
@@ -70,7 +71,7 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_event_details_discover);
+        setContentView(R.layout.entrant_activity_event_details_discover);
 
         // Initialize repositories
         waitlistRepo = App.graph().waitlists;
@@ -130,11 +131,108 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
         backButton.setOnClickListener(v -> getOnBackPressedDispatcher().onBackPressed());
         shareButton.setOnClickListener(v -> shareEvent());
         waitlistButton.setOnClickListener(v -> handleJoinWaitlist());
-        guidelinesButton.setOnClickListener(v ->
-                GuidelinesDialogFragment.show(
-                        getSupportFragmentManager(),
-                        getString(R.string.event_details_guidelines_title),
-                        guidelinesBody));
+        guidelinesButton.setOnClickListener(v -> showGuidelinesDialog());
+
+        // Wire bottom nav include buttons
+        android.widget.LinearLayout navButtonMyEvents = findViewById(R.id.nav_button_my_events);
+        android.widget.LinearLayout navButtonDiscover = findViewById(R.id.nav_button_discover);
+        android.widget.LinearLayout navButtonAccount = findViewById(R.id.nav_button_account);
+        if (navButtonDiscover != null) {
+            navButtonDiscover.setOnClickListener(v -> navigateToMain("discover"));
+        }
+        if (navButtonMyEvents != null) {
+            navButtonMyEvents.setOnClickListener(v -> navigateToMain("myEvents"));
+        }
+        if (navButtonAccount != null) {
+            navButtonAccount.setOnClickListener(v -> navigateToMain("account"));
+        }
+    }
+
+    private void showGuidelinesDialog() {
+        // Capture screenshot and blur it
+        android.graphics.Bitmap screenshot = captureScreenshot();
+        android.graphics.Bitmap blurredBitmap = blurBitmap(screenshot, 25f);
+
+        // Create custom dialog with full screen to show blur background
+        android.app.Dialog dialog = new android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        dialog.setContentView(R.layout.entrant_dialog_guidelines);
+
+        // Set window properties
+        android.view.Window window = dialog.getWindow();
+        if (window != null) {
+            window.setLayout(android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.MATCH_PARENT);
+            window.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+            android.view.WindowManager.LayoutParams lp = window.getAttributes();
+            lp.dimAmount = 0f; // we use our own blur
+            window.setAttributes(lp);
+            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+        }
+
+        // Apply blurred background
+        android.view.View blurBackground = dialog.findViewById(R.id.dialogBlurBackground);
+        if (blurredBitmap != null) {
+            blurBackground.setBackground(new android.graphics.drawable.BitmapDrawable(getResources(), blurredBitmap));
+        }
+        blurBackground.setOnClickListener(v -> dialog.dismiss());
+
+        // Card for zoom animation
+        androidx.cardview.widget.CardView cardView = dialog.findViewById(R.id.dialogCardView);
+
+        // Content
+        TextView tvContent = dialog.findViewById(R.id.tvDialogContent);
+        android.widget.Button btnOk = dialog.findViewById(R.id.btnDialogOk);
+        if (!TextUtils.isEmpty(guidelinesBody)) {
+            tvContent.setText(guidelinesBody);
+        }
+        btnOk.setOnClickListener(v -> dialog.dismiss());
+
+        dialog.show();
+
+        // Animations
+        android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_fade_in);
+        android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_zoom_in);
+        blurBackground.startAnimation(fadeIn);
+        cardView.startAnimation(zoomIn);
+    }
+
+    private void navigateToMain(String target) {
+        android.content.Intent intent = new android.content.Intent(this, com.example.eventease.MainActivity.class);
+        intent.putExtra("nav_target", target);
+        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP | android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        startActivity(intent);
+        finish();
+    }
+
+    private android.graphics.Bitmap captureScreenshot() {
+        android.view.View rootView = getWindow().getDecorView().getRootView();
+        rootView.setDrawingCacheEnabled(true);
+        android.graphics.Bitmap bitmap = android.graphics.Bitmap.createBitmap(rootView.getDrawingCache());
+        rootView.setDrawingCacheEnabled(false);
+        return bitmap;
+    }
+
+    private android.graphics.Bitmap blurBitmap(android.graphics.Bitmap bitmap, float radius) {
+        if (bitmap == null) return null;
+        try {
+            int width = Math.round(bitmap.getWidth() * 0.4f);
+            int height = Math.round(bitmap.getHeight() * 0.4f);
+            android.graphics.Bitmap inputBitmap = android.graphics.Bitmap.createScaledBitmap(bitmap, width, height, false);
+            android.graphics.Bitmap outputBitmap = android.graphics.Bitmap.createBitmap(inputBitmap);
+
+            android.renderscript.RenderScript rs = android.renderscript.RenderScript.create(this);
+            android.renderscript.ScriptIntrinsicBlur blurScript = android.renderscript.ScriptIntrinsicBlur.create(rs, android.renderscript.Element.U8_4(rs));
+            android.renderscript.Allocation tmpIn = android.renderscript.Allocation.createFromBitmap(rs, inputBitmap);
+            android.renderscript.Allocation tmpOut = android.renderscript.Allocation.createFromBitmap(rs, outputBitmap);
+            blurScript.setRadius(radius);
+            blurScript.setInput(tmpIn);
+            blurScript.forEach(tmpOut);
+            tmpOut.copyTo(outputBitmap);
+            rs.destroy();
+            return android.graphics.Bitmap.createScaledBitmap(outputBitmap, bitmap.getWidth(), bitmap.getHeight(), true);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return bitmap;
+        }
     }
 
     private void observeEvent() {
@@ -207,11 +305,11 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
         if (!TextUtils.isEmpty(event.getPosterUrl())) {
             Glide.with(this)
                     .load(event.getPosterUrl())
-                    .placeholder(R.drawable.ic_launcher_foreground)
-                    .error(R.drawable.ic_launcher_foreground)
+                    .placeholder(R.drawable.entrant_ic_launcher_foreground)
+                    .error(R.drawable.entrant_ic_launcher_foreground)
                     .into(posterView);
         } else {
-            posterView.setImageResource(R.drawable.ic_launcher_foreground);
+            posterView.setImageResource(R.drawable.entrant_ic_launcher_foreground);
         }
 
         shareButton.setEnabled(true);
@@ -280,9 +378,9 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
 
     private void observeWaitlistCollection() {
         if (waitlistRegistration != null) return;
+        // Listen to the event document to get waitlist array size
         waitlistRegistration = firestore.collection("events")
                 .document(eventId)
-                .collection("waitlist")
                 .addSnapshotListener((snapshot, error) -> {
                     if (error != null) {
                         if (waitlistCountView != null) {
@@ -290,8 +388,14 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
                         }
                         return;
                     }
-                    int count = snapshot != null ? snapshot.size() : 0;
-                    updateWaitlistCount(count);
+                    if (snapshot != null && snapshot.exists()) {
+                        @SuppressWarnings("unchecked")
+                        List<String> waitlist = (List<String>) snapshot.get("waitlist");
+                        int count = waitlist != null ? waitlist.size() : 0;
+                        updateWaitlistCount(count);
+                    } else {
+                        updateWaitlistCount(0);
+                    }
                 });
     }
 

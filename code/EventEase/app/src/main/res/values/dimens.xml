@@ -1,5 +1,0 @@
-<resources>
-    <!-- Tweak this number to match your template precisely -->
-    <dimen name="ee_topbar_height">70dp</dimen>
-    <dimen name="ee_topbar_width">140dp</dimen>
-</resources>

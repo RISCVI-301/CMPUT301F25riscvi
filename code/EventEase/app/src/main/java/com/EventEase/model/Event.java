@@ -1,8 +1,10 @@
 package com.EventEase.model;
 
 import androidx.annotation.Nullable;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -12,7 +14,9 @@ public class Event {
     public long startsAtEpochMs;    // millis UTC
     public String location;
     public int capacity;
-    public int waitlistCount; // Current number of people on waitlist
+    public int waitlistCount; // Current number of people on waitlist (deprecated - use waitlist.size())
+    public List<String> waitlist; // UIDs of entrants on waitlist
+    public List<String> admitted; // UIDs of admitted entrants
     @Nullable public String notes;
     @Nullable public String guidelines; // Event-specific rules and requirements
     @Nullable public String posterUrl;
@@ -27,6 +31,8 @@ public class Event {
         e.id = UUID.randomUUID().toString();
         e.organizerId = organizerId;
         e.createdAtEpochMs = System.currentTimeMillis();
+        e.waitlist = new ArrayList<>();
+        e.admitted = new ArrayList<>();
         return e;
     }
 
@@ -38,6 +44,8 @@ public class Event {
         m.put("location", location);
         m.put("capacity", capacity);
         m.put("waitlistCount", waitlistCount);
+        m.put("waitlist", waitlist != null ? waitlist : new ArrayList<>());
+        m.put("admitted", admitted != null ? admitted : new ArrayList<>());
         m.put("notes", notes);
         m.put("guidelines", guidelines);
         m.put("posterUrl", posterUrl);
@@ -64,6 +72,31 @@ public class Event {
         
         Object wc = m.get("waitlistCount");
         e.waitlistCount = wc != null ? ((Number) wc).intValue() : 0;
+        
+        // Read waitlist array
+        Object waitlistObj = m.get("waitlist");
+        if (waitlistObj instanceof List) {
+            @SuppressWarnings("unchecked")
+            List<String> waitlistList = (List<String>) waitlistObj;
+            e.waitlist = waitlistList != null ? new ArrayList<>(waitlistList) : new ArrayList<>();
+        } else {
+            e.waitlist = new ArrayList<>();
+        }
+        
+        // Read admitted array
+        Object admittedObj = m.get("admitted");
+        if (admittedObj instanceof List) {
+            @SuppressWarnings("unchecked")
+            List<String> admittedList = (List<String>) admittedObj;
+            e.admitted = admittedList != null ? new ArrayList<>(admittedList) : new ArrayList<>();
+        } else {
+            e.admitted = new ArrayList<>();
+        }
+        
+        // Sync waitlistCount with waitlist size if not set
+        if (e.waitlistCount == 0 && e.waitlist != null && !e.waitlist.isEmpty()) {
+            e.waitlistCount = e.waitlist.size();
+        }
         
         e.notes = (String) m.get("notes");
         e.guidelines = (String) m.get("guidelines");
@@ -119,4 +152,22 @@ public class Event {
 
     @Nullable public String getQrPayload() { return qrPayload; }
     public void setQrPayload(@Nullable String qrPayload) { this.qrPayload = qrPayload; }
+
+    public List<String> getWaitlist() { 
+        return waitlist != null ? waitlist : new ArrayList<>(); 
+    }
+    public void setWaitlist(List<String> waitlist) { 
+        this.waitlist = waitlist != null ? new ArrayList<>(waitlist) : new ArrayList<>();
+        // Sync waitlistCount
+        if (this.waitlist != null) {
+            this.waitlistCount = this.waitlist.size();
+        }
+    }
+
+    public List<String> getAdmitted() { 
+        return admitted != null ? admitted : new ArrayList<>(); 
+    }
+    public void setAdmitted(List<String> admitted) { 
+        this.admitted = admitted != null ? new ArrayList<>(admitted) : new ArrayList<>();
+    }
 }

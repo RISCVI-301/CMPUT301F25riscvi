@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/welcomeFragment">
+
+    <fragment
+        android:id="@+id/welcomeFragment"
+        android:name="com.EventEase.auth.WelcomeFragment"
+        android:label="Welcome">
+        <action
+            android:id="@+id/action_welcome_to_signup"
+            app:destination="@id/signupFragment" />
+        <action
+            android:id="@+id/action_welcome_to_login"
+            app:destination="@id/loginFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/signupFragment"
+        android:name="com.EventEase.auth.SignupFragment"
+        android:label="Sign Up">
+        <action
+            android:id="@+id/action_signup_to_login"
+            app:destination="@id/loginFragment" />
+        <action
+            android:id="@+id/action_signup_to_upload"
+            app:destination="@id/uploadProfilePictureFragment"
+            app:popUpTo="@id/welcomeFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/uploadProfilePictureFragment"
+        android:name="com.EventEase.auth.UploadProfilePictureFragment"
+        android:label="Upload Profile Picture">
+        <action
+            android:id="@+id/action_upload_to_locationPermission"
+            app:destination="@id/locationPermissionFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/locationPermissionFragment"
+        android:name="com.EventEase.auth.LocationPermissionFragment"
+        android:label="Location Permission">
+        <action
+            android:id="@+id/action_locationPermission_to_discover"
+            app:destination="@id/discoverFragment"
+            app:popUpTo="@id/welcomeFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/loginFragment"
+        android:name="com.EventEase.auth.LoginFragment"
+        android:label="Login">
+        <action
+            android:id="@+id/action_login_to_signup"
+            app:destination="@id/signupFragment" />
+        <action
+            android:id="@+id/action_login_to_discover"
+            app:destination="@id/discoverFragment"
+            app:popUpTo="@id/welcomeFragment"
+            app:popUpToInclusive="true" />
+        <action
+            android:id="@+id/action_login_to_forgotPassword"
+            app:destination="@id/forgotPasswordFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/forgotPasswordFragment"
+        android:name="com.EventEase.auth.ForgotPasswordFragment"
+        android:label="Forgot Password">
+        <action
+            android:id="@+id/action_forgotPassword_to_login"
+            app:destination="@id/loginFragment"
+            app:popUpTo="@id/loginFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/eventsSelectionFragment"
+        android:name="com.EventEase.ui.entrant.EventsSelectionFragment"
+        android:label="Events Selection">
+        <action
+            android:id="@+id/action_eventsSelection_to_upcomingEvents"
+            app:destination="@id/upcomingEventsFragment" />
+        <action
+            android:id="@+id/action_eventsSelection_to_myEvents"
+            app:destination="@id/myEventsFragment" />
+        <action
+            android:id="@+id/action_eventsSelection_to_previousEvents"
+            app:destination="@id/previousEventsFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/upcomingEventsFragment"
+        android:name="com.EventEase.ui.entrant.UpcomingEventsFragment"
+        android:label="Upcoming Events" />
+
+    <fragment
+        android:id="@+id/myEventsFragment"
+        android:name="com.EventEase.ui.entrant.myevents.MyEventsFragment"
+        android:label="Waitlisted Events" />
+
+    <fragment
+        android:id="@+id/previousEventsFragment"
+        android:name="com.EventEase.ui.entrant.PreviousEventsFragment"
+        android:label="Previous Events" />
+
+    <fragment
+        android:id="@+id/discoverFragment"
+        android:name="com.EventEase.ui.entrant.discover.DiscoverFragment"
+        android:label="Discover" />
+
+    <fragment
+        android:id="@+id/accountFragment"
+        android:name="com.EventEase.ui.entrant.profile.AccountFragment"
+        android:label="Account">
+        <action
+            android:id="@+id/action_accountFragment_to_editProfileFragment"
+            app:destination="@id/editProfileFragment" />
+        <action
+            android:id="@+id/action_accountFragment_to_welcomeFragment"
+            app:destination="@id/welcomeFragment"
+            app:popUpTo="@id/welcomeFragment"
+            app:popUpToInclusive="true" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/editProfileFragment"
+        android:name="com.EventEase.ui.entrant.profile.EditProfileFragment"
+        android:label="Edit Profile" />
+
+    <!-- Activity placeholders (IDs only); actual navigation to these may be via intents later -->
+    <activity
+        android:id="@+id/eventDetailActivity"
+        android:name="com.EventEase.ui.entrant.eventdetail.EventDetailActivity"
+        android:label="Event Detail" />
+</navigation>
+

@@ -22,13 +22,15 @@ import androidx.lifecycle.ViewModelProvider;
 import androidx.navigation.fragment.NavHostFragment;
 
 import com.example.eventease.R;
+import com.EventEase.util.ToastUtil;
 
 public class LoginFragment extends Fragment {
 
     private static final String PREFS_NAME = "EventEasePrefs";
     private static final String KEY_REMEMBER_ME = "rememberMe";
-    private static final String KEY_SAVED_EMAIL = "savedEmail";
-    private static final String KEY_SAVED_PASSWORD = "savedPassword";
+    private static final String KEY_SAVED_UID = "savedUid";
+    private static final String KEY_SAVED_EMAIL = "savedEmail"; // Keep for auto-fill convenience only
+    private static final String KEY_SAVED_PASSWORD = "savedPassword"; // Keep for auto-fill convenience only
 
     private com.EventEase.auth.AuthViewModel vm;
     private boolean navigateOnSuccess = false; // only true for login, not for reset
@@ -37,7 +39,7 @@ public class LoginFragment extends Fragment {
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_login, container, false);
+        return inflater.inflate(R.layout.entrant_fragment_login, container, false);
     }
 
     @Override
@@ -70,12 +72,12 @@ public class LoginFragment extends Fragment {
             if (isPasswordVisible) {
                 // Hide password
                 password.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-                btnTogglePassword.setImageResource(R.drawable.ic_eye_off);
+                btnTogglePassword.setImageResource(R.drawable.entrant_ic_eye_off);
                 isPasswordVisible = false;
             } else {
                 // Show password
                 password.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
-                btnTogglePassword.setImageResource(R.drawable.ic_eye_on);
+                btnTogglePassword.setImageResource(R.drawable.entrant_ic_eye_on);
                 isPasswordVisible = true;
             }
             // Move cursor to end of text
@@ -87,7 +89,7 @@ public class LoginFragment extends Fragment {
             if (s == null) return;
             progress.setVisibility(s.loading ? View.VISIBLE : View.GONE);
             if (s.error != null) {
-                Toast.makeText(requireContext(), s.error, Toast.LENGTH_LONG).show();
+                ToastUtil.showLong(requireContext(), s.error);
             }
             if (s.success && navigateOnSuccess) {
                 // Successful login → save Remember Me preference and navigate
@@ -95,12 +97,17 @@ public class LoginFragment extends Fragment {
                 String emailText = email.getText().toString().trim();
                 String passwordText = password.getText().toString();
                 
-                if (checkboxRememberMe.isChecked()) {
+                // Save UID for Remember Me (this persists even if email/password changes)
+                com.google.firebase.auth.FirebaseUser currentUser = com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser();
+                if (checkboxRememberMe.isChecked() && currentUser != null) {
                     editor.putBoolean(KEY_REMEMBER_ME, true);
+                    editor.putString(KEY_SAVED_UID, currentUser.getUid());
+                    // Still save email for auto-fill convenience, but UID is what matters for auth persistence
                     editor.putString(KEY_SAVED_EMAIL, emailText);
                     editor.putString(KEY_SAVED_PASSWORD, passwordText);
                 } else {
                     editor.putBoolean(KEY_REMEMBER_ME, false);
+                    editor.remove(KEY_SAVED_UID);
                     editor.remove(KEY_SAVED_EMAIL);
                     editor.remove(KEY_SAVED_PASSWORD);
                 }
@@ -111,13 +118,13 @@ public class LoginFragment extends Fragment {
                         NavHostFragment.findNavController(LoginFragment.this).navigate(R.id.action_login_to_discover);
                     }
                 } catch (Exception e) {
-                    Toast.makeText(requireContext(), "Navigation error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    ToastUtil.showLong(requireContext(), "Navigation error: " + e.getMessage());
                     e.printStackTrace();
                 }
                 navigateOnSuccess = false; // reset
             } else if (s.success && !navigateOnSuccess) {
                 // Success for reset password path
-                Toast.makeText(requireContext(), "Reset email sent", Toast.LENGTH_LONG).show();
+                ToastUtil.showLong(requireContext(), "Reset email sent");
             }
         });
 

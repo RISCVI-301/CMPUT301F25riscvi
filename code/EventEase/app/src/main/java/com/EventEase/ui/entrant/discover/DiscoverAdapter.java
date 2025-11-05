@@ -113,8 +113,8 @@ public class DiscoverAdapter extends RecyclerView.Adapter<DiscoverAdapter.VH> {
 
             Glide.with(ivPoster.getContext())
                     .load(event.getPosterUrl())
-                    .placeholder(R.drawable.image_placeholder_event)
-                    .error(R.drawable.image_placeholder_event)
+                    .placeholder(R.drawable.entrant_image_placeholder_event)
+                    .error(R.drawable.entrant_image_placeholder_event)
                     .centerCrop()
                     .into(ivPoster);
 
@@ -135,7 +135,7 @@ public class DiscoverAdapter extends RecyclerView.Adapter<DiscoverAdapter.VH> {
     @Override
     public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View v = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_event_card, parent, false);
+                .inflate(R.layout.entrant_item_event_card, parent, false);
         return new VH(v);
     }
 

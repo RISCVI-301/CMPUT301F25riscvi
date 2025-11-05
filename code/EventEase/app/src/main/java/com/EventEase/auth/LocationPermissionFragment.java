@@ -78,7 +78,7 @@ public class LocationPermissionFragment extends Fragment {
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_location_permission, container, false);
+        return inflater.inflate(R.layout.entrant_fragment_location_permission, container, false);
     }
 
     @Override

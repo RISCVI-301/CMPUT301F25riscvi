@@ -1,12 +1,22 @@
 package com.EventEase.auth;
 
-import android.app.Activity;
-import android.content.Intent;
+import android.Manifest;
+import android.app.Dialog;
+import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.Color;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
 import android.os.Bundle;
+import android.renderscript.Allocation;
+import android.renderscript.Element;
+import android.renderscript.RenderScript;
+import android.renderscript.ScriptIntrinsicBlur;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.Toast;
@@ -15,8 +25,13 @@ import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.widget.AppCompatButton;
+import androidx.core.content.ContextCompat;
+import androidx.core.content.FileProvider;
 import androidx.fragment.app.Fragment;
 import androidx.navigation.fragment.NavHostFragment;
+import java.io.File;
+import java.io.IOException;
 
 import com.EventEase.auth.AuthManager;
 import com.bumptech.glide.Glide;
@@ -35,19 +50,48 @@ public class UploadProfilePictureFragment extends Fragment {
     private ProgressBar progressUpload;
     private Uri selectedImageUri;
     private AuthManager auth;
+    private File photoFile;
 
-    private final ActivityResultLauncher<Intent> imagePickerLauncher = registerForActivityResult(
-            new ActivityResultContracts.StartActivityForResult(),
-            result -> {
-                if (result.getResultCode() == Activity.RESULT_OK && result.getData() != null) {
-                    selectedImageUri = result.getData().getData();
-                    if (selectedImageUri != null) {
-                        // Show selected image in the circle
-                        Glide.with(this)
-                                .load(selectedImageUri)
-                                .centerCrop()
-                                .into(profileIconImage);
-                    }
+    private final ActivityResultLauncher<String> pickImageLauncher = registerForActivityResult(
+            new ActivityResultContracts.GetContent(),
+            uri -> {
+                if (uri != null) {
+                    selectedImageUri = uri;
+                    // Change scaleType to centerCrop when image is selected
+                    profileIconImage.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                    // Show selected image in the circle with centerCrop and circular clipping
+                    Glide.with(this)
+                            .load(selectedImageUri)
+                            .centerCrop()
+                            .circleCrop()
+                            .into(profileIconImage);
+                }
+            }
+    );
+    
+    private final ActivityResultLauncher<String> requestCameraPermission = registerForActivityResult(
+            new ActivityResultContracts.RequestPermission(),
+            isGranted -> {
+                if (isGranted) {
+                    openCameraInternal();
+                } else {
+                    Toast.makeText(getContext(), "Camera permission is required to take photos", Toast.LENGTH_SHORT).show();
+                }
+            }
+    );
+    
+    private final ActivityResultLauncher<Uri> takePictureLauncher = registerForActivityResult(
+            new ActivityResultContracts.TakePicture(),
+            success -> {
+                if (success && selectedImageUri != null) {
+                    // Change scaleType to centerCrop when image is captured
+                    profileIconImage.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                    // Show captured image in the circle with centerCrop and circular clipping
+                    Glide.with(this)
+                            .load(selectedImageUri)
+                            .centerCrop()
+                            .circleCrop()
+                            .into(profileIconImage);
                 }
             }
     );
@@ -57,7 +101,7 @@ public class UploadProfilePictureFragment extends Fragment {
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_upload_profile_picture, container, false);
+        return inflater.inflate(R.layout.entrant_fragment_upload_profile_picture, container, false);
     }
 
     @Override
@@ -72,23 +116,126 @@ public class UploadProfilePictureFragment extends Fragment {
         View btnSkipUpload = view.findViewById(R.id.btnSkipUpload);
 
         // Make the profile icon clickable to select image
-        profileIconImage.setOnClickListener(v -> openImagePicker());
+        profileIconImage.setOnClickListener(v -> showImageSourceDialog());
 
         btnUploadPicture.setOnClickListener(v -> {
             if (selectedImageUri != null) {
                 uploadProfilePicture();
             } else {
-                openImagePicker();
+                showImageSourceDialog();
             }
         });
 
         btnSkipUpload.setOnClickListener(v -> navigateToLocationPermission());
     }
 
-    private void openImagePicker() {
-        Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-        intent.setType("image/*");
-        imagePickerLauncher.launch(intent);
+    private void showImageSourceDialog() {
+        if (getContext() == null) return;
+        
+        Dialog dialog = new Dialog(requireContext(), android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
+        dialog.setContentView(R.layout.entrant_dialog_image_source);
+        dialog.setCanceledOnTouchOutside(false);
+
+        // Set window properties for full screen blur
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            WindowManager.LayoutParams layoutParams = dialog.getWindow().getAttributes();
+            layoutParams.dimAmount = 0f;
+            dialog.getWindow().setAttributes(layoutParams);
+            dialog.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+        }
+        
+        // Capture screenshot and blur it for the background
+        Bitmap screenshot = captureScreenshot();
+        if (screenshot != null) {
+            Bitmap blurredBitmap = blurBitmap(screenshot, 25f);
+            if (blurredBitmap != null) {
+                android.view.View blurBackground = dialog.findViewById(R.id.dialogBlurBackground);
+                if (blurBackground != null) {
+                    blurBackground.setBackground(new BitmapDrawable(getResources(), blurredBitmap));
+                }
+            }
+        }
+        
+        // Make the background clickable to dismiss
+        android.view.View blurBackground = dialog.findViewById(R.id.dialogBlurBackground);
+        if (blurBackground != null) {
+            blurBackground.setOnClickListener(v -> dialog.dismiss());
+        }
+
+        AppCompatButton cameraButton = dialog.findViewById(R.id.btnCamera);
+        AppCompatButton galleryButton = dialog.findViewById(R.id.btnGallery);
+
+        if (cameraButton != null) {
+            cameraButton.setOnClickListener(v -> {
+                dialog.dismiss();
+                openCamera();
+            });
+        }
+
+        if (galleryButton != null) {
+            galleryButton.setOnClickListener(v -> {
+                dialog.dismiss();
+                pickImageLauncher.launch("image/*");
+            });
+        }
+
+        dialog.show();
+        
+        // Apply animations after dialog is shown
+        View card = dialog.findViewById(R.id.dialogCard);
+        if (blurBackground != null && card != null) {
+            android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(getContext(), R.anim.entrant_dialog_fade_in);
+            android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(getContext(), R.anim.entrant_dialog_zoom_in);
+            
+            blurBackground.startAnimation(fadeIn);
+            card.startAnimation(zoomIn);
+        }
+    }
+    
+    private void openCamera() {
+        if (getContext() == null) return;
+        
+        // Check camera permission first
+        if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.CAMERA) 
+                != PackageManager.PERMISSION_GRANTED) {
+            // Request camera permission
+            requestCameraPermission.launch(Manifest.permission.CAMERA);
+        } else {
+            // Permission already granted, open camera
+            openCameraInternal();
+        }
+    }
+    
+    private void openCameraInternal() {
+        if (getContext() == null) return;
+        
+        try {
+            // Create a File object for the photo
+            photoFile = File.createTempFile(
+                "profile_photo_" + System.currentTimeMillis(),
+                ".jpg",
+                getContext().getCacheDir()
+            );
+            
+            // Create a content URI for the file using FileProvider
+            selectedImageUri = FileProvider.getUriForFile(
+                getContext(),
+                getContext().getPackageName() + ".fileprovider",
+                photoFile
+            );
+            
+            // Launch the camera intent
+            takePictureLauncher.launch(selectedImageUri);
+        } catch (IOException e) {
+            e.printStackTrace();
+            Toast.makeText(getContext(), "Failed to create image file", Toast.LENGTH_SHORT).show();
+        } catch (Exception e) {
+            e.printStackTrace();
+            Toast.makeText(getContext(), "Failed to open camera: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
     }
 
     private void uploadProfilePicture() {
@@ -176,6 +323,50 @@ public class UploadProfilePictureFragment extends Fragment {
         } catch (Exception e) {
             Toast.makeText(requireContext(), "Navigation error: " + e.getMessage(), Toast.LENGTH_LONG).show();
             e.printStackTrace();
+        }
+    }
+    
+    private Bitmap captureScreenshot() {
+        try {
+            if (getActivity() == null || getActivity().getWindow() == null) return null;
+            View rootView = getActivity().getWindow().getDecorView().getRootView();
+            rootView.setDrawingCacheEnabled(true);
+            Bitmap bitmap = Bitmap.createBitmap(rootView.getDrawingCache());
+            rootView.setDrawingCacheEnabled(false);
+            return bitmap;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    private Bitmap blurBitmap(Bitmap bitmap, float radius) {
+        if (bitmap == null || requireContext() == null) return null;
+        
+        try {
+            // Scale down for better performance
+            int width = Math.round(bitmap.getWidth() * 0.4f);
+            int height = Math.round(bitmap.getHeight() * 0.4f);
+            Bitmap inputBitmap = Bitmap.createScaledBitmap(bitmap, width, height, false);
+            Bitmap outputBitmap = Bitmap.createBitmap(inputBitmap);
+            
+            RenderScript rs = RenderScript.create(requireContext());
+            ScriptIntrinsicBlur blurScript = ScriptIntrinsicBlur.create(rs, Element.U8_4(rs));
+            Allocation tmpIn = Allocation.createFromBitmap(rs, inputBitmap);
+            Allocation tmpOut = Allocation.createFromBitmap(rs, outputBitmap);
+            
+            blurScript.setRadius(radius);
+            blurScript.setInput(tmpIn);
+            blurScript.forEach(tmpOut);
+            tmpOut.copyTo(outputBitmap);
+            
+            rs.destroy();
+            
+            // Scale back up
+            return Bitmap.createScaledBitmap(outputBitmap, bitmap.getWidth(), bitmap.getHeight(), true);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return bitmap;
         }
     }
 }

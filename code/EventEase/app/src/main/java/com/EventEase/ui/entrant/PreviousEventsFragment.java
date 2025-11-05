@@ -22,7 +22,7 @@ public class PreviousEventsFragment extends Fragment {
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        View root = inflater.inflate(R.layout.fragment_previous_events, container, false);
+        View root = inflater.inflate(R.layout.entrant_fragment_previous_events, container, false);
 
         // Set status bar color to match top bar
         if (getActivity() != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {

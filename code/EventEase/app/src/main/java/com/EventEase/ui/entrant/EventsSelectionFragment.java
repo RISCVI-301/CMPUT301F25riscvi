@@ -21,7 +21,7 @@ public class EventsSelectionFragment extends Fragment {
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_events_selection, container, false);
+        return inflater.inflate(R.layout.entrant_fragment_events_selection, container, false);
     }
 
     @Override

@@ -46,6 +46,10 @@ public class EventDetailActivity extends AppCompatActivity {
     private ImageButton btnBack;
     private ImageButton btnShare;
     private ImageView ivEventImage;
+    // Custom nav include controls
+    private android.widget.LinearLayout navButtonMyEvents;
+    private android.widget.LinearLayout navButtonDiscover;
+    private android.widget.LinearLayout navButtonAccount;
     private BottomNavigationView bottomNavigation;
     
     private String eventId;
@@ -69,7 +73,7 @@ public class EventDetailActivity extends AppCompatActivity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_event_detail);
+        setContentView(R.layout.entrant_activity_event_detail);
 
         // Get event data from Intent
         eventId = getIntent().getStringExtra("eventId");
@@ -100,7 +104,10 @@ public class EventDetailActivity extends AppCompatActivity {
         btnBack = findViewById(R.id.btnBack);
         btnShare = findViewById(R.id.btnShare);
         ivEventImage = findViewById(R.id.ivEventImage);
-        bottomNavigation = findViewById(R.id.bottomNavigation);
+        // Find custom nav include buttons
+        navButtonMyEvents = findViewById(R.id.nav_button_my_events);
+        navButtonDiscover = findViewById(R.id.nav_button_discover);
+        navButtonAccount = findViewById(R.id.nav_button_account);
 
         // Set up back button
         btnBack.setOnClickListener(v -> finish());
@@ -142,8 +149,16 @@ public class EventDetailActivity extends AppCompatActivity {
         // Listen to waitlist count updates from Firebase
         setupWaitlistCountListener();
 
-        // Set up bottom navigation
-        setupBottomNavigation();
+        // Wire bottom nav navigation to MainActivity destinations
+        if (navButtonDiscover != null) {
+            navButtonDiscover.setOnClickListener(v -> navigateToMain("discover"));
+        }
+        if (navButtonMyEvents != null) {
+            navButtonMyEvents.setOnClickListener(v -> navigateToMain("myEvents"));
+        }
+        if (navButtonAccount != null) {
+            navButtonAccount.setOnClickListener(v -> navigateToMain("account"));
+        }
     }
 
     private void loadEventData() {
@@ -164,13 +179,13 @@ public class EventDetailActivity extends AppCompatActivity {
         if (eventPosterUrl != null && !eventPosterUrl.isEmpty()) {
             Glide.with(this)
                 .load(eventPosterUrl)
-                .placeholder(R.drawable.card_image_placeholder)
-                .error(R.drawable.card_image_placeholder)
+                .placeholder(R.drawable.entrant_card_image_placeholder)
+                .error(R.drawable.entrant_card_image_placeholder)
                 .transition(DrawableTransitionOptions.withCrossFade())
                 .centerCrop()
                 .into(ivEventImage);
         } else {
-            ivEventImage.setImageResource(R.drawable.card_image_placeholder);
+            ivEventImage.setImageResource(R.drawable.entrant_card_image_placeholder);
         }
         
         // Update button text based on event details
@@ -217,7 +232,7 @@ public class EventDetailActivity extends AppCompatActivity {
         
         // Create custom dialog with full screen to show blur background
         android.app.Dialog dialog = new android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
-        dialog.setContentView(R.layout.dialog_guidelines);
+        dialog.setContentView(R.layout.entrant_dialog_guidelines);
         
         // Set window properties
         android.view.Window window = dialog.getWindow();
@@ -244,6 +259,9 @@ public class EventDetailActivity extends AppCompatActivity {
         // Make the background clickable to dismiss
         blurBackground.setOnClickListener(v -> dialog.dismiss());
         
+        // Get the CardView for animation
+        androidx.cardview.widget.CardView cardView = dialog.findViewById(R.id.dialogCardView);
+        
         // Set up dialog views
         TextView tvContent = dialog.findViewById(R.id.tvDialogContent);
         android.widget.Button btnOk = dialog.findViewById(R.id.btnDialogOk);
@@ -259,6 +277,13 @@ public class EventDetailActivity extends AppCompatActivity {
         btnOk.setOnClickListener(v -> dialog.dismiss());
         
         dialog.show();
+        
+        // Apply animations after dialog is shown
+        android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_fade_in);
+        android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_zoom_in);
+        
+        blurBackground.startAnimation(fadeIn);
+        cardView.startAnimation(zoomIn);
     }
     
     private void showAcceptDialog() {
@@ -268,7 +293,7 @@ public class EventDetailActivity extends AppCompatActivity {
         
         // Create custom dialog with full screen to show blur background
         android.app.Dialog dialog = new android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
-        dialog.setContentView(R.layout.dialog_accept_invitation);
+        dialog.setContentView(R.layout.entrant_dialog_accept_invitation);
         
         // Set window properties
         android.view.Window window = dialog.getWindow();
@@ -295,6 +320,9 @@ public class EventDetailActivity extends AppCompatActivity {
         // Make the background clickable to dismiss
         blurBackground.setOnClickListener(v -> dialog.dismiss());
         
+        // Get the CardView for animation
+        androidx.cardview.widget.CardView cardView = dialog.findViewById(R.id.dialogCard);
+        
         // Set up dialog views
         android.widget.Button btnDone = dialog.findViewById(R.id.btnAcceptDone);
         
@@ -305,6 +333,15 @@ public class EventDetailActivity extends AppCompatActivity {
         });
         
         dialog.show();
+        
+        // Apply animations after dialog is shown
+        if (blurBackground != null && cardView != null) {
+            android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_fade_in);
+            android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_zoom_in);
+            
+            blurBackground.startAnimation(fadeIn);
+            cardView.startAnimation(zoomIn);
+        }
     }
     
     private void showDeclineDialog() {
@@ -314,7 +351,7 @@ public class EventDetailActivity extends AppCompatActivity {
         
         // Create custom dialog with full screen to show blur background
         android.app.Dialog dialog = new android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
-        dialog.setContentView(R.layout.dialog_decline_invitation);
+        dialog.setContentView(R.layout.entrant_dialog_decline_invitation);
         
         // Set window properties
         android.view.Window window = dialog.getWindow();
@@ -391,6 +428,14 @@ public class EventDetailActivity extends AppCompatActivity {
         }
     }
 
+    private void navigateToMain(String target) {
+        android.content.Intent intent = new android.content.Intent(this, com.example.eventease.MainActivity.class);
+        intent.putExtra("nav_target", target);
+        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP | android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        startActivity(intent);
+        finish();
+    }
+
     /**
      * Accept the invitation and move user to upcoming events
      */
@@ -422,11 +467,23 @@ public class EventDetailActivity extends AppCompatActivity {
                 })
                 .addOnFailureListener(e -> {
                     android.util.Log.e("EventDetailActivity", "❌ Failed to accept invitation", e);
-                    Toast.makeText(this, "Failed to accept invitation: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                    // Restore buttons
+                    // Restore button state
                     btnRegister.setEnabled(true);
                     btnDecline.setEnabled(true);
-                    btnRegister.setText("Register");
+                    btnRegister.setText("Accept");
+                    
+                    // Show appropriate error message
+                    String errorMessage = "Failed to accept invitation";
+                    if (e != null && e.getMessage() != null) {
+                        if (e.getMessage().contains("full capacity")) {
+                            errorMessage = "Event is at full capacity. Please contact the organizer.";
+                        } else if (e.getMessage().contains("Event not found")) {
+                            errorMessage = "Event not found";
+                        } else {
+                            errorMessage = e.getMessage();
+                        }
+                    }
+                    Toast.makeText(this, errorMessage, Toast.LENGTH_LONG).show();
                 });
     }
 

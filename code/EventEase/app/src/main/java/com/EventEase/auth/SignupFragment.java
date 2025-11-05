@@ -1,6 +1,8 @@
 package com.EventEase.auth;
 
 
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -18,12 +20,16 @@ import androidx.navigation.fragment.NavHostFragment;
 
 
 import com.example.eventease.R;
+import com.EventEase.util.ToastUtil;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
 
 
 public class SignupFragment extends Fragment {
 
+    private static final String PREFS_NAME = "EventEasePrefs";
+    private static final String KEY_REMEMBER_ME = "rememberMe";
+    private static final String KEY_SAVED_UID = "savedUid";
 
     private com.EventEase.auth.AuthViewModel vm;
 
@@ -31,7 +37,7 @@ public class SignupFragment extends Fragment {
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.fragment_signup, container, false);
+        return inflater.inflate(R.layout.entrant_fragment_signup, container, false);
     }
 
 
@@ -57,7 +63,7 @@ public class SignupFragment extends Fragment {
         final ProgressBar progress = view.findViewById(R.id.progress);
         
         if (btnSignup == null) {
-            Toast.makeText(requireContext(), "Signup button not found", Toast.LENGTH_SHORT).show();
+            ToastUtil.showShort(requireContext(), "Signup button not found");
             return;
         }
 
@@ -67,16 +73,26 @@ public class SignupFragment extends Fragment {
             if (s == null) return;
             progress.setVisibility(s.loading ? View.VISIBLE : View.GONE);
             if (s.error != null) {
-                Toast.makeText(requireContext(), s.error, Toast.LENGTH_LONG).show();
+                ToastUtil.showLong(requireContext(), s.error);
             }
             if (s.success) {
-// Successful sign up → go to Upload Profile Picture
+                // Successful sign up → automatically enable Remember Me with UID
+                com.google.firebase.auth.FirebaseUser currentUser = com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser();
+                if (currentUser != null) {
+                    SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+                    prefs.edit()
+                        .putBoolean(KEY_REMEMBER_ME, true)
+                        .putString(KEY_SAVED_UID, currentUser.getUid())
+                        .apply();
+                }
+                
+                // Navigate to Upload Profile Picture
                 try {
                     if (isAdded() && getView() != null) {
                         NavHostFragment.findNavController(SignupFragment.this).navigate(R.id.action_signup_to_upload);
                     }
                 } catch (Exception e) {
-                    Toast.makeText(requireContext(), "Navigation error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    ToastUtil.showLong(requireContext(), "Navigation error: " + e.getMessage());
                     e.printStackTrace();
                 }
             }

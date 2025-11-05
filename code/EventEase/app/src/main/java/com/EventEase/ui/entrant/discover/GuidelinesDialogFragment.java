@@ -58,7 +58,7 @@ public class GuidelinesDialogFragment extends DialogFragment {
     public View onCreateView(@NonNull LayoutInflater inflater,
                              @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
-        return inflater.inflate(R.layout.dialog_guidelines, container, false);
+        return inflater.inflate(R.layout.entrant_dialog_guidelines, container, false);
     }
 
     @Override

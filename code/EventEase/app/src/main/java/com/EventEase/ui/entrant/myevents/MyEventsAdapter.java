@@ -52,7 +52,7 @@ class MyEventsAdapter extends RecyclerView.Adapter<MyEventsAdapter.VH> {
     @NonNull @Override
     public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View v = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.item_event_card, parent, false);
+                .inflate(R.layout.entrant_item_event_card, parent, false);
         return new VH(v);
     }
 
@@ -93,8 +93,8 @@ class MyEventsAdapter extends RecyclerView.Adapter<MyEventsAdapter.VH> {
         // Load event image with Glide
         Glide.with(h.image.getContext())
                 .load(e.getPosterUrl())
-                .placeholder(R.drawable.image_placeholder_event)
-                .error(R.drawable.image_placeholder_event)
+                .placeholder(R.drawable.entrant_image_placeholder_event)
+                .error(R.drawable.entrant_image_placeholder_event)
                 .centerCrop()
                 .into(h.image);
 

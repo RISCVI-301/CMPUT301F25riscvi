@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/dialogRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/transparent"
+    android:clickable="true"
+    android:focusable="true">
+
+    <View
+        android:id="@+id/dialogBlurBackground"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/entrant_dialog_blur_background"
+        android:clickable="true"
+        android:focusable="true" />
+
+    <androidx.cardview.widget.CardView
+        android:id="@+id/dialogCard"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:layout_margin="32dp"
+        android:backgroundTint="#FFFFFF"
+        android:clickable="true"
+        app:cardCornerRadius="20dp"
+        app:cardElevation="24dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <FrameLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:layout_marginTop="28dp">
+
+                <ImageView
+                    android:id="@+id/ivWaitlistBadge"
+                    android:layout_width="148dp"
+                    android:layout_height="148dp"
+                    android:contentDescription="@null"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/entrant_ellipse" />
+
+                <ImageView
+                    android:id="@+id/ivWaitlistIcon"
+                    android:layout_width="96dp"
+                    android:layout_height="96dp"
+                    android:layout_gravity="center"
+                    android:contentDescription="@string/waitlist_dialog_icon_description"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/entrant_tick" />
+
+            </FrameLayout>
+
+            <ScrollView
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_marginTop="16dp"
+                android:layout_weight="1"
+                android:maxHeight="400dp"
+                android:padding="28dp"
+                android:paddingTop="24dp"
+                android:paddingBottom="24dp">
+
+                <TextView
+                    android:id="@+id/tvDialogContent"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/entrant_fredoka_one"
+                    android:gravity="center"
+                    android:lineSpacingExtra="8dp"
+                    android:text="@string/waitlist_dialog_message"
+                    android:textColor="#223C65"
+                    android:textSize="16sp" />
+
+            </ScrollView>
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/btnDialogOk"
+                style="@style/Widget.AppCompat.Button.Borderless"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:layout_margin="28dp"
+                android:layout_marginTop="20dp"
+                android:background="@drawable/entrant_button_guidelines_ok"
+                android:elevation="8dp"
+                android:fontFamily="@font/entrant_fredoka_one"
+                android:text="@string/waitlist_dialog_done"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:textColor="#FFFFFF" />
+
+        </LinearLayout>
+
+    </androidx.cardview.widget.CardView>
+
+</FrameLayout>
