@@ -32,6 +32,7 @@
         <activity
             android:name=".OrganizerAccountActivity"
             android:exported="false" />
+        <activity android:name=".OrganizerWaitlistActivity" />
     </application>
 
 </manifest>
