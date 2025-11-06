@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/rounded_panel_bg"
+    android:layout_marginTop="8dp"
+    android:layout_marginBottom="8dp"
+    android:padding="16dp">
+
+    <!-- Organizer and Event Info -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/organizer_name_text"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Organizer: John Doe"
+            android:textColor="@color/white_text"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:fontFamily="@font/fredoka_bold" />
+
+        <TextView
+            android:id="@+id/timestamp_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Nov 04, 22:30"
+            android:textColor="#B0BEC5"
+            android:textSize="12sp"
+            android:fontFamily="@font/fredoka_regular" />
+    </LinearLayout>
+
+    <!-- The actual notification message -->
+    <TextView
+        android:id="@+id/message_content_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="The event will now start 30 minutes earlier. Please be on time!"
+        android:textColor="@color/white_text"
+        android:textSize="14sp"
+        android:fontFamily="@font/fredoka_regular" />
+
+    <!-- A separator line -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="12dp"
+        android:layout_marginBottom="12dp"
+        android:background="#4A6572" />
+
+    <!-- Recipient Info (Entrant and Event) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="To: "
+            android:textColor="#B0BEC5"
+            android:textSize="12sp"
+            android:fontFamily="@font/fredoka_regular"/>
+
+        <TextView
+            android:id="@+id/entrant_name_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Jane Smith"
+            android:textColor="@color/white_text"
+            android:textSize="12sp"
+            android:fontFamily="@font/fredoka_medium" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=" (Event: "
+            android:textColor="#B0BEC5"
+            android:textSize="12sp"
+            android:fontFamily="@font/fredoka_regular"/>
+
+        <TextView
+            android:id="@+id/event_id_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Summer Fest 2025"
+            android:textColor="@color/white_text"
+            android:textSize="12sp"
+            android:fontFamily="@font/fredoka_medium" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=")"
+            android:textColor="#B0BEC5"
+            android:textSize="12sp"
+            android:fontFamily="@font/fredoka_regular"/>
+    </LinearLayout>
+
+</LinearLayout>
