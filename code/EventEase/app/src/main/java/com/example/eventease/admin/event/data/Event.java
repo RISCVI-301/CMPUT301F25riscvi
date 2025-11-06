@@ -7,9 +7,12 @@ public class Event implements java.io.Serializable {
     private final String description, id, organizerId, posterUrl, qrPayload, title;
     private final boolean geolocation, qrEnabled;
 
+    private final String guidelines;
+    private final int waitlist_count;
+
     public Event(int capacity, long createdAt, String description, boolean geolocation,
                  String id, String organizerId, String posterUrl, boolean qrEnabled,
-                 String qrPayload, long registrationEnd, long registrationStart, String title) {
+                 String qrPayload, long registrationEnd, long registrationStart, String title, String guidelines, int waitlistCount) {
         this.capacity = capacity;
         this.createdAt = createdAt;
         this.description = description;
@@ -22,6 +25,8 @@ public class Event implements java.io.Serializable {
         this.registrationEnd = registrationEnd;
         this.registrationStart = registrationStart;
         this.title = title;
+        this.guidelines = guidelines;
+        waitlist_count = waitlistCount;
     }
 
     public int getCapacity() { return capacity; }

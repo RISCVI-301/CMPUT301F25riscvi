@@ -68,6 +68,10 @@ public class AdminEventDatabaseController {
 
                         String title = getStr(d, "title");
 
+                        String guidelines = getStr(d, "guidelines");
+                        Number waitlistCountN = (Number) d.get("waitlistCount");
+                        int waitlistCount = waitlistCountN != null ? waitlistCountN.intValue() : 0;
+
                         list.add(new Event(
                                 capacity,
                                 createdAt,
@@ -80,7 +84,9 @@ public class AdminEventDatabaseController {
                                 qrPayload,
                                 registrationEnd,
                                 registrationStart,
-                                title
+                                title,
+                                guidelines,
+                                waitlistCount
                         ));
                     }
                     cb.onLoaded(list);
