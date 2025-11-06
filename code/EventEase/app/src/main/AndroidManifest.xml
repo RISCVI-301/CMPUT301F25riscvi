@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
+    <uses-permission android:name="android.permission.INTERNET"/>
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -31,6 +32,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+<<<<<<< HEAD
 
         <meta-data
             android:name="preloaded_fonts"
@@ -48,6 +50,19 @@
                 android:name="androidx.core.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+=======
+        <activity
+            android:name=".ui.organizer.OrganizerMyEventActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".ui.organizer.OrganizerCreateEventActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".OrganizerAccountActivity"
+            android:exported="false" />
+>>>>>>> organizers
     </application>
 
 </manifest>
