@@ -1,5 +1,14 @@
 package com.example.eventease.admin.event.data;
 
+import android.util.Log;
+
+import com.google.android.gms.tasks.Tasks;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.QuerySnapshot;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -8,65 +17,51 @@ public class AdminEventDatabaseController {
     List<Event> data = new ArrayList<>();
 
 
-    public List<Event> getEvents(){
+    public List<Event> getEvents() {
+        List<Event> data = new ArrayList<>();
+        FirebaseAuth.getInstance().signInAnonymously()
+                .addOnSuccessListener(r ->
+                        FirebaseFirestore.getInstance().collection("events").get()
+                                .addOnSuccessListener(q -> {
+                                    for (DocumentSnapshot d : q.getDocuments()) {
+                                        Number capN = (Number) d.get("capacity");
+                                        int capacity = capN != null ? capN.intValue() : 0;
 
-        long now = System.currentTimeMillis();
-        long oneDay = 24L * 60 * 60 * 1000;
+                                        Long createdAt = d.getLong("createdAtEpochMs");
+                                        Long startsAt = d.getLong("startsAtEpochMs");
+                                        long createdAtMs = createdAt != null ? createdAt : 0L;
+                                        long regStart = createdAtMs;
+                                        long regEnd = startsAt != null ? startsAt : 0L;
 
-        // Event 1
-        data.add(new Event(
-                500,                                // capacity
-                now,                                // createdAt
-                "A day of talks on the future of AI and product design.", // description
-                true,                               // geolocation
-                "evt_001",                          // id
-                "org_admin",                        // organizerId
-                "https://images.unsplash.com/photo-1497493292307-31c376b6e479", // posterUrl
-                true,                               // qrEnabled
-                "EVT001",                           // qrPayload
-                now + 14 * oneDay,                  // registrationEnd
-                now - 1 * oneDay,                   // registrationStart
-                "Tech Innovators Summit"            // title
-        ));
-
-        // Event 2
-        data.add(new Event(
-                120,
-                now - 2 * oneDay,
-                "Hands-on building and networking for indie makers.",
-                false,
-                "evt_002",
-                "org_admin",
-                "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee",
-                true,
-                "EVT002",
-                now + 21 * oneDay,
-                now - 3 * oneDay,
-                "Startup Hack Night"
-        ));
-
-        // Event 3
-        data.add(new Event(
-                300,
-                now - 7 * oneDay,
-                "Outdoor music, food trucks, and local artists.",
-                true,
-                "evt_003",
-                "org_admin",
-                "https://images.unsplash.com/photo-1472653431158-6364773b2a56",
-                false,
-                "EVT003",
-                now + 30 * oneDay,
-                now - 5 * oneDay,
-                "Summer Lights Festival"
-        ));
-
+                                        data.add(new Event(
+                                                capacity,
+                                                createdAtMs,
+                                                d.getString("notes"),
+                                                Boolean.TRUE.equals(d.getBoolean("geolocation")),
+                                                d.getString("id") != null ? d.getString("id") : d.getId(),
+                                                d.getString("organizerId"),
+                                                d.getString("posterUrl"),
+                                                Boolean.TRUE.equals(d.getBoolean("qrEnabled")),
+                                                d.getString("qrPayload"),
+                                                regEnd,
+                                                regStart,
+                                                d.getString("title")
+                                        ));
+                                    }
+                                    for (Event e : data) {
+                                        Log.d("getEvents", "id=" + e.getId() + ", title=" + e.getTitle()
+                                                + ", capacity=" + e.getCapacity() + ", createdAt=" + e.getCreatedAt() + ", Photo=" + e.getPosterUrl());
+                                    }
+                                })
+                                .addOnFailureListener(e -> Log.e("getEvents", "read fail", e))
+                )
+                .addOnFailureListener(e -> Log.e("getEvents", "auth fail", e));
         return data;
     }
+
 
     public boolean deleteEvent(Event obj){
         return true;
     }
-
 
 }
