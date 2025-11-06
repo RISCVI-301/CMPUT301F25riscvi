@@ -10,7 +10,7 @@
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application
-        android:name=".App"
+        android:name="com.EventEase.App"
         android:label="@string/app_name"
         android:icon="@mipmap/entrant_ic_launcher"
         android:roundIcon="@mipmap/entrant_ic_launcher_round"
@@ -23,7 +23,7 @@
             android:name="com.EventEase.ui.entrant.discover.EventDetailsDiscoverActivity"
             android:exported="false" />
         <activity
-            android:name=".MainActivity"
+            android:name="com.EventEase.MainActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

@@ -33,7 +33,7 @@ import com.EventEase.data.ListenerRegistration;
 import com.EventEase.data.WaitlistRepository;
 import com.EventEase.model.Event;
 import com.EventEase.model.Invitation;
-import com.example.eventease.App;                // ✅ use shared DevGraph
+import com.EventEase.App;                // ✅ use shared DevGraph
 import com.example.eventease.R;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;

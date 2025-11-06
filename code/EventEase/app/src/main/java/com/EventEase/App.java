@@ -1,4 +1,4 @@
-package com.example.eventease;
+package com.EventEase;
 
 import android.app.Application;
 import com.EventEase.data.firebase.FirebaseDevGraph;
@@ -11,3 +11,5 @@ public class App extends Application {
     }
     public static FirebaseDevGraph graph() { return GRAPH; }
 }
+
+

@@ -1,4 +1,4 @@
-package com.example.eventease;
+package com.EventEase;
 
 import android.os.Bundle;
 import android.view.View;
@@ -14,6 +14,7 @@ import androidx.navigation.NavDestination;
 import androidx.navigation.fragment.NavHostFragment;
 
 import com.google.firebase.auth.FirebaseAuth;
+import com.example.eventease.R;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -260,3 +261,5 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 }
+
+

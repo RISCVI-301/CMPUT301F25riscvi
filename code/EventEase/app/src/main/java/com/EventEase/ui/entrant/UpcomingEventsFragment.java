@@ -28,7 +28,7 @@ import com.EventEase.data.AdmittedRepository;
 import com.EventEase.model.Event;
 import com.EventEase.ui.entrant.eventdetail.EventDetailActivity;
 import com.bumptech.glide.Glide;
-import com.example.eventease.App;
+import com.EventEase.App;
 import com.example.eventease.R;
 
 import java.text.SimpleDateFormat;
