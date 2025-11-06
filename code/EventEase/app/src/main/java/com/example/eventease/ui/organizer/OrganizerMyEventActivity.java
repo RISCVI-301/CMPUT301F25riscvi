@@ -12,6 +12,9 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.eventease.R;
+import com.example.eventease.util.AuthHelper;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.FirebaseFirestoreSettings;
@@ -34,11 +37,8 @@ public class OrganizerMyEventActivity extends AppCompatActivity {
     private LinearLayout btnMyEvents, btnAccount;
     private View fabAdd;
 
-    // Use your card adapter (with poster ImageView)
     private OrganizerMyEventAdapter adapter;
     private final List<Map<String, Object>> items = new ArrayList<>();
-
-    private static final String DEV_ORGANIZER_ID = "organizer_test_1";
 
     private FirebaseFirestore db;
     private ListenerRegistration registration;
@@ -65,7 +65,7 @@ public class OrganizerMyEventActivity extends AppCompatActivity {
         try {
             db.setFirestoreSettings(
                     new FirebaseFirestoreSettings.Builder()
-                            .setPersistenceEnabled(false) // DEV ONLY: show console deletes instantly
+                            .setPersistenceEnabled(false)
                             .build()
             );
         } catch (Throwable ignored) { }
@@ -82,6 +82,11 @@ public class OrganizerMyEventActivity extends AppCompatActivity {
     @Override
     protected void onStart() {
         super.onStart();
+        if (!AuthHelper.isAuthenticated()) {
+            Toast.makeText(this, "Please sign in to view your events", Toast.LENGTH_LONG).show();
+            finish();
+            return;
+        }
         refreshFromServer();
         attachRealtime();
     }
@@ -96,13 +101,14 @@ public class OrganizerMyEventActivity extends AppCompatActivity {
     }
 
     private Query baseQuery() {
-        // If you ever need to see ALL events regardless of owner, temporarily remove whereEqualTo.
+        String organizerId = AuthHelper.getCurrentOrganizerIdOrNull();
+        if (organizerId == null) {
+            return db.collection("events").whereEqualTo("organizerId", "__invalid__");
+        }
         return db.collection("events")
-                .whereEqualTo("organizerId", DEV_ORGANIZER_ID)
-                .orderBy("createdAt", Query.Direction.DESCENDING);
+                .whereEqualTo("organizerId", organizerId);
     }
 
-    /** Force a SERVER read so app matches console deletes/edits immediately. */
     private void refreshFromServer() {
         baseQuery().get(Source.SERVER)
                 .addOnSuccessListener(this::applySnapshot)
@@ -111,7 +117,6 @@ public class OrganizerMyEventActivity extends AppCompatActivity {
                 );
     }
 
-    /** Realtime updates for future creates/edits/deletes. */
     private void attachRealtime() {
         if (registration != null) {
             registration.remove();
@@ -129,7 +134,6 @@ public class OrganizerMyEventActivity extends AppCompatActivity {
         );
     }
 
-    /** Convert Firestore docs -> maps expected by OrganizerMyEventAdapter. */
     private void applySnapshot(QuerySnapshot snapshots) {
         items.clear();
         for (QueryDocumentSnapshot d : snapshots) {
@@ -145,15 +149,12 @@ public class OrganizerMyEventActivity extends AppCompatActivity {
         rvMyEvents.setVisibility(hasItems ? View.VISIBLE : View.GONE);
     }
 
-    // ---------- mapping helpers (tolerant to missing/typed fields) ----------
     private Map<String, Object> toAdapterMap(DocumentSnapshot d) {
         Map<String, Object> m = new HashMap<>();
 
         String id = getStringOr(d.getString("id"), d.getId());
         String title = getStringOr(d.getString("title"), "Untitled");
-
-        // IMPORTANT: keep this EXACT key — your adapter reads "posterUrl"
-        String posterUrl = d.getString("posterUrl"); // must be https URL or gs:// handled by Glide (ok if Storage public-read)
+        String posterUrl = d.getString("posterUrl");
         String location = d.getString("location");
 
         long regStart = coerceLong(d.get("registrationStart"));
@@ -162,7 +163,7 @@ public class OrganizerMyEventActivity extends AppCompatActivity {
 
         m.put("id", id);
         m.put("title", title);
-        m.put("posterUrl", posterUrl);   // <-- used by Glide in your adapter
+        m.put("posterUrl", posterUrl);
         m.put("location", location);
         m.put("registrationStart", regStart);
         m.put("registrationEnd", regEnd);
