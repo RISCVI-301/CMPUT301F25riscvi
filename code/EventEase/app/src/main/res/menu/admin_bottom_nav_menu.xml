@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+<!--    <item-->
+<!--        android:id="@+id/nav_events"-->
+<!--        android:title="Events"-->
+<!--        android:icon="@drawable/ic_events" />-->
+<!--    <item-->
+<!--        android:id="@+id/nav_profiles"-->
+<!--        android:title="Profiles"-->
+<!--        android:icon="@drawable/ic_profiles" />-->
+<!--    <item-->
+<!--        android:id="@+id/nav_images"-->
+<!--        android:title="Images"-->
+<!--        android:icon="@drawable/ic_images" />-->
+<!--    <item-->
+<!--        android:id="@+id/nav_logs"-->
+<!--        android:title="Logs"-->
+<!--        android:icon="@drawable/ic_logs" />-->
+</menu>

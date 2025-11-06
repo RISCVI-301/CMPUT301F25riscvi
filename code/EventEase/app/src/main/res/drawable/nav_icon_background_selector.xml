@@ -1,0 +1,7 @@
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- When the item is selected (state_checked="true"), use the selected background -->
+    <item android:drawable="@drawable/nav_icon_background_selected" android:state_checked="true" />
+    <!-- Otherwise (default state), use the unselected background -->
+    <item android:drawable="@drawable/nav_icon_background_unselected" />
+</selector>
+    
