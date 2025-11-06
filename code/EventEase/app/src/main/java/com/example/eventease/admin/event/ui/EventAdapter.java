@@ -1,5 +1,9 @@
 package com.example.eventease.admin.event.ui;
 
+import android.content.Intent;
+import com.example.eventease.admin.event.ui.EventDetailActivity;
+
+
 import android.content.Context;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
@@ -83,10 +87,12 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
 
         // Optional click handling
         holder.itemView.setOnClickListener(v -> {
-            if (onEventClickListener != null) {
-                onEventClickListener.onEventClick(event, holder.getBindingAdapterPosition());
-            }
+            Intent i = new Intent(v.getContext(), EventDetailActivity.class);
+            i.putExtra(EventDetailActivity.EXTRA_EVENT, event); // Event must implement Serializable
+            // i.putExtra(EventDetailActivity.EXTRA_WAITLIST_COUNT, 0); // optional
+            v.getContext().startActivity(i);
         });
+
     }
 
     @Override public int getItemCount() { return items.size(); }
