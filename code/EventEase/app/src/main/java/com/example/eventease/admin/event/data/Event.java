@@ -1,6 +1,7 @@
 package com.example.eventease.admin.event.data;
 
-public final class Event {
+public class Event implements java.io.Serializable {
+    private static final long serialVersionUID = 1L;
     private final int capacity;
     private final long createdAt, registrationEnd, registrationStart;
     private final String description, id, organizerId, posterUrl, qrPayload, title;
