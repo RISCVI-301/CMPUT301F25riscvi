@@ -33,7 +33,7 @@ public class EventDetailActivity extends AppCompatActivity {
         onDeleteCallback = deleteCallback;
         Intent i = new Intent(context, EventDetailActivity.class);
         i.putExtra(EXTRA_EVENT, event);
-        i.putExtra(EXTRA_WAITLIST_COUNT, event.getWaitlist_count());
+        i.putExtra(EXTRA_WAITLIST_COUNT, event.getWaitlist_count()); // keeping existing behavior
         context.startActivity(i);
     }
 
@@ -55,6 +55,7 @@ public class EventDetailActivity extends AppCompatActivity {
         ImageView ivPoster       = findViewById(R.id.ivPoster);
         TextView tvDescription   = findViewById(R.id.tvDescription);
         TextView tvWaitlistCount = findViewById(R.id.tvWaitlistCount);
+        TextView tvGuidelines    = findViewById(R.id.tvGuidelines); // NEW
         MaterialButton btnDelete = findViewById(R.id.btnDeleteEvent);
 
         Event event = (Event) getIntent().getSerializableExtra(EXTRA_EVENT);
@@ -84,6 +85,12 @@ public class EventDetailActivity extends AppCompatActivity {
         );
 
         tvWaitlistCount.setText(String.valueOf(waitlistCount));
+
+        // NEW: show guidelines
+        String guidelines = event.getGuidelines();
+        tvGuidelines.setText(TextUtils.isEmpty(guidelines)
+                ? "No guidelines provided."
+                : guidelines);
 
         btnBack.setOnClickListener(v -> onBackPressed());
 
