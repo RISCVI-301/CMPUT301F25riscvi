@@ -1,46 +1,54 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:background="#223C65"
-    android:fitsSystemWindows="true">
+    tools:context=".AdminEventManagementActivity">
 
-    <!--  Top Bar  -->
+    <!-- Top bar -->
     <TextView
-        android:id="@+id/main"
+        android:id="@+id/tvTitle"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="56dp"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
         android:text="EventEase"
-        android:textColor="#223C65"
-        android:textSize="28sp"
         android:textStyle="bold"
-        android:padding="16dp"
-        android:background="#9EFFF1" />
+        android:textSize="22sp"
+        android:textColor="#1A2C44"
+        android:background="#BDE9DB" />
 
-    <androidx.constraintlayout.widget.ConstraintLayout
+    <!-- Admin pill -->
+    <TextView
+        android:id="@+id/tvAdmin"
+        android:layout_width="wrap_content"
+        android:layout_height="36dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="12dp"
+        android:paddingStart="18dp"
+        android:paddingEnd="18dp"
+        android:gravity="center"
+        android:text="Admin"
+        android:textStyle="bold"
+        android:textColor="#1A2C44"
+        android:background="@drawable/bg_admin_pill"
+        tools:ignore="HardcodedText" />
+
+    <!-- Events list -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvEvents"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:padding="16dp"
+        android:clipToPadding="false"
+        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
+        tools:listitem="@layout/item_event_card" />
 
-        <!-- Admin Pill -->
-        <TextView
-            android:id="@+id/adminBadge"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:text="Admin"
-            android:textColor="#223C65"
-            android:textSize="22sp"
-            android:textStyle="bold"
-            android:paddingVertical="14dp"
-            android:gravity="center"
-            android:layout_marginTop="16dp"
-            android:background="@drawable/admin_pill"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintWidth_percent="0.8"/>
-    </androidx.constraintlayout.widget.ConstraintLayout>
+    <!-- (Navbar will go here later) -->
 
 </LinearLayout>
