@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:background="#223C65"
+    android:padding="32dp">
+
+    <!-- Main Card Container -->
+    <androidx.cardview.widget.CardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:cardCornerRadius="24dp"
+        app:cardElevation="24dp"
+        app:cardBackgroundColor="#7A8FA8">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center_horizontal"
+            android:padding="48dp">
+
+            <!-- Profile Picture Container (White Circle with Icon) -->
+            <FrameLayout
+                android:layout_width="180dp"
+                android:layout_height="180dp"
+                android:layout_marginBottom="48dp">
+
+                <!-- White Circle Background -->
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@drawable/entrant_circle_profile_placeholder"
+                    android:elevation="8dp"/>
+
+                <!-- User Icon / Profile Picture -->
+                <ImageView
+                    android:id="@+id/profileIconImage"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:src="@drawable/entrant_icon"
+                    android:scaleType="center"
+                    android:background="@drawable/entrant_circle_image_clip"
+                    android:clipToOutline="true"
+                    android:elevation="12dp"
+                    android:contentDescription="Profile Picture"/>
+
+            </FrameLayout>
+
+            <!-- Upload Picture Button -->
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/btnUploadPicture"
+                style="@style/Widget.AppCompat.Button.Borderless"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Upload Picture"
+                android:textSize="28sp"
+                android:textStyle="bold"
+                android:textColor="#223C65"
+                android:background="@drawable/entrant_btn_upload_picture"
+                android:paddingTop="20dp"
+                android:paddingBottom="20dp"
+                android:fontFamily="@font/entrant_fredoka_one"
+                android:elevation="8dp"
+                android:layout_marginBottom="32dp"/>
+
+            <!-- Skip for now Button -->
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/btnSkipUpload"
+                style="@style/Widget.AppCompat.Button.Borderless"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Skip for now"
+                android:textSize="28sp"
+                android:textStyle="bold"
+                android:textColor="#223C65"
+                android:background="@drawable/entrant_btn_upload_picture"
+                android:paddingTop="20dp"
+                android:paddingBottom="20dp"
+                android:fontFamily="@font/entrant_fredoka_one"
+                android:elevation="8dp"/>
+
+        </LinearLayout>
+
+    </androidx.cardview.widget.CardView>
+
+    <ProgressBar
+        android:id="@+id/progressUpload"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        android:layout_marginTop="24dp"/>
+
+</LinearLayout>
+
