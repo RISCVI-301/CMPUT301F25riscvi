@@ -23,5 +23,16 @@ public final class Event {
         this.title = title;
     }
 
-   
+    public int getCapacity() { return capacity; }
+    public long getCreatedAt() { return createdAt; }
+    public String getDescription() { return description; }
+    public boolean isGeolocation() { return geolocation; }
+    public String getId() { return id; }
+    public String getOrganizerId() { return organizerId; }
+    public String getPosterUrl() { return posterUrl; }
+    public boolean isQrEnabled() { return qrEnabled; }
+    public String getQrPayload() { return qrPayload; }
+    public long getRegistrationEnd() { return registrationEnd; }
+    public long getRegistrationStart() { return registrationStart; }
+    public String getTitle() { return title; }
 }
