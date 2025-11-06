@@ -35,7 +35,7 @@
         android:text="Admin"
         android:textStyle="bold"
         android:textColor="#1A2C44"
-        android:background="@drawable/bg_admin_pill"
+        android:background="@drawable/admin_pill"
         tools:ignore="HardcodedText" />
 
     <!-- Events list -->
