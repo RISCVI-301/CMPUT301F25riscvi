@@ -18,16 +18,12 @@ public class AdminEventDatabaseController {
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
     private final FirebaseAuth auth = FirebaseAuth.getInstance();
 
-    // Callback to deliver results asynchronously
     public interface EventsCallback {
         void onLoaded(@NonNull List<Event> events);
         void onError(@NonNull Exception e);
     }
 
-    /**
-     * Fetch events asynchronously and return them via callback.
-     * Replaces the old synchronous getEvents() pattern.
-     */
+
     public void fetchEvents(@NonNull final EventsCallback cb) {
         // If you need auth, ensure user exists; otherwise you can omit this check.
         if (auth.getCurrentUser() == null) {
@@ -40,7 +36,6 @@ public class AdminEventDatabaseController {
                 .addOnSuccessListener((QuerySnapshot qs) -> {
                     List<Event> list = new ArrayList<>();
                     for (DocumentSnapshot d : qs.getDocuments()) {
-                        // Safely extract fields; provide sane defaults if missing
                         String id = d.getId();
                         Number capN = (Number) d.get("capacity");
                         int capacity = capN != null ? capN.intValue() : 0;
@@ -102,15 +97,12 @@ public class AdminEventDatabaseController {
         return v != null ? String.valueOf(v) : "";
     }
 
-    // Keep existing signature if other code uses it; optional no-op or delegate.
-    // You can remove this if it's not referenced anywhere else.
     public List<Event> getEvents() {
-        // Deprecated synchronous access; returns empty list immediately.
         return new ArrayList<>();
     }
 
     public boolean deleteEvent(@NonNull Event obj) {
-        String id = obj.getId(); // ensure Event exposes its document ID
+        String id = obj.getId();
         if (id == null || id.isEmpty()) return false;
 
         db.collection("events")

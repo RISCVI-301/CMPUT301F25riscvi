@@ -17,7 +17,6 @@ public class AdminImageDatabaseController {
     private final StorageReference postersRef =
             FirebaseStorage.getInstance().getReference().child("posters/");
 
-    /** 1) Get all download URLs in posters/ */
     public List<String> getImageLinks() {
         try {
             ListResult res = Tasks.await(postersRef.listAll());
@@ -38,7 +37,7 @@ public class AdminImageDatabaseController {
             if (urlOrPath.startsWith("http") || urlOrPath.startsWith("gs://")) {
                 ref = FirebaseStorage.getInstance().getReferenceFromUrl(urlOrPath);
             } else {
-                ref = postersRef.child(urlOrPath); // e.g., "posters/myPoster.jpg" or just "myPoster.jpg"
+                ref = postersRef.child(urlOrPath);
             }
             Tasks.await(ref.delete());
             return true;

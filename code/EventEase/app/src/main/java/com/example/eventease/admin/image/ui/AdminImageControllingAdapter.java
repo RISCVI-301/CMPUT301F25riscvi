@@ -20,7 +20,7 @@ public class AdminImageControllingAdapter extends RecyclerView.Adapter<AdminImag
     private final int itemW, itemH, margin; // Holding Tile width, height, and margin.
 
     public interface OnDelete {
-        void onDelete(String url, int pos); // void is fine
+        void onDelete(String url, int pos);
     }
 
     private final OnDelete onDelete;
@@ -39,7 +39,7 @@ public class AdminImageControllingAdapter extends RecyclerView.Adapter<AdminImag
         // Assign Tile Margin, width, Height
         margin = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 8, dm);
         itemW = (int) (screenW * 0.46f) - margin * 2;
-        itemH = (int) (screenH * 0.25f) - margin * 2; // keep same height
+        itemH = (int) (screenH * 0.25f) - margin * 2;
     }
 
     //
@@ -64,8 +64,6 @@ public class AdminImageControllingAdapter extends RecyclerView.Adapter<AdminImag
 
     @Override
     public void onBindViewHolder(VH h, int i) {
-
-        // Attach Image to Data:
 
         String url = urls.get(i);
         Glide.with(h.image.getContext())

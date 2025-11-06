@@ -36,7 +36,6 @@ public class AdminImageManagementActivity extends AppCompatActivity {
                 (url, pos) -> deleteImage(url, pos));
         rv.setAdapter(adapter);
 
-        // Load images off the main thread (controller is blocking)
         io.execute(() -> {
             List<String> urls = AIDC.getImageLinks();
             runOnUiThread(() -> {

@@ -31,7 +31,6 @@ public class AdminEventManagementActivity extends AppCompatActivity {
         rv = findViewById(R.id.rvEvents);
         if (rv != null) {
             rv.setLayoutManager(new LinearLayoutManager(this));
-            // Start with an empty list; data will be set when it arrives.
             adapter = new EventAdapter(this, new ArrayList<>(), this::deleteEventAndRefresh);
             rv.setAdapter(adapter);
         }
