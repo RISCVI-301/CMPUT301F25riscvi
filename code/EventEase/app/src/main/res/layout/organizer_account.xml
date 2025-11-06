@@ -73,6 +73,33 @@
                     android:tint="@color/ee_text_light"/>
             </LinearLayout>
 
+            <LinearLayout
+                android:layout_marginTop="16dp"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/ee_card_bg"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:text="Authentication Info"
+                    android:textStyle="bold"
+                    android:textSize="16sp"
+                    android:textColor="@color/ee_text_light"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"/>
+
+                <TextView
+                    android:id="@+id/tvUserId"
+                    android:layout_marginTop="8dp"
+                    android:text="Loading..."
+                    android:textSize="12sp"
+                    android:textColor="@color/ee_text_light"
+                    android:fontFamily="monospace"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"/>
+            </LinearLayout>
+
             <!-- Notifications row -->
             <LinearLayout
                 android:id="@+id/rowNotifications"

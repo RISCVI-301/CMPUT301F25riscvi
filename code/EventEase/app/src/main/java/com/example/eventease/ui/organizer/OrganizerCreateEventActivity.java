@@ -15,6 +15,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.bumptech.glide.Glide;
 import com.example.eventease.R;
+import com.example.eventease.util.AuthHelper;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.auth.FirebaseAuth;
@@ -31,8 +32,6 @@ import java.util.UUID;
 
 public class OrganizerCreateEventActivity extends AppCompatActivity {
     private static final String TAG = "CreateEvent";
-    // Keep this to match your OrganizerMyEventActivity query
-    private static final String DEV_ORGANIZER_ID = "organizer_test_1";
 
     private ImageButton btnBack, btnPickPoster;
     private EditText etTitle, etDescription, etCapacity;
@@ -111,7 +110,6 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         dp.show();
     }
 
-    // Step 0: ensure we’re authenticated (rules require request.auth != null)
     private void beginSaveEvent() {
         FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
         if (user == null) {
@@ -130,7 +128,6 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         }
     }
 
-    // Step 1: validate inputs
     private void doValidateAndSave() {
         String title = safe(etTitle.getText());
         if (title.isEmpty()) { etTitle.setError("Event name is required"); etTitle.requestFocus(); return; }
@@ -160,14 +157,13 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         doUploadAndSave(title, chosenCapacity);
     }
 
-    // Step 2: upload poster with explicit MIME type to satisfy Storage rules
     private void doUploadAndSave(String title, int chosenCapacity) {
         final String id = UUID.randomUUID().toString();
         final StorageReference ref = FirebaseStorage.getInstance()
                 .getReference("posters/" + id + ".jpg");
 
         StorageMetadata meta = new StorageMetadata.Builder()
-                .setContentType("image/jpeg") // IMPORTANT for your Storage rule
+                .setContentType("image/jpeg")
                 .build();
 
         ref.putFile(posterUri, meta)
@@ -184,8 +180,14 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                 });
     }
 
-    // Step 3: write Firestore document
     private void writeEventDoc(String id, String title, int chosenCapacity, String posterUrl) {
+        String organizerId = AuthHelper.getCurrentOrganizerIdOrNull();
+        if (organizerId == null) {
+            toast("Not signed in. Please sign in again.");
+            btnSave.setEnabled(true);
+            btnSave.setText("SAVE CHANGES");
+            return;
+        }
         String description = safe(etDescription.getText());
         boolean useGeo = swGeo.isChecked();
         boolean generateQr = swQr.isChecked();
@@ -200,7 +202,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         doc.put("geolocation", useGeo);
         doc.put("qrEnabled", generateQr);
         doc.put("posterUrl", posterUrl);
-        doc.put("organizerId", DEV_ORGANIZER_ID);
+        doc.put("organizerId", organizerId);
         doc.put("createdAt", System.currentTimeMillis());
         doc.put("qrPayload", generateQr ? ("event:" + id) : null);
 
@@ -233,13 +235,11 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                 .setTitle("Event created")
                 .setMessage(msg.toString())
                 .setPositiveButton("View My Events", (d, w) -> {
-                    // Return to list; your list listener will pick up the new doc
                     startActivity(new Intent(
                             this, com.example.eventease.ui.organizer.OrganizerMyEventActivity.class));
                     finish();
                 })
                 .setNegativeButton("Create Another", (d, w) -> {
-                    // Just clear fields for a new one
                     resetForm();
                 })
                 .show();
