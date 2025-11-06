@@ -1,8 +1,5 @@
+// File: EventAdapter.java
 package com.example.eventease.admin.event.ui;
-
-import android.content.Intent;
-import com.example.eventease.admin.event.ui.EventDetailActivity;
-
 
 import android.content.Context;
 import android.graphics.Color;
@@ -25,20 +22,24 @@ import com.example.eventease.admin.event.data.Event;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHolder> {
 
     private final LayoutInflater inflater;
     private final List<Event> items = new ArrayList<>();
     @Nullable private OnEventClickListener onEventClickListener;
+    @NonNull private final Consumer<Event> onDeleteCallback;
 
-    public EventAdapter(@NonNull Context context, @NonNull List<Event> events) {
+    public EventAdapter(@NonNull Context context,
+                        @NonNull List<Event> events,
+                        @NonNull Consumer<Event> onDeleteCallback) {
         this.inflater = LayoutInflater.from(context);
         if (events != null) this.items.addAll(events);
+        this.onDeleteCallback = onDeleteCallback;
         setHasStableIds(true);
     }
 
-    /** Optional click listener so each box can be clickable if you wire it later. */
     public interface OnEventClickListener {
         void onEventClick(@NonNull Event event, int position);
     }
@@ -47,16 +48,29 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         this.onEventClickListener = listener;
     }
 
-    /** Replace all items (simple version; swap to DiffUtil if needed). */
     public void submitList(@NonNull List<Event> newItems) {
         items.clear();
         items.addAll(newItems);
         notifyDataSetChanged();
     }
 
+    /** Remove by stable id and notify the exact removal index. */
+    public boolean removeById(@NonNull String id) {
+        for (int i = 0; i < items.size(); i++) {
+            Event e = items.get(i);
+            if (id.equals(e.getId())) {
+                items.remove(i);
+                notifyItemRemoved(i);
+                return true;
+            }
+        }
+        return false;
+    }
+
     @Override public long getItemId(int position) {
-        // If your Event has a real id, use it; otherwise fall back to position.
-        return position;
+        Event e = items.get(position);
+        String id = e.getId();
+        return (id != null) ? id.hashCode() : position;
     }
 
     @NonNull @Override
@@ -69,13 +83,10 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
     public void onBindViewHolder(@NonNull EventViewHolder holder, int position) {
         Event event = items.get(position);
 
-        // Title (bottom-left)
         holder.tvTitle.setText(event.getTitle());
 
-        // Poster background
         String url = event.getPosterUrl();
         if (TextUtils.isEmpty(url)) {
-            // Safe fallback color if no image available
             holder.ivPoster.setImageDrawable(new ColorDrawable(Color.parseColor("#546E7A")));
         } else {
             Glide.with(holder.ivPoster.getContext())
@@ -85,14 +96,10 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
                     .into(holder.ivPoster);
         }
 
-        // Optional click handling
-        holder.itemView.setOnClickListener(v -> {
-            Intent i = new Intent(v.getContext(), EventDetailActivity.class);
-            i.putExtra(EventDetailActivity.EXTRA_EVENT, event); // Event must implement Serializable
-            // i.putExtra(EventDetailActivity.EXTRA_WAITLIST_COUNT, 0); // optional
-            v.getContext().startActivity(i);
-        });
-
+        // Pass the callback forward to EventDetailActivity
+        holder.itemView.setOnClickListener(v ->
+                EventDetailActivity.start(v.getContext(), event, onDeleteCallback)
+        );
     }
 
     @Override public int getItemCount() { return items.size(); }

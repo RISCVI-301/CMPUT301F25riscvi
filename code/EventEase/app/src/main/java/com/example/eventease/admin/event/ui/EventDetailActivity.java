@@ -1,4 +1,3 @@
-// File: EventDetailActivity.java
 package com.example.eventease.admin.event.ui;
 
 import android.content.Context;
@@ -20,15 +19,28 @@ import com.example.eventease.R;
 import com.example.eventease.admin.event.data.Event;
 import com.google.android.material.button.MaterialButton;
 
+import java.util.function.Consumer;
+
 public class EventDetailActivity extends AppCompatActivity {
 
     public static final String EXTRA_EVENT = "com.example.eventease.extra.EVENT";
     public static final String EXTRA_WAITLIST_COUNT = "com.example.eventease.extra.WAITLIST_COUNT";
 
-    /** Helper to start this screen from anywhere. */
+    private static Consumer<Event> onDeleteCallback; // receives the delete function
+
+    /** Helper to start this screen and pass a delete callback. */
+    public static void start(Context context, Event event, Consumer<Event> deleteCallback) {
+        onDeleteCallback = deleteCallback;
+        Intent i = new Intent(context, EventDetailActivity.class);
+        i.putExtra(EXTRA_EVENT, event);
+        i.putExtra(EXTRA_WAITLIST_COUNT, 0);
+        context.startActivity(i);
+    }
+
+    /** Existing helper preserved (no callback). */
     public static void start(Context context, Event event, int waitlistCount) {
         Intent i = new Intent(context, EventDetailActivity.class);
-        i.putExtra(EXTRA_EVENT, event);              // Event passed via Serializable (see note below)
+        i.putExtra(EXTRA_EVENT, event);
         i.putExtra(EXTRA_WAITLIST_COUNT, waitlistCount);
         context.startActivity(i);
     }
@@ -38,7 +50,6 @@ public class EventDetailActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_event_detail);
 
-        // Views
         ImageButton btnBack      = findViewById(R.id.btnBack);
         TextView tvEventTitle    = findViewById(R.id.tvEventTitle);
         ImageView ivPoster       = findViewById(R.id.ivPoster);
@@ -46,7 +57,6 @@ public class EventDetailActivity extends AppCompatActivity {
         TextView tvWaitlistCount = findViewById(R.id.tvWaitlistCount);
         MaterialButton btnDelete = findViewById(R.id.btnDeleteEvent);
 
-        // Get data
         Event event = (Event) getIntent().getSerializableExtra(EXTRA_EVENT);
         int waitlistCount = getIntent().getIntExtra(EXTRA_WAITLIST_COUNT, 0);
 
@@ -56,7 +66,6 @@ public class EventDetailActivity extends AppCompatActivity {
             return;
         }
 
-        // Bind
         tvEventTitle.setText(event.getTitle());
 
         String posterUrl = event.getPosterUrl();
@@ -66,7 +75,7 @@ public class EventDetailActivity extends AppCompatActivity {
                     .centerCrop()
                     .transition(DrawableTransitionOptions.withCrossFade())
                     .into(ivPoster);
-        } // else keep placeholder from tools/drawable
+        }
 
         tvDescription.setText(
                 TextUtils.isEmpty(event.getDescription())
@@ -76,7 +85,6 @@ public class EventDetailActivity extends AppCompatActivity {
 
         tvWaitlistCount.setText(String.valueOf(waitlistCount));
 
-        // Interactions
         btnBack.setOnClickListener(v -> onBackPressed());
 
         btnDelete.setOnClickListener(v -> {
@@ -84,10 +92,9 @@ public class EventDetailActivity extends AppCompatActivity {
                     .setTitle("Delete event?")
                     .setMessage("This action cannot be undone.")
                     .setPositiveButton("Delete", (d, which) -> {
-                        // TODO: delete from your data source.
-                        // Return which event was deleted to the caller (optional):
-                        Intent result = new Intent().putExtra("deleted_event_id", event.getId());
-                        setResult(RESULT_OK, result);
+                        if (onDeleteCallback != null) {
+                            onDeleteCallback.accept(event); // use the passed-in delete function
+                        }
                         Toast.makeText(this, "Event deleted", Toast.LENGTH_SHORT).show();
                         finish();
                     })
