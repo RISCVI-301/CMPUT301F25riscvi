@@ -33,7 +33,7 @@ public class EventDetailActivity extends AppCompatActivity {
         onDeleteCallback = deleteCallback;
         Intent i = new Intent(context, EventDetailActivity.class);
         i.putExtra(EXTRA_EVENT, event);
-        i.putExtra(EXTRA_WAITLIST_COUNT, 0);
+        i.putExtra(EXTRA_WAITLIST_COUNT, event.getWaitlist_count());
         context.startActivity(i);
     }
 
