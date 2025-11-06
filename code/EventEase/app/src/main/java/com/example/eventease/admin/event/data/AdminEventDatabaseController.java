@@ -104,7 +104,15 @@ public class AdminEventDatabaseController {
     }
 
     public boolean deleteEvent(@NonNull Event obj) {
-        // Implement Firestore delete as needed; left as-is per original stub.
+        String id = obj.getId(); // ensure Event exposes its document ID
+        if (id == null || id.isEmpty()) return false;
+
+        db.collection("events")
+                .document(id)
+                .delete()
+                .addOnSuccessListener(aVoid -> Log.d(TAG, "Deleted event: " + id))
+                .addOnFailureListener(e -> Log.e(TAG, "Delete failed for " + id, e));
         return true;
     }
+
 }
