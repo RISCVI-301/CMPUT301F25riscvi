@@ -41,4 +41,12 @@ public class Event implements java.io.Serializable {
     public long getRegistrationEnd() { return registrationEnd; }
     public long getRegistrationStart() { return registrationStart; }
     public String getTitle() { return title; }
+
+    public String getGuidelines(){
+        return this.guidelines;
+    }
+
+    public int getWaitlist_count(){
+        return this.waitlist_count;
+    }
 }
