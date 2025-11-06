@@ -28,6 +28,9 @@
         <activity
             android:name=".admin.event.ui.AdminEventManagementActivity"
             android:exported="false" />
+        <activity
+            android:name=".admin.event.ui.EventDetailActivity"
+            android:exported="false" />
     </application>
 
 </manifest>
