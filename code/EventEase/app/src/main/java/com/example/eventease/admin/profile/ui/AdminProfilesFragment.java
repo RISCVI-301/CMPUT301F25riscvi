@@ -20,6 +20,25 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Fragment for admin users to view and manage all user profiles in the system.
+ * 
+ * <p>This fragment displays a list of all user profiles from the Firestore database and provides
+ * administrative functionality to view and delete user profiles. Admins can see all users
+ * regardless of their role (entrant, organizer, admin).
+ * 
+ * <p>Features:
+ * <ul>
+ *   <li>View all user profiles in a scrollable list</li>
+ *   <li>Delete user profiles with confirmation dialog</li>
+ *   <li>Prevent self-deletion (admin cannot delete their own profile)</li>
+ *   <li>Refresh profile list after deletion</li>
+ * </ul>
+ * 
+ * <p>The fragment uses AdminProfileDatabaseController to fetch profiles and ProfileDeletionHelper
+ * to perform comprehensive profile deletions (including associated data). Only users with admin
+ * role can access this functionality.
+ */
 public class AdminProfilesFragment extends Fragment {
 
     private final AdminProfileDatabaseController APDC = new AdminProfileDatabaseController();

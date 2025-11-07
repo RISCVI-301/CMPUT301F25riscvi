@@ -15,6 +15,24 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * Helper class for sending invitations to selected entrants.
+ * 
+ * <p>This class provides functionality for organizers to send invitations to users who have been
+ * selected for an event. Invitations are created in the Firestore 'invitations' collection and
+ * include information about the event, organizer, and entrant.
+ * 
+ * <p>The invitation process:
+ * <ol>
+ *   <li>Retrieves all selected entrants from the event's SelectedEntrants subcollection</li>
+ *   <li>Creates invitation documents in the invitations collection for each selected entrant</li>
+ *   <li>Includes organizerId and entrantId in the invitation data for proper tracking</li>
+ *   <li>Uses batch writes for efficient database operations</li>
+ * </ol>
+ * 
+ * <p>Invitations are created with PENDING status and can be accepted or declined by entrants.
+ * This class is used by OrganizerViewEntrantsActivity when organizers send invitations.
+ */
 public class InvitationHelper {
     private static final String TAG = "InvitationHelper";
     private final FirebaseFirestore db;
@@ -35,6 +53,17 @@ public class InvitationHelper {
             }
             return;
         }
+        
+        // Get current user (organizer)
+        com.google.firebase.auth.FirebaseAuth auth = com.google.firebase.auth.FirebaseAuth.getInstance();
+        com.google.firebase.auth.FirebaseUser currentUser = auth.getCurrentUser();
+        if (currentUser == null) {
+            if (callback != null) {
+                callback.onError("User not authenticated");
+            }
+            return;
+        }
+        String organizerId = currentUser.getUid();
         
         DocumentReference eventRef = db.collection("events").document(eventId);
         
@@ -72,6 +101,8 @@ public class InvitationHelper {
                         invitationData.put("id", invitationId);
                         invitationData.put("eventId", eventId);
                         invitationData.put("uid", userId);
+                        invitationData.put("entrantId", userId); // Add for compatibility
+                        invitationData.put("organizerId", organizerId); // Add organizer ID
                         invitationData.put("status", "PENDING");
                         invitationData.put("issuedAt", currentTime);
                         invitationData.put("expiresAt", expiresAt);
@@ -96,6 +127,9 @@ public class InvitationHelper {
                                 .addOnSuccessListener(aVoid -> {
                                     Log.d(TAG, "Successfully created " + userIds.size() + " invitations");
                                     
+                                    // Notify listeners by refreshing the invitation repository
+                                    // The FirebaseInvitationRepository will pick up the new invitations via its listener
+                                    
                                     Map<String, Object> notificationData = new HashMap<>();
                                     notificationData.put("eventId", eventId);
                                     notificationData.put("eventTitle", eventTitle != null ? eventTitle : "event");
@@ -112,6 +146,7 @@ public class InvitationHelper {
                                             })
                                             .addOnFailureListener(e -> {
                                                 Log.w(TAG, "Failed to save notification data", e);
+                                                // Still report success since invitations were created
                                                 if (callback != null) {
                                                     callback.onComplete(userIds.size());
                                                 }
@@ -119,8 +154,15 @@ public class InvitationHelper {
                                 })
                                 .addOnFailureListener(e -> {
                                     Log.e(TAG, "Failed to create invitations", e);
-                                    if (callback != null) {
-                                        callback.onError("Failed to create invitations: " + e.getMessage());
+                                    String errorMsg = e.getMessage();
+                                    if (errorMsg != null && errorMsg.contains("index")) {
+                                        if (callback != null) {
+                                            callback.onError("Firestore index required. Please check Firebase Console for index creation link.");
+                                        }
+                                    } else {
+                                        if (callback != null) {
+                                            callback.onError("Failed to create invitations: " + errorMsg);
+                                        }
                                     }
                                 });
                     } else {

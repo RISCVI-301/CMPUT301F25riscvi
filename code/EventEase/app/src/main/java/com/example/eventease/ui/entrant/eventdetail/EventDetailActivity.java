@@ -31,8 +31,27 @@ import java.util.Date;
 import java.util.Locale;
 
 /**
- * Activity for displaying event details from My Events screen.
- * Shows event information and allows users to accept or decline invitations.
+ * Activity for displaying event details from the My Events screen.
+ * 
+ * <p>This activity shows comprehensive event information including:
+ * <ul>
+ *   <li>Event title, description, location, and guidelines</li>
+ *   <li>Event start time and deadline</li>
+ *   <li>Event capacity and current waitlist count</li>
+ *   <li>Event poster image</li>
+ * </ul>
+ * 
+ * <p>Features:
+ * <ul>
+ *   <li>Accept/decline invitation buttons (shown if user has a pending invitation)</li>
+ *   <li>Register button (shown if user is on waitlist)</li>
+ *   <li>Guidelines button to view event-specific rules</li>
+ *   <li>Real-time waitlist count updates</li>
+ *   <li>Share functionality</li>
+ * </ul>
+ * 
+ * <p>The activity listens for invitation and waitlist updates in real-time and
+ * updates the UI accordingly.
  */
 public class EventDetailActivity extends AppCompatActivity {
 
@@ -192,7 +211,12 @@ public class EventDetailActivity extends AppCompatActivity {
         String dateStr = eventStartTime > 0 ? sdf.format(new Date(eventStartTime)) : "TBD";
         
         // You can show more event details in a toast or update UI as needed
-        Toast.makeText(this, "Event at " + eventLocation + " on " + dateStr, Toast.LENGTH_SHORT).show();
+        String detailMsg = "Event at " + eventLocation + " on " + dateStr;
+        long eventDeadline = getIntent().getLongExtra("eventDeadline", 0);
+        if (eventDeadline > 0) {
+            detailMsg += " (Deadline: " + sdf.format(new Date(eventDeadline)) + ")";
+        }
+        Toast.makeText(this, detailMsg, Toast.LENGTH_SHORT).show();
     }
     
     private void setupWaitlistCountListener() {

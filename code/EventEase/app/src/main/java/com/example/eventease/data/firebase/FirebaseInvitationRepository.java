@@ -52,39 +52,58 @@ public class FirebaseInvitationRepository implements InvitationRepository {
     public ListenerRegistration listenActive(String uid, InvitationListener l) {
         listenersByUid.computeIfAbsent(uid, k -> new ArrayList<>()).add(l);
         
+        // Use simpler query without orderBy to avoid index requirement
+        // We'll filter and sort in memory
         Query query = db.collection("invitations")
                 .whereEqualTo("uid", uid)
-                .whereEqualTo("status", "PENDING")
-                .orderBy("issuedAt", Query.Direction.DESCENDING);
+                .whereEqualTo("status", "PENDING");
         
         com.google.firebase.firestore.ListenerRegistration firestoreReg = query.addSnapshotListener((snapshots, e) -> {
             if (e != null) {
-                Log.e(TAG, "Error listening to invitations", e);
+                Log.e(TAG, "Error listening to invitations for uid: " + uid, e);
+                // If it's an index error, log it clearly
+                if (e instanceof FirebaseFirestoreException) {
+                    FirebaseFirestoreException firestoreEx = (FirebaseFirestoreException) e;
+                    Log.e(TAG, "Firestore error code: " + firestoreEx.getCode() + ", message: " + e.getMessage());
+                }
                 return;
             }
             
             if (snapshots != null) {
                 byId.clear();
                 Date now = new Date();
+                int validCount = 0;
+                int totalCount = 0;
                 for (QueryDocumentSnapshot doc : snapshots) {
+                    totalCount++;
                     try {
                         Invitation inv = documentToInvitation(doc);
-                        if (inv != null && (inv.getExpiresAt() == null || inv.getExpiresAt().after(now))) {
-                            byId.put(inv.getId(), inv);
+                        if (inv != null && inv.getStatus() == Status.PENDING) {
+                            // Check expiration
+                            if (inv.getExpiresAt() == null || inv.getExpiresAt().after(now)) {
+                                byId.put(inv.getId(), inv);
+                                validCount++;
+                            } else {
+                                Log.d(TAG, "Invitation expired: " + inv.getId());
+                            }
                         }
                     } catch (Exception ex) {
-                        Log.e(TAG, "Error parsing invitation document", ex);
+                        Log.e(TAG, "Error parsing invitation document: " + doc.getId(), ex);
                     }
                 }
-                
+                Log.d(TAG, "Listener: Found " + totalCount + " documents, " + validCount + " valid active invitations for uid: " + uid);
                 notifyUid(uid);
             }
         });
         
         firestoreListeners.put(uid, firestoreReg);
         
-        loadInitialInvitations(uid).addOnSuccessListener(invitations -> {
+        // Load initial invitations (using simpler query that doesn't require index)
+        loadInitialInvitationsWithoutOrderBy(uid).addOnSuccessListener(invitations -> {
+            Log.d(TAG, "Initial invitations loaded: " + invitations.size() + " for uid: " + uid);
             notifyUid(uid);
+        }).addOnFailureListener(e -> {
+            Log.e(TAG, "Failed to load initial invitations", e);
         });
         
         return new ListenerRegistration() {
@@ -112,6 +131,17 @@ public class FirebaseInvitationRepository implements InvitationRepository {
         
         return query.get().continueWith(task -> {
             if (!task.isSuccessful() || task.getResult() == null) {
+                Exception exception = task.getException();
+                if (exception instanceof FirebaseFirestoreException) {
+                    FirebaseFirestoreException firestoreEx = (FirebaseFirestoreException) exception;
+                    if (firestoreEx.getCode() == FirebaseFirestoreException.Code.FAILED_PRECONDITION) {
+                        Log.w(TAG, "Index required for ordered query, falling back to unordered query");
+                        // Fallback to query without orderBy - this will be handled asynchronously
+                        // Return empty list for now, the fallback will update via notifyUid
+                        return new ArrayList<>();
+                    }
+                }
+                Log.e(TAG, "Failed to load initial invitations", exception);
                 return new ArrayList<>();
             }
             
@@ -125,10 +155,52 @@ public class FirebaseInvitationRepository implements InvitationRepository {
                         byId.put(inv.getId(), inv);
                     }
                 } catch (Exception e) {
-                    Log.e(TAG, "Error parsing invitation document", e);
+                    Log.e(TAG, "Error parsing invitation document: " + doc.getId(), e);
                 }
             }
             
+            Log.d(TAG, "Loaded " + invitations.size() + " initial invitations for uid: " + uid);
+            return invitations;
+        });
+    }
+    
+    private Task<List<Invitation>> loadInitialInvitationsWithoutOrderBy(String uid) {
+        // Fallback query without orderBy (doesn't require index)
+        Query query = db.collection("invitations")
+                .whereEqualTo("uid", uid)
+                .whereEqualTo("status", "PENDING");
+        
+        return query.get().continueWith(task -> {
+            if (!task.isSuccessful() || task.getResult() == null) {
+                Log.e(TAG, "Failed to load invitations (fallback query)", task.getException());
+                return new ArrayList<>();
+            }
+            
+            List<Invitation> invitations = new ArrayList<>();
+            Date now = new Date();
+            for (QueryDocumentSnapshot doc : task.getResult()) {
+                try {
+                    Invitation inv = documentToInvitation(doc);
+                    if (inv != null && (inv.getExpiresAt() == null || inv.getExpiresAt().after(now))) {
+                        invitations.add(inv);
+                        byId.put(inv.getId(), inv);
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error parsing invitation document: " + doc.getId(), e);
+                }
+            }
+            
+            // Sort manually by issuedAt descending
+            invitations.sort((a, b) -> {
+                Date aDate = a.getIssuedAt();
+                Date bDate = b.getIssuedAt();
+                if (aDate == null && bDate == null) return 0;
+                if (aDate == null) return 1;
+                if (bDate == null) return -1;
+                return bDate.compareTo(aDate); // Descending
+            });
+            
+            Log.d(TAG, "Loaded " + invitations.size() + " invitations (fallback, no index) for uid: " + uid);
             return invitations;
         });
     }
@@ -281,12 +353,14 @@ public class FirebaseInvitationRepository implements InvitationRepository {
 
     private List<Invitation> activeFor(String uid) {
         Date now = new Date();
-        return byId.values().stream()
+        List<Invitation> active = byId.values().stream()
                 .filter(i -> uid.equals(i.getUid()))
                 .filter(i -> i.getStatus() == Status.PENDING)
                 .filter(i -> i.getExpiresAt() == null || i.getExpiresAt().after(now))
                 .sorted(Comparator.comparing(Invitation::getIssuedAt, Comparator.nullsLast(Comparator.reverseOrder())))
                 .collect(Collectors.toList());
+        Log.d(TAG, "activeFor(" + uid + "): returning " + active.size() + " active invitations");
+        return active;
     }
 
     private void notifyUid(String uid) {

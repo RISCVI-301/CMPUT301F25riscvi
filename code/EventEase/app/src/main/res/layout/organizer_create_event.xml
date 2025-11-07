@@ -280,6 +280,32 @@
                 </LinearLayout>
             </LinearLayout>
 
+            <!-- Event Deadline -->
+            <TextView
+                android:layout_marginTop="12dp"
+                android:layout_marginBottom="8dp"
+                android:text="Event Deadline"
+                android:textStyle="bold"
+                android:textSize="20sp"
+                android:textColor="@color/ee_text_light"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"/>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnDeadline"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:text="Select Deadline"
+                android:textColor="@color/ee_text_light"
+                android:textSize="16sp"
+                android:layout_marginBottom="16dp"
+                app:backgroundTint="@color/ee_navy_dark"
+                app:strokeColor="@color/ee_mint_aqua"
+                app:strokeWidth="2dp"
+                app:rippleColor="@color/ee_mint_aqua"
+                app:cornerRadius="12dp"/>
+
             <!-- Toggles -->
             <LinearLayout
                 android:layout_marginTop="16dp"

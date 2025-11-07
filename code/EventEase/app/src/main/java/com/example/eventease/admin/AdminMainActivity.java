@@ -25,7 +25,13 @@ import android.content.SharedPreferences;
 
 /**
  * Main activity for admin users.
- * Handles navigation between admin fragments and manages bottom navigation.
+ * Handles navigation between admin fragments (Events, Profiles, Images, Logs) and manages bottom navigation.
+ * This activity serves as the entry point for authenticated admin users and provides administrative
+ * functionality for managing events, user profiles, images, and system logs.
+ * 
+ * <p>On startup, this activity verifies that the current user has admin privileges. If not,
+ * the user is redirected to MainActivity. The activity implements a custom bottom navigation bar
+ * for switching between admin sections.
  */
 public class AdminMainActivity extends AppCompatActivity {
 

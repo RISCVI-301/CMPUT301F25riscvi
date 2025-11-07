@@ -283,11 +283,37 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
             SimpleDateFormat regDateFormat = new SimpleDateFormat("MMM d, yyyy • h:mm a", Locale.getDefault());
             String regStartStr = regDateFormat.format(new Date(event.getRegistrationStart()));
             String regEndStr = regDateFormat.format(new Date(event.getRegistrationEnd()));
-            dateView.setText("Registration Period:\n" + regStartStr + "\n" + regEndStr);
+            String dateText = "Registration Period:\n" + regStartStr + "\n" + regEndStr;
+            
+            // Add deadline if available
+            if (event.getDeadlineEpochMs() > 0) {
+                String deadlineStr = regDateFormat.format(new Date(event.getDeadlineEpochMs()));
+                dateText += "\n\nEvent Deadline: " + deadlineStr;
+            }
+            
+            dateView.setText(dateText);
         } else if (event.getStartsAtEpochMs() > 0) {
-            dateView.setText(DATE_FORMAT.format(new Date(event.getStartsAtEpochMs())));
+            String dateText = DATE_FORMAT.format(new Date(event.getStartsAtEpochMs()));
+            
+            // Add deadline if available
+            if (event.getDeadlineEpochMs() > 0) {
+                SimpleDateFormat regDateFormat = new SimpleDateFormat("MMM d, yyyy • h:mm a", Locale.getDefault());
+                String deadlineStr = regDateFormat.format(new Date(event.getDeadlineEpochMs()));
+                dateText += "\n\nEvent Deadline: " + deadlineStr;
+            }
+            
+            dateView.setText(dateText);
         } else {
-            dateView.setText(R.string.event_details_date_tbd);
+            String dateText = getString(R.string.event_details_date_tbd);
+            
+            // Add deadline if available
+            if (event.getDeadlineEpochMs() > 0) {
+                SimpleDateFormat regDateFormat = new SimpleDateFormat("MMM d, yyyy • h:mm a", Locale.getDefault());
+                String deadlineStr = regDateFormat.format(new Date(event.getDeadlineEpochMs()));
+                dateText += "\n\nEvent Deadline: " + deadlineStr;
+            }
+            
+            dateView.setText(dateText);
         }
 
         if (!TextUtils.isEmpty(event.getLocation())) {

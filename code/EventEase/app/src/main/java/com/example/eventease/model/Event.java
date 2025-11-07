@@ -19,6 +19,8 @@ public class Event {
     public String title;
     /** Event start time in milliseconds UTC. */
     public long startsAtEpochMs;
+    /** Event deadline in milliseconds UTC. */
+    public long deadlineEpochMs;
     /** Registration start time in milliseconds UTC. */
     public long registrationStart;
     /** Registration end time in milliseconds UTC. */
@@ -76,6 +78,7 @@ public class Event {
         m.put("id", id);
         m.put("title", title);
         m.put("startsAtEpochMs", startsAtEpochMs);
+        m.put("deadlineEpochMs", deadlineEpochMs);
         m.put("registrationStart", registrationStart);
         m.put("registrationEnd", registrationEnd);
         m.put("location", location);
@@ -108,6 +111,9 @@ public class Event {
         
         Object startsAt = m.get("startsAtEpochMs");
         e.startsAtEpochMs = startsAt != null ? ((Number) startsAt).longValue() : 0;
+        
+        Object deadline = m.get("deadlineEpochMs");
+        e.deadlineEpochMs = deadline != null ? ((Number) deadline).longValue() : 0;
         
         Object regStart = m.get("registrationStart");
         e.registrationStart = regStart != null ? ((Number) regStart).longValue() : 0;
@@ -168,19 +174,88 @@ public class Event {
         return e;
     }
 
+    /**
+     * Gets the unique event identifier.
+     *
+     * @return the event ID, or null if not set
+     */
     public String getId() { return id; }
+
+    /**
+     * Sets the unique event identifier.
+     *
+     * @param id the event ID to set
+     */
     public void setId(String id) { this.id = id; }
 
+    /**
+     * Gets the event title.
+     *
+     * @return the event title, or null if not set
+     */
     public String getTitle() { return title; }
+
+    /**
+     * Sets the event title.
+     *
+     * @param title the event title to set
+     */
     public void setTitle(String title) { this.title = title; }
 
+    /**
+     * Gets the event start time in milliseconds since epoch (UTC).
+     *
+     * @return the start time in milliseconds, or 0 if not set
+     */
     public long getStartsAtEpochMs() { return startsAtEpochMs; }
+
+    /**
+     * Sets the event start time in milliseconds since epoch (UTC).
+     *
+     * @param startsAtEpochMs the start time in milliseconds
+     */
     public void setStartsAtEpochMs(long startsAtEpochMs) { this.startsAtEpochMs = startsAtEpochMs; }
 
+    /**
+     * Gets the event deadline in milliseconds since epoch (UTC).
+     *
+     * @return the deadline in milliseconds, or 0 if not set
+     */
+    public long getDeadlineEpochMs() { return deadlineEpochMs; }
+
+    /**
+     * Sets the event deadline in milliseconds since epoch (UTC).
+     *
+     * @param deadlineEpochMs the deadline in milliseconds
+     */
+    public void setDeadlineEpochMs(long deadlineEpochMs) { this.deadlineEpochMs = deadlineEpochMs; }
+
+    /**
+     * Gets the registration start time in milliseconds since epoch (UTC).
+     *
+     * @return the registration start time in milliseconds, or 0 if not set
+     */
     public long getRegistrationStart() { return registrationStart; }
+
+    /**
+     * Sets the registration start time in milliseconds since epoch (UTC).
+     *
+     * @param registrationStart the registration start time in milliseconds
+     */
     public void setRegistrationStart(long registrationStart) { this.registrationStart = registrationStart; }
 
+    /**
+     * Gets the registration end time in milliseconds since epoch (UTC).
+     *
+     * @return the registration end time in milliseconds, or 0 if not set
+     */
     public long getRegistrationEnd() { return registrationEnd; }
+
+    /**
+     * Sets the registration end time in milliseconds since epoch (UTC).
+     *
+     * @param registrationEnd the registration end time in milliseconds
+     */
     public void setRegistrationEnd(long registrationEnd) { this.registrationEnd = registrationEnd; }
 
     /**
@@ -192,34 +267,144 @@ public class Event {
         return startsAtEpochMs > 0 ? new Date(startsAtEpochMs) : null; 
     }
 
+    /**
+     * Gets the maximum capacity of the event.
+     *
+     * @return the event capacity
+     */
     public int getCapacity() { return capacity; }
+
+    /**
+     * Sets the maximum capacity of the event.
+     *
+     * @param capacity the event capacity to set
+     */
     public void setCapacity(int capacity) { this.capacity = capacity; }
 
+    /**
+     * Gets the waitlist count (deprecated - use getWaitlist().size() instead).
+     *
+     * @return the number of users on the waitlist
+     */
     public int getWaitlistCount() { return waitlistCount; }
+
+    /**
+     * Sets the waitlist count (deprecated - this is automatically synced with waitlist size).
+     *
+     * @param waitlistCount the waitlist count to set
+     */
     public void setWaitlistCount(int waitlistCount) { this.waitlistCount = waitlistCount; }
 
+    /**
+     * Gets the event location.
+     *
+     * @return the event location, or null if not set
+     */
     public String getLocation() { return location; }
+
+    /**
+     * Sets the event location.
+     *
+     * @param location the event location to set
+     */
     public void setLocation(String location) { this.location = location; }
 
+    /**
+     * Gets the event notes or description.
+     *
+     * @return the event notes, or null if not set
+     */
     @Nullable public String getNotes() { return notes; }
+
+    /**
+     * Sets the event notes or description.
+     *
+     * @param notes the event notes to set
+     */
     public void setNotes(@Nullable String notes) { this.notes = notes; }
 
+    /**
+     * Gets the event description (returns notes if description is null).
+     *
+     * @return the event description, or notes if description is null, or null if neither is set
+     */
     @Nullable public String getDescription() { return description != null ? description : notes; }
+
+    /**
+     * Sets the event description.
+     *
+     * @param description the event description to set
+     */
     public void setDescription(@Nullable String description) { this.description = description; }
 
+    /**
+     * Gets the event-specific guidelines and requirements.
+     *
+     * @return the event guidelines, or null if not set
+     */
     @Nullable public String getGuidelines() { return guidelines; }
+
+    /**
+     * Sets the event-specific guidelines and requirements.
+     *
+     * @param guidelines the event guidelines to set
+     */
     public void setGuidelines(@Nullable String guidelines) { this.guidelines = guidelines; }
 
+    /**
+     * Gets the URL of the event poster image.
+     *
+     * @return the poster URL, or null if not set
+     */
     @Nullable public String getPosterUrl() { return posterUrl; }
+
+    /**
+     * Sets the URL of the event poster image.
+     *
+     * @param posterUrl the poster URL to set
+     */
     public void setPosterUrl(@Nullable String posterUrl) { this.posterUrl = posterUrl; }
 
+    /**
+     * Gets the unique identifier of the event organizer.
+     *
+     * @return the organizer ID, or null if not set
+     */
     public String getOrganizerId() { return organizerId; }
+
+    /**
+     * Sets the unique identifier of the event organizer.
+     *
+     * @param organizerId the organizer ID to set
+     */
     public void setOrganizerId(String organizerId) { this.organizerId = organizerId; }
 
+    /**
+     * Gets the event creation timestamp in milliseconds since epoch (UTC).
+     *
+     * @return the creation timestamp in milliseconds, or 0 if not set
+     */
     public long getCreatedAtEpochMs() { return createdAtEpochMs; }
+
+    /**
+     * Sets the event creation timestamp in milliseconds since epoch (UTC).
+     *
+     * @param createdAtEpochMs the creation timestamp in milliseconds
+     */
     public void setCreatedAtEpochMs(long createdAtEpochMs) { this.createdAtEpochMs = createdAtEpochMs; }
 
+    /**
+     * Gets the QR code payload string for the event.
+     *
+     * @return the QR payload (e.g., "event:&lt;id&gt;"), or null if not set
+     */
     @Nullable public String getQrPayload() { return qrPayload; }
+
+    /**
+     * Sets the QR code payload string for the event.
+     *
+     * @param qrPayload the QR payload to set
+     */
     public void setQrPayload(@Nullable String qrPayload) { this.qrPayload = qrPayload; }
 
     /**

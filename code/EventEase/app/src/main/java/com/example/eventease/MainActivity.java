@@ -23,8 +23,13 @@ import com.example.eventease.notifications.FCMTokenManager;
 import com.example.eventease.notifications.InvitationNotificationListener;
 
 /**
- * Main activity that hosts navigation fragments and manages bottom navigation.
- * Handles authentication state and controls visibility of navigation bars.
+ * Main activity that hosts navigation fragments and manages bottom navigation for entrant users.
+ * Handles authentication state, role-based navigation, and controls visibility of navigation bars.
+ * This activity serves as the entry point for authenticated entrant users and manages navigation
+ * between the Discover, My Events, and Account fragments.
+ * 
+ * <p>On startup, this activity checks if the user is an admin and redirects to AdminMainActivity if so.
+ * Otherwise, it sets up the standard entrant navigation flow with bottom navigation.
  */
 public class MainActivity extends AppCompatActivity {
 

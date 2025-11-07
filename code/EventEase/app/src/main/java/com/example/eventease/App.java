@@ -6,13 +6,27 @@ import com.example.eventease.data.firebase.FirebaseDevGraph;
 /**
  * Main application class that initializes the dependency graph.
  * Provides access to shared repositories and services throughout the app.
+ * This class follows the Application singleton pattern and initializes the Firebase dependency graph
+ * which contains all repository instances used throughout the application.
  */
 public class App extends Application {
     private static FirebaseDevGraph GRAPH;
+
+    /**
+     * Initializes the application and creates the dependency graph.
+     * Called when the application process is created.
+     */
     @Override public void onCreate() {
         super.onCreate();
         GRAPH = new FirebaseDevGraph();
     }
+
+    /**
+     * Gets the shared dependency graph instance.
+     * The dependency graph provides access to all repositories and services.
+     *
+     * @return the FirebaseDevGraph instance containing all repositories
+     */
     public static FirebaseDevGraph graph() { return GRAPH; }
 }
 
