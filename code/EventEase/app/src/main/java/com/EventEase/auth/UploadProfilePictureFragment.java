@@ -44,6 +44,10 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Fragment for uploading user profile picture during signup.
+ * Supports image selection from gallery or camera capture, uploads to Firebase Storage.
+ */
 public class UploadProfilePictureFragment extends Fragment {
 
     private ImageView profileIconImage;

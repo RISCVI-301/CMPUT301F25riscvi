@@ -30,6 +30,10 @@ import com.google.firebase.firestore.QuerySnapshot;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Fragment for discovering and browsing available events.
+ * Displays a list of open events and allows users to join waitlists.
+ */
 public class DiscoverFragment extends Fragment {
 
     private DiscoverAdapter adapter;

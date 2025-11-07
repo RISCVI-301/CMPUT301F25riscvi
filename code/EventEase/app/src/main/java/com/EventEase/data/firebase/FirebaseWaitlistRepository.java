@@ -20,8 +20,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * FirebaseWaitlistRepository
- * Now uses Firestore for persistent waitlist storage.
+ * Firebase implementation of WaitlistRepository.
+ * Uses Firestore for persistent waitlist storage and management.
  */
 public class FirebaseWaitlistRepository implements WaitlistRepository {
 

@@ -55,3 +55,26 @@ dependencies {
     implementation("com.google.firebase:firebase-storage")
     implementation("com.google.android.gms:play-services-location:21.1.0")
 }
+
+afterEvaluate {
+    tasks.register<Javadoc>("generateJavadoc") {
+        source = fileTree("src/main/java")
+        destinationDir = file(project.rootDir.parentFile.parentFile.resolve("doc"))
+        val androidJar = "${android.sdkDirectory}/platforms/${android.compileSdk}/android.jar"
+        val variant = android.applicationVariants.first()
+        classpath = files(androidJar) + variant.javaCompileProvider.get().classpath
+        isFailOnError = false
+        options {
+            encoding = "UTF-8"
+            (this as StandardJavadocDocletOptions).apply {
+                windowTitle = "EventEase API Documentation"
+                docTitle = "EventEase API Documentation"
+                bottom = "Copyright © 2025"
+                addStringOption("Xdoclint:none", "-quiet")
+                addStringOption("charset", "UTF-8")
+                addStringOption("docencoding", "UTF-8")
+                addStringOption("Xmaxwarns", "0")
+            }
+        }
+    }
+}

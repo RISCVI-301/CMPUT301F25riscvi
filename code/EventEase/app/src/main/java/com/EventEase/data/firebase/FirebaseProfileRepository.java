@@ -10,9 +10,8 @@ import java.util.NoSuchElementException;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * FirebaseProfileRepository
- * Prod name. In-memory for Step 1 contracts.
- * TODO(salaar): Swap to Firebase (Auth + user doc).
+ * Firebase implementation of ProfileRepository.
+ * Manages user profile data in Firestore.
  */
 public class FirebaseProfileRepository implements ProfileRepository {
 

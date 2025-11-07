@@ -17,6 +17,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Firebase implementation of AdmittedRepository.
+ * Manages admitted users and retrieves upcoming events from Firestore.
+ */
 public class FirebaseAdmittedRepository implements AdmittedRepository {
 
     private static final String TAG = "AdmittedRepository";

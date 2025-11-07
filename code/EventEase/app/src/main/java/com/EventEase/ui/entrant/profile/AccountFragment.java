@@ -37,6 +37,10 @@ import android.renderscript.Element;
 import android.renderscript.RenderScript;
 import android.renderscript.ScriptIntrinsicBlur;
 
+/**
+ * Fragment for displaying user account information.
+ * Shows profile details and provides navigation to edit profile and logout.
+ */
 public class AccountFragment extends Fragment {
     private TextView fullNameText;
     private ShapeableImageView profileImage;

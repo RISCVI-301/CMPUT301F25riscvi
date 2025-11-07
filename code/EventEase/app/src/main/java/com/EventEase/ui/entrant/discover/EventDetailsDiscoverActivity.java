@@ -33,7 +33,8 @@ import java.util.Date;
 import java.util.Locale;
 
 /**
- * Displays the details for a selected event coming from the Discover screen.
+ * Activity for displaying event details from Discover screen.
+ * Shows event information and allows users to join waitlists.
  */
 public class EventDetailsDiscoverActivity extends AppCompatActivity {
 

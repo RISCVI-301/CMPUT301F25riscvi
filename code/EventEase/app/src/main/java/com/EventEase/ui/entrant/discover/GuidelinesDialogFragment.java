@@ -21,7 +21,8 @@ import androidx.fragment.app.FragmentManager;
 import com.EventEase.R;
 
 /**
- * Displays the event selection guidelines in a modal dialog.
+ * Dialog fragment for displaying event selection guidelines.
+ * Shows event-specific rules and requirements in a modal dialog.
  */
 public class GuidelinesDialogFragment extends DialogFragment {
 

@@ -1,5 +1,9 @@
 package com.EventEase.model;
 
+/**
+ * Represents a user profile in the EventEase system.
+ * Contains user information including display name, email, phone number, and photo URL.
+ */
 public class Profile {
     private String uid;
     private String displayName;
@@ -9,6 +13,14 @@ public class Profile {
 
     public Profile() { }
 
+    /**
+     * Creates a new Profile with the specified information.
+     *
+     * @param uid the unique user identifier
+     * @param displayName the user's display name
+     * @param email the user's email address
+     * @param photoUrl the URL of the user's profile photo
+     */
     public Profile(String uid, String displayName, String email, String photoUrl) {
         this.uid = uid;
         this.displayName = displayName;

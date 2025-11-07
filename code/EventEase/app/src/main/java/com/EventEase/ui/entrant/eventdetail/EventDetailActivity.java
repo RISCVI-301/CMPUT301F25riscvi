@@ -32,8 +32,8 @@ import java.util.Date;
 import java.util.Locale;
 
 /**
- * Entrant — Event detail screen.
- * Displays event information and allows user to register or decline.
+ * Activity for displaying event details from My Events screen.
+ * Shows event information and allows users to accept or decline invitations.
  */
 public class EventDetailActivity extends AppCompatActivity {
 

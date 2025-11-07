@@ -5,6 +5,10 @@ import com.google.android.gms.tasks.Task;
 
 import java.util.List;
 
+/**
+ * Repository interface for admitted event operations.
+ * Provides methods to admit users to events and retrieve upcoming events.
+ */
 public interface AdmittedRepository {
     /**
      * Move a user from waitlist to admitted/accepted status

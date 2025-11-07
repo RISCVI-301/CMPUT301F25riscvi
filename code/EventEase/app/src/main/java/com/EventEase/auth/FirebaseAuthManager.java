@@ -5,6 +5,10 @@ import androidx.annotation.NonNull;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 
+/**
+ * Firebase implementation of AuthManager.
+ * Provides authentication status and user ID using Firebase Authentication.
+ */
 public final class FirebaseAuthManager implements AuthManager {
     private final FirebaseAuth auth;
 

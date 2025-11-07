@@ -1,6 +1,9 @@
 package com.EventEase.data;
 
-/** Minimal handle to unregister listeners (kept local to avoid forcing Firestore right now). */
+/**
+ * Interface for unregistering listeners.
+ * Provides a handle to remove active listeners when no longer needed.
+ */
 public interface ListenerRegistration {
     void remove();
 }

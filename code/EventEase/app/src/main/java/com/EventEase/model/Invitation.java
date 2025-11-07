@@ -2,7 +2,14 @@ package com.EventEase.model;
 
 import java.util.Date;
 
+/**
+ * Represents an invitation sent to an entrant for an event.
+ * Tracks invitation status and timing information.
+ */
 public class Invitation {
+    /**
+     * Invitation status values.
+     */
     public enum Status { PENDING, ACCEPTED, DECLINED }
 
     private String id;
@@ -14,6 +21,16 @@ public class Invitation {
 
     public Invitation() { }
 
+    /**
+     * Creates a new Invitation with the specified information.
+     *
+     * @param id the unique invitation identifier
+     * @param eventId the ID of the event this invitation is for
+     * @param uid the user ID of the invitee
+     * @param status the current status of the invitation
+     * @param issuedAt the date when the invitation was issued
+     * @param expiresAt the date when the invitation expires
+     */
     public Invitation(String id, String eventId, String uid, Status status, Date issuedAt, Date expiresAt) {
         this.id = id;
         this.eventId = eventId;

@@ -24,7 +24,10 @@ import com.EventEase.util.ToastUtil;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
 
-
+/**
+ * Fragment for user registration.
+ * Collects user information and creates a new account with Firebase Authentication.
+ */
 public class SignupFragment extends Fragment {
 
     private static final String PREFS_NAME = "EventEasePrefs";

@@ -17,8 +17,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
- * FirebaseInvitationRepository
- * Handles invitation management with Firebase backend
+ * Firebase implementation of InvitationRepository.
+ * Handles invitation management with Firebase backend and provides real-time updates.
  */
 public class FirebaseInvitationRepository implements InvitationRepository {
 

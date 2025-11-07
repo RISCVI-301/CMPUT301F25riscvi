@@ -26,7 +26,8 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Adapter showing discoverable events coming from Firestore.
+ * RecyclerView adapter for displaying discoverable events.
+ * Binds event data to card views with images, titles, dates, and locations.
  */
 public class DiscoverAdapter extends RecyclerView.Adapter<DiscoverAdapter.VH> {
 

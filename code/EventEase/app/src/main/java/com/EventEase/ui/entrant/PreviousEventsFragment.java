@@ -17,6 +17,10 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.EventEase.R;
 
+/**
+ * Fragment for displaying past events.
+ * Shows events that have already occurred.
+ */
 public class PreviousEventsFragment extends Fragment {
 
     @Nullable

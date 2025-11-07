@@ -15,8 +15,8 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * FirebaseEventRepository
- * Now loads events from Firestore for persistence.
+ * Firebase implementation of EventRepository.
+ * Loads events from Firestore and provides real-time waitlist count updates.
  */
 public class FirebaseEventRepository implements EventRepository {
 

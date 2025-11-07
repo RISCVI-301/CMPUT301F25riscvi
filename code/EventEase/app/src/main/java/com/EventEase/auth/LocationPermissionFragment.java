@@ -31,6 +31,10 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Fragment for requesting location permissions during signup.
+ * Handles permission requests and location access setup.
+ */
 public class LocationPermissionFragment extends Fragment {
 
     private static final String PREFS_NAME = "EventEasePrefs";

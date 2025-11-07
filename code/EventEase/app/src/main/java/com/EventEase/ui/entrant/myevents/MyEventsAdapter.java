@@ -24,6 +24,10 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
+/**
+ * RecyclerView adapter for displaying user's events.
+ * Shows events the user is admitted to or has invitations for.
+ */
 class MyEventsAdapter extends RecyclerView.Adapter<MyEventsAdapter.VH> {
 
     private final List<Event> data = new ArrayList<>();

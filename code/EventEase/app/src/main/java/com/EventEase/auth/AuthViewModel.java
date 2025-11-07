@@ -5,8 +5,10 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
 
-
-// View model
+/**
+ * ViewModel for authentication operations.
+ * Manages login, signup, and password reset state.
+ */
 public class AuthViewModel extends ViewModel {
     public static class State {
         public boolean loading;

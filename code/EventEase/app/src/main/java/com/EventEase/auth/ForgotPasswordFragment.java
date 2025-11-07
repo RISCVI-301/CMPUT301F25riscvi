@@ -32,6 +32,10 @@ import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.util.regex.Pattern;
 
+/**
+ * Fragment for password recovery.
+ * Validates email and sends password reset instructions via Firebase.
+ */
 public class ForgotPasswordFragment extends Fragment {
 
     private EditText emailInput;

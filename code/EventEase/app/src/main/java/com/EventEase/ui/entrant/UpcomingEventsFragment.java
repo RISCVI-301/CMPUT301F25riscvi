@@ -37,6 +37,10 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
+/**
+ * Fragment for displaying upcoming events.
+ * Shows events the user is admitted to that haven't started yet.
+ */
 public class UpcomingEventsFragment extends Fragment {
 
     private RecyclerView recyclerView;

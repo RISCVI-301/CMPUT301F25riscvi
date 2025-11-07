@@ -11,7 +11,10 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import java.util.HashMap;
 import java.util.Map;
 
-// Handles user logins , signups and password resets as well as does User Checks like passwords checks.
+/**
+ * Repository for authentication operations.
+ * Handles user login, signup, and password reset with Firebase Authentication.
+ */
 public class AuthRepository {
     private final FirebaseAuth auth = FirebaseAuth.getInstance();
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();

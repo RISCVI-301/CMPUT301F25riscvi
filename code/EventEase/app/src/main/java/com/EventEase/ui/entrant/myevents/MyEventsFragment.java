@@ -50,6 +50,10 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+/**
+ * Fragment for displaying user's events.
+ * Shows events the user is admitted to or has invitations for.
+ */
 public class MyEventsFragment extends Fragment {
 
     // ✅ no local FirebaseDevGraph here

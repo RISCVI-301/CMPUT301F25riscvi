@@ -13,6 +13,9 @@ import androidx.navigation.Navigation;
 
 import com.EventEase.R;
 
+/**
+ * Welcome screen fragment that provides navigation to login or signup.
+ */
 public class WelcomeFragment extends Fragment {
 
     @Nullable

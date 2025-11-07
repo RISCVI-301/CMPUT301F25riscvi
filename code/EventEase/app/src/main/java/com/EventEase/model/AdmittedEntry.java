@@ -3,7 +3,8 @@ package com.EventEase.model;
 import java.util.Date;
 
 /**
- * Represents an admitted/accepted event entry for a user
+ * Represents an admitted entry for an event.
+ * Tracks when a user was admitted and when they accepted the invitation.
  */
 public class AdmittedEntry {
     private String eventId;
@@ -13,6 +14,14 @@ public class AdmittedEntry {
 
     public AdmittedEntry() { }
 
+    /**
+     * Creates a new AdmittedEntry with the specified information.
+     *
+     * @param eventId the ID of the event
+     * @param uid the user ID who was admitted
+     * @param admittedAt the date when the user was admitted
+     * @param acceptedAt the date when the user accepted the invitation
+     */
     public AdmittedEntry(String eventId, String uid, Date admittedAt, Date acceptedAt) {
         this.eventId = eventId;
         this.uid = uid;

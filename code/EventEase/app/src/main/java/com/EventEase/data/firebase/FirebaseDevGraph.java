@@ -7,6 +7,10 @@ import com.EventEase.model.*;
 
 import java.util.*;
 
+/**
+ * Dependency graph that provides shared repository instances.
+ * Initializes all Firebase repositories and makes them available throughout the app.
+ */
 public final class FirebaseDevGraph {
     public final AuthManager auth;
     public final FirebaseEventRepository events;

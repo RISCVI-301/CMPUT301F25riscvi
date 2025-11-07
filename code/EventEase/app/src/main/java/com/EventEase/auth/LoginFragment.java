@@ -24,6 +24,10 @@ import androidx.navigation.fragment.NavHostFragment;
 import com.EventEase.R;
 import com.EventEase.util.ToastUtil;
 
+/**
+ * Fragment for user login with email and password.
+ * Handles authentication, remember me functionality, and password visibility toggle.
+ */
 public class LoginFragment extends Fragment {
 
     private static final String PREFS_NAME = "EventEasePrefs";

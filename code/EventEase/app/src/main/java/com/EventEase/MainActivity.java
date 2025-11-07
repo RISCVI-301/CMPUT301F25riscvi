@@ -16,6 +16,10 @@ import androidx.navigation.fragment.NavHostFragment;
 import com.google.firebase.auth.FirebaseAuth;
 import com.EventEase.R;
 
+/**
+ * Main activity that hosts navigation fragments and manages bottom navigation.
+ * Handles authentication state and controls visibility of navigation bars.
+ */
 public class MainActivity extends AppCompatActivity {
 
     private View bottomNav;

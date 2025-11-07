@@ -16,6 +16,10 @@ import androidx.navigation.Navigation;
 
 import com.EventEase.R;
 
+/**
+ * Fragment for selecting between upcoming and previous events.
+ * Provides navigation to event lists based on time.
+ */
 public class EventsSelectionFragment extends Fragment {
 
     @Nullable

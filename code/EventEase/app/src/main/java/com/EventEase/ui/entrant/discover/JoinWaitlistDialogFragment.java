@@ -25,7 +25,8 @@ import androidx.fragment.app.FragmentManager;
 import com.EventEase.R;
 
 /**
- * Full-screen confirmation dialog shown after an entrant taps Join Waitlist.
+ * Dialog fragment shown after successfully joining a waitlist.
+ * Displays confirmation message to the user.
  */
 public class JoinWaitlistDialogFragment extends DialogFragment {
 
