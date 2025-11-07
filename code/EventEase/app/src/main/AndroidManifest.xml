@@ -10,20 +10,20 @@
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application
-        android:name="com.EventEase.App"
+        android:name="com.example.eventease.App"
         android:label="@string/app_name"
         android:icon="@mipmap/entrant_ic_launcher"
         android:roundIcon="@mipmap/entrant_ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.EventEase">
         <activity
-            android:name="com.EventEase.ui.entrant.eventdetail.EventDetailActivity"
+            android:name="com.example.eventease.ui.entrant.eventdetail.EventDetailActivity"
             android:exported="false" />
         <activity
-            android:name="com.EventEase.ui.entrant.discover.EventDetailsDiscoverActivity"
+            android:name="com.example.eventease.ui.entrant.discover.EventDetailsDiscoverActivity"
             android:exported="false" />
         <activity
-            android:name="com.EventEase.MainActivity"
+            android:name="com.example.eventease.MainActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

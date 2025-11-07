@@ -10,7 +10,7 @@
     android:paddingTop="0dp"
     android:paddingEnd="0dp"
     android:paddingBottom="12dp"
-    tools:context="com.EventEase.ui.entrant.discover.DiscoverFragment">
+    tools:context="com.example.eventease.ui.entrant.discover.DiscoverFragment">
 
     <!-- Top AppBar with EventEase branding -->
     <com.google.android.material.appbar.AppBarLayout
