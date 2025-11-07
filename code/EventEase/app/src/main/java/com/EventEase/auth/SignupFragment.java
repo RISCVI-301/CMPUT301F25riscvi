@@ -22,7 +22,6 @@ import androidx.navigation.fragment.NavHostFragment;
 import com.EventEase.R;
 import com.EventEase.util.ToastUtil;
 import com.google.android.material.button.MaterialButton;
-import com.google.android.material.textfield.TextInputEditText;
 
 /**
  * Fragment for user registration.
@@ -79,7 +78,7 @@ public class SignupFragment extends Fragment {
                 ToastUtil.showLong(requireContext(), s.error);
             }
             if (s.success) {
-                // Successful sign up → automatically enable Remember Me with UID
+                // Successful sign up then automatically enable Remember Me with UID
                 com.google.firebase.auth.FirebaseUser currentUser = com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser();
                 if (currentUser != null) {
                     SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);

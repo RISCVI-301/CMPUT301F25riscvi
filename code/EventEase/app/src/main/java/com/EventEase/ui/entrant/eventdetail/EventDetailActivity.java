@@ -172,7 +172,7 @@ public class EventDetailActivity extends AppCompatActivity {
             tvOverview.setText("No description available for this event.");
         }
         
-        // Waitlist count will be updated by the listener (see setupWaitlistCountListener)
+        // Waitlist count will be updated by the listener
         tvWaitlistCount.setText("Loading...");
         
         // Load event image using Glide
@@ -457,7 +457,7 @@ public class EventDetailActivity extends AppCompatActivity {
         // Accept the invitation
         invitationRepo.accept(invitationId, eventId, uid)
                 .addOnSuccessListener(aVoid -> {
-                    android.util.Log.d("EventDetailActivity", "✅ Invitation accepted successfully in UI");
+                    android.util.Log.d("EventDetailActivity", "Invitation accepted successfully in UI");
                     Toast.makeText(this, "Invitation accepted! Event added to upcoming.", Toast.LENGTH_LONG).show();
                     // Hide the buttons since invitation is now accepted
                     btnRegister.setVisibility(View.GONE);
@@ -466,7 +466,7 @@ public class EventDetailActivity extends AppCompatActivity {
                     finish();
                 })
                 .addOnFailureListener(e -> {
-                    android.util.Log.e("EventDetailActivity", "❌ Failed to accept invitation", e);
+                    android.util.Log.e("EventDetailActivity", "Failed to accept invitation", e);
                     // Restore button state
                     btnRegister.setEnabled(true);
                     btnDecline.setEnabled(true);
@@ -508,7 +508,7 @@ public class EventDetailActivity extends AppCompatActivity {
         // Decline the invitation (but keep user in waitlist)
         invitationRepo.decline(invitationId, eventId, uid)
                 .addOnSuccessListener(aVoid -> {
-                    android.util.Log.d("EventDetailActivity", "✅ Invitation declined successfully (user remains in waitlist)");
+                    android.util.Log.d("EventDetailActivity", "Invitation declined successfully (user remains in waitlist)");
                     Toast.makeText(this, "Invitation declined. You remain on the waitlist.", Toast.LENGTH_LONG).show();
                     // Hide the buttons since invitation is now declined
                     btnRegister.setVisibility(View.GONE);
@@ -517,7 +517,7 @@ public class EventDetailActivity extends AppCompatActivity {
                     finish();
                 })
                 .addOnFailureListener(e -> {
-                    android.util.Log.e("EventDetailActivity", "❌ Failed to decline invitation", e);
+                    android.util.Log.e("EventDetailActivity", "Failed to decline invitation", e);
                     Toast.makeText(this, "Failed to decline invitation: " + e.getMessage(), Toast.LENGTH_LONG).show();
                     // Restore buttons
                     btnRegister.setEnabled(true);

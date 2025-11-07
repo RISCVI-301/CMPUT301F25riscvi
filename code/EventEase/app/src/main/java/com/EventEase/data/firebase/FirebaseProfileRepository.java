@@ -13,6 +13,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * Firebase implementation of ProfileRepository.
  * Manages user profile data in Firestore.
  */
+
 public class FirebaseProfileRepository implements ProfileRepository {
 
     private final Map<String, Profile> byUid = new ConcurrentHashMap<>();
