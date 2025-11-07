@@ -123,7 +123,7 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
                     .setNegativeButton("Cancel", null) // User clicked "Cancel", do nothing
                     .show();
         });
-        // --- NEW: Start the Auth and Data Loading Process ---
+        // --- Start the Auth and Data Loading Process ---
         signInAndLoadData();
     }
 
@@ -201,6 +201,47 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
                         .into(eventPosterImageView);
 
                 Log.d(TAG, "SUCCESS: Event details loaded for: " + title);
+                entrantNamesList.clear(); // Clear old data
+
+                Object waitlistObject = documentSnapshot.get("waitlist");
+                if (waitlistObject instanceof ArrayList) {
+                    ArrayList<String> waitlistUserIDs = (ArrayList<String>) waitlistObject;
+
+                    if (waitlistUserIDs.isEmpty()) {
+                        Log.d(TAG, "INFO: Waitlist array is empty. No names to display.");
+                        waitlistAdapter.notifyDataSetChanged(); // Refresh UI to show empty list
+                        return; // Stop here if there are no users to fetch.
+                    }
+
+                    Log.d(TAG, "Waitlist contains " + waitlistUserIDs.size() + " user IDs. Fetching names...");
+
+                    // For each user ID, fetch the user's name from the 'users' collection.
+                    for (String userId : waitlistUserIDs) {
+                        db.collection("users").document(userId).get()
+                                .addOnSuccessListener(userDocument -> {
+                                    if (userDocument.exists()) {
+                                        String name = userDocument.getString("name"); // Use "name" or "fullName"
+                                        if (name != null) {
+                                            entrantNamesList.add(name);
+                                            Log.d(TAG, "Fetched name: " + name);
+                                        } else {
+                                            Log.w(TAG, "User document " + userId + " is missing a 'name' field.");
+                                            entrantNamesList.add("Unnamed User (" + userId.substring(0, 5) + ")");
+                                        }
+                                    } else {
+                                        Log.w(TAG, "User document not found for ID: " + userId);
+                                        entrantNamesList.add("Unknown User");
+                                    }
+                                    // Update the adapter EVERY time a name is added.
+                                    waitlistAdapter.notifyDataSetChanged();
+                                })
+                                .addOnFailureListener(e -> {
+                                    Log.e(TAG, "Failed to fetch user document for ID: " + userId, e);
+                                    entrantNamesList.add("Error Fetching User");
+                                    waitlistAdapter.notifyDataSetChanged();
+                                });
+                    }
+                }
             } else {
                 Log.w(TAG, "WARNING: Event document with ID " + eventId + " not found.");
                 eventNameTextView.setText("Event Not Found");
