@@ -83,13 +83,11 @@ public class DiscoverFragment extends Fragment {
     private void ensureBottomNavVisible() {
         if (getActivity() == null) return;
         
-        // Check if user is authenticated
+        // Check if user is authenticated - simply check if Firebase Auth has a current user
+        // "Remember Me" only affects persistence across app restarts, not current authentication state
         FirebaseAuth auth = FirebaseAuth.getInstance();
-        android.content.SharedPreferences prefs = getActivity().getSharedPreferences("EventEasePrefs", android.content.Context.MODE_PRIVATE);
-        boolean rememberMe = prefs.getBoolean("rememberMe", false);
-        String savedUid = prefs.getString("savedUid", null);
         FirebaseUser currentUser = auth.getCurrentUser();
-        boolean isAuthenticated = rememberMe && savedUid != null && currentUser != null && savedUid.equals(currentUser.getUid());
+        boolean isAuthenticated = currentUser != null;
         
         if (isAuthenticated) {
             View bottomNav = getActivity().findViewById(R.id.include_bottom);

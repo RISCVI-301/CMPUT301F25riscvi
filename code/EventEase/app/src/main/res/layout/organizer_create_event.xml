@@ -140,6 +140,67 @@
                     android:src="@android:drawable/ic_menu_edit"/>
             </LinearLayout>
 
+            <!-- Guidelines -->
+            <TextView
+                android:layout_marginTop="12dp"
+                android:layout_marginBottom="8dp"
+                android:text="Guidelines"
+                android:textStyle="bold"
+                android:textSize="20sp"
+                android:textColor="@color/ee_text_light"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="16dp">
+
+                <EditText
+                    android:id="@+id/etGuidelines"
+                    android:layout_width="0dp"
+                    android:layout_height="56dp"
+                    android:layout_weight="1"
+                    android:minLines="3"
+                    android:background="@drawable/ee_card_bg"
+                    android:padding="18dp"
+                    android:hint="Add guidelines"
+                    android:textColor="@color/ee_text_light"
+                    android:textColorHint="#B3FFFFFF"/>
+
+            </LinearLayout>
+
+            <!-- Location -->
+            <TextView
+                android:layout_marginTop="12dp"
+                android:layout_marginBottom="8dp"
+                android:text="Location"
+                android:textStyle="bold"
+                android:textSize="20sp"
+                android:textColor="@color/ee_text_light"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="16dp">
+
+                <EditText
+                    android:id="@+id/etLocation"
+                    android:layout_width="0dp"
+                    android:layout_height="56dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/ee_card_bg"
+                    android:padding="18dp"
+                    android:hint="Enter location"
+                    android:textColor="@color/ee_text_light"
+                    android:textColorHint="#B3FFFFFF"/>
+
+            </LinearLayout>
+
             <!-- Registration Period -->
             <TextView
                 android:layout_marginTop="12dp"

@@ -6,7 +6,11 @@ import com.example.eventease.util.ToastUtil;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.QuerySnapshot;
+import com.google.firebase.firestore.SetOptions;
+import com.google.firebase.firestore.WriteBatch;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
 import java.util.HashMap;
@@ -145,6 +149,8 @@ public class ProfileUpdateHelper {
             updates.put("updatedAt", System.currentTimeMillis());
             userRef.update(updates)
                 .addOnSuccessListener(aVoid -> {
+                    // After successfully updating the user document, update all event subcollections
+                    updateEventSubcollections(userRef.getId());
                     ToastUtil.showShort(context, "Profile updated successfully");
                     if (callback != null) callback.onUpdateSuccess();
                 })
@@ -155,6 +161,216 @@ public class ProfileUpdateHelper {
         } else {
             // Even if no updates, call success
             if (callback != null) callback.onUpdateSuccess();
+        }
+    }
+    
+    /**
+     * Updates all event subcollections where this user appears as an entrant.
+     * This ensures that when a user updates their profile, all event-specific
+     * entrant documents are also updated with the latest information.
+     * 
+     * @param uid the user ID
+     */
+    private void updateEventSubcollections(String uid) {
+        // First, get the updated user document
+        db.collection("users").document(uid).get()
+            .addOnSuccessListener(userDoc -> {
+                if (userDoc == null || !userDoc.exists()) {
+                    return;
+                }
+                
+                // Build the updated entrant data from the user document
+                Map<String, Object> updatedEntrantData = buildEntrantDataFromUser(userDoc);
+                
+                // List of subcollection names to check
+                String[] subcollections = {
+                    "WaitlistedEntrants",
+                    "SelectedEntrants",
+                    "NonSelectedEntrants",
+                    "CancelledEntrants"
+                };
+                
+                // Query all events once
+                db.collection("events").get()
+                    .addOnSuccessListener(eventsSnapshot -> {
+                        if (eventsSnapshot == null || eventsSnapshot.isEmpty()) {
+                            return;
+                        }
+                        
+                        // Collect all entrant document references across all events and subcollections
+                        java.util.List<DocumentReference> allEntrantRefs = new java.util.ArrayList<>();
+                        
+                        for (DocumentSnapshot eventDoc : eventsSnapshot.getDocuments()) {
+                            String eventId = eventDoc.getId();
+                            DocumentReference eventRef = db.collection("events").document(eventId);
+                            
+                            // Check each subcollection for this event
+                            for (String subcollectionName : subcollections) {
+                                DocumentReference entrantRef = eventRef
+                                    .collection(subcollectionName)
+                                    .document(uid);
+                                allEntrantRefs.add(entrantRef);
+                            }
+                        }
+                        
+                        // Check which documents exist and update them
+                        checkAndUpdateEntrantDocuments(allEntrantRefs, updatedEntrantData);
+                    })
+                    .addOnFailureListener(e -> {
+                        android.util.Log.e("ProfileUpdateHelper", 
+                            "Failed to query events for subcollection update", e);
+                    });
+            })
+            .addOnFailureListener(e -> {
+                android.util.Log.e("ProfileUpdateHelper", 
+                    "Failed to get user document for subcollection update", e);
+            });
+    }
+    
+    /**
+     * Checks which entrant documents exist and updates them in batches.
+     * 
+     * @param entrantRefs list of document references to check and update
+     * @param updatedData the data to update with
+     */
+    private void checkAndUpdateEntrantDocuments(java.util.List<DocumentReference> entrantRefs, 
+                                                Map<String, Object> updatedData) {
+        if (entrantRefs.isEmpty()) {
+            return;
+        }
+        
+        // Check each document and collect those that exist
+        java.util.List<DocumentReference> existingRefs = new java.util.ArrayList<>();
+        final int[] checkedCount = {0};
+        final int totalCount = entrantRefs.size();
+        
+        for (DocumentReference ref : entrantRefs) {
+            ref.get()
+                .addOnSuccessListener(doc -> {
+                    if (doc != null && doc.exists()) {
+                        existingRefs.add(ref);
+                    }
+                    checkedCount[0]++;
+                    
+                    // Once all documents are checked, update them in batches
+                    if (checkedCount[0] >= totalCount) {
+                        updateDocumentsInBatches(existingRefs, updatedData);
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    android.util.Log.w("ProfileUpdateHelper", 
+                        "Failed to check entrant document", e);
+                    checkedCount[0]++;
+                    if (checkedCount[0] >= totalCount) {
+                        updateDocumentsInBatches(existingRefs, updatedData);
+                    }
+                });
+        }
+    }
+    
+    /**
+     * Updates documents in batches to avoid exceeding Firestore limits.
+     * 
+     * @param refs list of document references to update
+     * @param updatedData the data to update with
+     */
+    private void updateDocumentsInBatches(java.util.List<DocumentReference> refs,
+                                         Map<String, Object> updatedData) {
+        if (refs.isEmpty()) {
+            android.util.Log.d("ProfileUpdateHelper", 
+                "No entrant documents found to update");
+            return;
+        }
+        
+        final int MAX_BATCH_SIZE = 500; // Firestore batch limit
+        final int totalToUpdate = refs.size();
+        int batchCount = 0;
+        WriteBatch batch = db.batch();
+        
+        for (DocumentReference ref : refs) {
+            // Use merge to preserve fields like joinedAt
+            batch.set(ref, updatedData, SetOptions.merge());
+            batchCount++;
+            
+            // Commit batch if it's getting large
+            if (batchCount >= MAX_BATCH_SIZE) {
+                final WriteBatch currentBatch = batch;
+                final int currentBatchCount = batchCount;
+                currentBatch.commit()
+                    .addOnSuccessListener(aVoid -> {
+                        android.util.Log.d("ProfileUpdateHelper", 
+                            "Updated batch of " + currentBatchCount + " entrant documents");
+                    })
+                    .addOnFailureListener(e -> {
+                        android.util.Log.e("ProfileUpdateHelper", 
+                            "Failed to update batch of entrant documents", e);
+                    });
+                batch = db.batch();
+                batchCount = 0;
+            }
+        }
+        
+        // Commit any remaining updates
+        if (batchCount > 0) {
+            final int finalBatchCount = batchCount;
+            batch.commit()
+                .addOnSuccessListener(aVoid -> {
+                    android.util.Log.d("ProfileUpdateHelper", 
+                        "Updated final batch of " + finalBatchCount + " entrant documents. " +
+                        "Total updated: " + totalToUpdate);
+                })
+                .addOnFailureListener(e -> {
+                    android.util.Log.e("ProfileUpdateHelper", 
+                        "Failed to update final batch of entrant documents", e);
+                });
+        } else if (totalToUpdate > 0) {
+            android.util.Log.d("ProfileUpdateHelper", 
+                "Total entrant documents updated: " + totalToUpdate);
+        }
+    }
+    
+    /**
+     * Builds entrant data map from a user document snapshot.
+     * This replicates the structure used in buildWaitlistEntry.
+     * 
+     * @param userDoc the user document snapshot
+     * @return a map containing the entrant data
+     */
+    private Map<String, Object> buildEntrantDataFromUser(DocumentSnapshot userDoc) {
+        Map<String, Object> data = new HashMap<>();
+        String uid = userDoc.getId();
+        data.put("userId", uid);
+        
+        // Compute displayName from available name fields
+        String displayName = userDoc.getString("fullName");
+        if (displayName == null || displayName.trim().isEmpty()) {
+            displayName = userDoc.getString("name");
+        }
+        if (displayName == null || displayName.trim().isEmpty()) {
+            String first = userDoc.getString("firstName");
+            String last = userDoc.getString("lastName");
+            displayName = ((first != null ? first : "") + " " + (last != null ? last : "")).trim();
+        }
+        
+        // Add all relevant fields
+        putIfString(data, "displayName", displayName);
+        putIfString(data, "fullName", userDoc.getString("fullName"));
+        putIfString(data, "name", userDoc.getString("name"));
+        putIfString(data, "firstName", userDoc.getString("firstName"));
+        putIfString(data, "lastName", userDoc.getString("lastName"));
+        putIfString(data, "email", userDoc.getString("email"));
+        putIfString(data, "phoneNumber", userDoc.getString("phoneNumber"));
+        putIfString(data, "photoUrl", userDoc.getString("photoUrl"));
+        
+        return data;
+    }
+    
+    /**
+     * Helper method to add a string value to a map only if it's not null or empty.
+     */
+    private void putIfString(Map<String, Object> target, String key, String value) {
+        if (value != null && !value.trim().isEmpty()) {
+            target.put(key, value);
         }
     }
     
@@ -180,7 +396,11 @@ public class ProfileUpdateHelper {
                             Map<String, Object> updates = new HashMap<>();
                             updates.put("email", authEmail);
                             updates.put("updatedAt", System.currentTimeMillis());
-                            userRef.update(updates);
+                            userRef.update(updates)
+                                .addOnSuccessListener(aVoid -> {
+                                    // After successfully updating email, update event subcollections
+                                    updateEventSubcollections(uid);
+                                });
                         }
                     } else {
                         // If doc missing, set minimal fields to avoid NPE elsewhere
@@ -188,7 +408,11 @@ public class ProfileUpdateHelper {
                         create.put("uid", uid);
                         create.put("email", authEmail);
                         create.put("updatedAt", System.currentTimeMillis());
-                        userRef.set(create, com.google.firebase.firestore.SetOptions.merge());
+                        userRef.set(create, com.google.firebase.firestore.SetOptions.merge())
+                            .addOnSuccessListener(aVoid -> {
+                                // After successfully creating/updating email, update event subcollections
+                                updateEventSubcollections(uid);
+                            });
                     }
                 });
             });

@@ -19,6 +19,10 @@ public class Event {
     public String title;
     /** Event start time in milliseconds UTC. */
     public long startsAtEpochMs;
+    /** Registration start time in milliseconds UTC. */
+    public long registrationStart;
+    /** Registration end time in milliseconds UTC. */
+    public long registrationEnd;
     /** Event location. */
     public String location;
     /** Maximum capacity of the event. */
@@ -31,6 +35,8 @@ public class Event {
     public List<String> admitted;
     /** Event notes or description. */
     @Nullable public String notes;
+    /** Event description (legacy field, same as notes). */
+    @Nullable public String description;
     /** Event-specific rules and requirements. */
     @Nullable public String guidelines;
     /** URL of the event poster image. */
@@ -70,12 +76,15 @@ public class Event {
         m.put("id", id);
         m.put("title", title);
         m.put("startsAtEpochMs", startsAtEpochMs);
+        m.put("registrationStart", registrationStart);
+        m.put("registrationEnd", registrationEnd);
         m.put("location", location);
         m.put("capacity", capacity);
         m.put("waitlistCount", waitlistCount);
         m.put("waitlist", waitlist != null ? waitlist : new ArrayList<>());
         m.put("admitted", admitted != null ? admitted : new ArrayList<>());
         m.put("notes", notes);
+        m.put("description", description);
         m.put("guidelines", guidelines);
         m.put("posterUrl", posterUrl);
         m.put("organizerId", organizerId);
@@ -99,6 +108,12 @@ public class Event {
         
         Object startsAt = m.get("startsAtEpochMs");
         e.startsAtEpochMs = startsAt != null ? ((Number) startsAt).longValue() : 0;
+        
+        Object regStart = m.get("registrationStart");
+        e.registrationStart = regStart != null ? ((Number) regStart).longValue() : 0;
+        
+        Object regEnd = m.get("registrationEnd");
+        e.registrationEnd = regEnd != null ? ((Number) regEnd).longValue() : 0;
         
         e.location = (String) m.get("location");
         
@@ -134,6 +149,13 @@ public class Event {
         }
         
         e.notes = (String) m.get("notes");
+        e.description = (String) m.get("description");
+        if (e.notes == null && e.description != null) {
+            e.notes = e.description;
+        }
+        if (e.description == null && e.notes != null) {
+            e.description = e.notes;
+        }
         e.guidelines = (String) m.get("guidelines");
         e.posterUrl = (String) m.get("posterUrl");
         e.organizerId = (String) m.get("organizerId");
@@ -155,6 +177,12 @@ public class Event {
     public long getStartsAtEpochMs() { return startsAtEpochMs; }
     public void setStartsAtEpochMs(long startsAtEpochMs) { this.startsAtEpochMs = startsAtEpochMs; }
 
+    public long getRegistrationStart() { return registrationStart; }
+    public void setRegistrationStart(long registrationStart) { this.registrationStart = registrationStart; }
+
+    public long getRegistrationEnd() { return registrationEnd; }
+    public void setRegistrationEnd(long registrationEnd) { this.registrationEnd = registrationEnd; }
+
     /**
      * Returns the event start time as a Date object.
      *
@@ -175,6 +203,9 @@ public class Event {
 
     @Nullable public String getNotes() { return notes; }
     public void setNotes(@Nullable String notes) { this.notes = notes; }
+
+    @Nullable public String getDescription() { return description != null ? description : notes; }
+    public void setDescription(@Nullable String description) { this.description = description; }
 
     @Nullable public String getGuidelines() { return guidelines; }
     public void setGuidelines(@Nullable String guidelines) { this.guidelines = guidelines; }

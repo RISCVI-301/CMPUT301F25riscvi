@@ -193,19 +193,19 @@ public class MyEventsFragment extends Fragment {
                 for (Event e : events) {
                     try {
                         Boolean joined = Tasks.await(waitlistRepo.isJoined(e.getId(), uid));
-                        // Also check if user has already been admitted/accepted
+                        Boolean inSelected = Tasks.await(isInSelectedEntrants(e.getId(), uid));
                         Boolean admitted = Tasks.await(admittedRepo.isAdmitted(e.getId(), uid));
-                        android.util.Log.d("MyEventsFragment", "Event " + e.getTitle() + " - Joined: " + joined + ", Admitted: " + admitted);
+                        android.util.Log.d("MyEventsFragment", "Event " + e.getTitle() + " - Joined: " + joined + ", Selected: " + inSelected + ", Admitted: " + admitted);
                         
-                        // Only show if in waitlist AND NOT admitted
-                        if (Boolean.TRUE.equals(joined) && !Boolean.TRUE.equals(admitted)) {
+                        // Show if in waitlist OR selected, AND NOT admitted
+                        if ((Boolean.TRUE.equals(joined) || Boolean.TRUE.equals(inSelected)) && !Boolean.TRUE.equals(admitted)) {
                             mine.add(e);
                         }
                     } catch (Exception ex) {
                         android.util.Log.e("MyEventsFragment", "Error checking waitlist for event " + e.getId(), ex);
                     }
                 }
-                android.util.Log.d("MyEventsFragment", "Found " + mine.size() + " waitlisted events (excluding admitted) for user");
+                android.util.Log.d("MyEventsFragment", "Found " + mine.size() + " waitlisted/selected events (excluding admitted) for user");
                 if (!isAdded()) return;
                 ViewCompat.postOnAnimation(requireView(), () -> {
                     adapter.submit(mine);
@@ -221,6 +221,18 @@ public class MyEventsFragment extends Fragment {
             setLoading(false);
             showEmptyIfNeeded();
         });
+    }
+
+    private Task<Boolean> isInSelectedEntrants(String eventId, String uid) {
+        com.google.firebase.firestore.FirebaseFirestore db = com.google.firebase.firestore.FirebaseFirestore.getInstance();
+        return db.collection("events")
+                .document(eventId)
+                .collection("SelectedEntrants")
+                .document(uid)
+                .get()
+                .continueWith(task -> {
+                    return task.isSuccessful() && task.getResult() != null && task.getResult().exists();
+                });
     }
 
     private int dp(int dps) {

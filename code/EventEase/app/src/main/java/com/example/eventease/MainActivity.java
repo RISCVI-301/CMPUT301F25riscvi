@@ -15,6 +15,8 @@ import androidx.navigation.fragment.NavHostFragment;
 
 import com.google.firebase.auth.FirebaseAuth;
 import com.example.eventease.R;
+import com.example.eventease.notifications.FCMTokenManager;
+import com.example.eventease.notifications.InvitationNotificationListener;
 
 /**
  * Main activity that hosts navigation fragments and manages bottom navigation.
@@ -36,6 +38,8 @@ public class MainActivity extends AppCompatActivity {
     private android.widget.TextView navLabelMyEvents;
     private android.widget.TextView navLabelDiscover;
     private android.widget.TextView navLabelAccount;
+    
+    private InvitationNotificationListener invitationListener;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -132,13 +136,11 @@ public class MainActivity extends AppCompatActivity {
             
             int id = destination.getId();
             
-            // Check if user is authenticated (check dynamically each time)
+            // Check if user is authenticated - simply check if Firebase Auth has a current user
+            // "Remember Me" only affects persistence across app restarts, not current authentication state
             FirebaseAuth authCheck = FirebaseAuth.getInstance();
-            android.content.SharedPreferences prefsCheck = getSharedPreferences("EventEasePrefs", MODE_PRIVATE);
-            boolean rememberMeCheck = prefsCheck.getBoolean("rememberMe", false);
-            String savedUidCheck = prefsCheck.getString("savedUid", null);
             com.google.firebase.auth.FirebaseUser currentUserCheck = authCheck.getCurrentUser();
-            boolean isAuthenticated = rememberMeCheck && savedUidCheck != null && currentUserCheck != null && savedUidCheck.equals(currentUserCheck.getUid());
+            boolean isAuthenticated = currentUserCheck != null;
             
             // Main app screens (discover, my events, account) - show bars if authenticated
             if (id == R.id.discoverFragment || id == R.id.myEventsFragment || id == R.id.accountFragment 
@@ -148,6 +150,13 @@ public class MainActivity extends AppCompatActivity {
                     bottomNav.setVisibility(View.VISIBLE);
                     topBar.setVisibility(View.VISIBLE);
                     updateNavigationSelection(id);
+                    
+                    // Initialize FCM token manager and invitation listener if not already done
+                    if (invitationListener == null) {
+                        FCMTokenManager.getInstance().initialize();
+                        invitationListener = new InvitationNotificationListener(this);
+                        invitationListener.startListening();
+                    }
                 } else {
                     // User not authenticated, hide bars
                     bottomNav.setVisibility(View.GONE);
@@ -185,6 +194,11 @@ public class MainActivity extends AppCompatActivity {
                 nav.navigate(R.id.discoverFragment);
                 updateNavigationSelection(R.id.discoverFragment);
             });
+            
+            // Initialize FCM token manager and invitation listener
+            FCMTokenManager.getInstance().initialize();
+            invitationListener = new InvitationNotificationListener(this);
+            invitationListener.startListening();
         } else {
             // User not logged in on startup - hide bars initially
             bottomNav.setVisibility(View.GONE);
@@ -193,6 +207,14 @@ public class MainActivity extends AppCompatActivity {
 
         // Handle external navigation intents (from detail activities)
         handleExternalNav(getIntent());
+    }
+    
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (invitationListener != null) {
+            invitationListener.stopListening();
+        }
     }
 
     @Override

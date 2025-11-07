@@ -336,126 +336,21 @@ public class AccountFragment extends Fragment {
 
         String uid = currentUser.getUid();
         
-        // Show loading toast
         ToastUtil.showShort(getContext(), "Deleting profile...");
 
-        // Delete all user references in cascade
-        deleteUserReferences(uid, () -> {
-            // After cascade deletion, delete user document and auth account
-            deleteUserDocumentAndAuth(uid);
+        ProfileDeletionHelper deletionHelper = new ProfileDeletionHelper(getContext());
+        deletionHelper.deleteAllUserReferences(uid, new ProfileDeletionHelper.DeletionCallback() {
+            @Override
+            public void onDeletionComplete() {
+                deleteUserDocumentAndAuth(uid);
+            }
+
+            @Override
+            public void onDeletionFailure(String error) {
+                android.util.Log.e("AccountFragment", "Failed to delete user references: " + error);
+                deleteUserDocumentAndAuth(uid);
+            }
         });
-    }
-
-    private void deleteUserReferences(String uid, Runnable onComplete) {
-        // Query all events or subcollections where the user might appear
-        Task<QuerySnapshot> waitlistEventsTask = db.collection("events")
-            .whereArrayContains("waitlist", uid)
-            .get();
-
-        Task<QuerySnapshot> admittedEventsTask = db.collection("events")
-            .whereArrayContains("admitted", uid)
-            .get();
-
-        Task<QuerySnapshot> waitlistSubTask = db.collectionGroup("WaitlistedEntrants")
-            .whereEqualTo("userId", uid)
-            .get();
-
-        Task<QuerySnapshot> selectedSubTask = db.collectionGroup("SelectedEntrants")
-            .whereEqualTo("userId", uid)
-            .get();
-
-        Task<QuerySnapshot> nonSelectedSubTask = db.collectionGroup("NonSelectedEntrants")
-            .whereEqualTo("userId", uid)
-            .get();
-
-        Task<QuerySnapshot> cancelledSubTask = db.collectionGroup("CancelledEntrants")
-            .whereEqualTo("userId", uid)
-            .get();
-
-        // Delete all invitations
-        Task<QuerySnapshot> invitationsTask = db.collection("invitations")
-            .whereEqualTo("uid", uid)
-            .get();
-
-        Tasks.whenAllComplete(waitlistEventsTask, admittedEventsTask, waitlistSubTask,
-                selectedSubTask, nonSelectedSubTask, cancelledSubTask, invitationsTask)
-            .addOnSuccessListener(results -> {
-                List<Task<Void>> updateTasks = new ArrayList<>();
-
-                if (waitlistEventsTask.isSuccessful() && waitlistEventsTask.getResult() != null) {
-                    for (QueryDocumentSnapshot document : waitlistEventsTask.getResult()) {
-                        updateTasks.add(document.getReference().update("waitlist",
-                                com.google.firebase.firestore.FieldValue.arrayRemove(uid)));
-                    }
-                }
-
-                if (admittedEventsTask.isSuccessful() && admittedEventsTask.getResult() != null) {
-                    for (QueryDocumentSnapshot document : admittedEventsTask.getResult()) {
-                        updateTasks.add(document.getReference().update("admitted",
-                                com.google.firebase.firestore.FieldValue.arrayRemove(uid)));
-                    }
-                }
-
-                if (waitlistSubTask.isSuccessful() && waitlistSubTask.getResult() != null) {
-                    for (DocumentSnapshot document : waitlistSubTask.getResult()) {
-                        updateTasks.add(removeSubcollectionEntry(document));
-                    }
-                }
-
-                if (selectedSubTask.isSuccessful() && selectedSubTask.getResult() != null) {
-                    for (DocumentSnapshot document : selectedSubTask.getResult()) {
-                        updateTasks.add(document.getReference().delete());
-                    }
-                }
-
-                if (nonSelectedSubTask.isSuccessful() && nonSelectedSubTask.getResult() != null) {
-                    for (DocumentSnapshot document : nonSelectedSubTask.getResult()) {
-                        updateTasks.add(document.getReference().delete());
-                    }
-                }
-
-                if (cancelledSubTask.isSuccessful() && cancelledSubTask.getResult() != null) {
-                    for (DocumentSnapshot document : cancelledSubTask.getResult()) {
-                        updateTasks.add(document.getReference().delete());
-                    }
-                }
-
-                if (invitationsTask.isSuccessful() && invitationsTask.getResult() != null) {
-                    for (QueryDocumentSnapshot document : invitationsTask.getResult()) {
-                        updateTasks.add(document.getReference().delete());
-                    }
-                }
-
-                if (!updateTasks.isEmpty()) {
-                    Tasks.whenAll(updateTasks)
-                            .addOnSuccessListener(aVoid -> onComplete.run())
-                            .addOnFailureListener(e -> {
-                                android.util.Log.e("AccountFragment", "Some cascade updates failed", e);
-                                onComplete.run();
-                            });
-                } else {
-                    onComplete.run();
-                }
-            })
-            .addOnFailureListener(e -> {
-                android.util.Log.e("AccountFragment", "Failed to query user references", e);
-                onComplete.run();
-            });
-    }
-
-    private Task<Void> removeSubcollectionEntry(DocumentSnapshot document) {
-        com.google.firebase.firestore.WriteBatch batch = db.batch();
-        batch.delete(document.getReference());
-
-        DocumentReference parentEvent = null;
-        if (document.getReference().getParent() != null) {
-            parentEvent = document.getReference().getParent().getParent();
-        }
-        if (parentEvent != null) {
-            batch.update(parentEvent, "waitlistCount", com.google.firebase.firestore.FieldValue.increment(-1));
-        }
-
-        return batch.commit();
     }
 
     private void deleteUserDocumentAndAuth(String uid) {
