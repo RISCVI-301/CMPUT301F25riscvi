@@ -1,0 +1,11 @@
+com.EventEase
+com.EventEase.auth
+com.EventEase.data
+com.EventEase.data.firebase
+com.EventEase.model
+com.EventEase.ui.entrant
+com.EventEase.ui.entrant.discover
+com.EventEase.ui.entrant.eventdetail
+com.EventEase.ui.entrant.myevents
+com.EventEase.ui.entrant.profile
+com.EventEase.util

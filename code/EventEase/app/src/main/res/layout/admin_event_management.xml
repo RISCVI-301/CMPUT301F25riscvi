@@ -9,18 +9,12 @@
     android:background="#223C65"
     >
 
-    <!-- Top bar -->
-    <TextView
-        android:id="@+id/tvTitle"
+    <!-- Top bar with logout button -->
+    <include
+        android:id="@+id/admin_topbar"
+        layout="@layout/admin_include_topbar"
         android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:gravity="center_vertical"
-        android:paddingStart="16dp"
-        android:text="EventEase"
-        android:textStyle="bold"
-        android:textSize="22sp"
-        android:textColor="#1A2C44"
-        android:background="#BDE9DB" />
+        android:layout_height="wrap_content" />
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
