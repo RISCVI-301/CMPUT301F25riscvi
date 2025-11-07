@@ -11,6 +11,8 @@
     tools:context=".ViewEntrantsActivity">
 
 
+
+
     <!-- Header -->
     <TextView
         android:id="@+id/titleText"
@@ -49,7 +51,7 @@
             android:text="Selected Entrants"
             android:textStyle="bold"
             android:textColor="#9EFFF1"
-            android:textSize="22sp" />
+            android:textSize="24sp" />
 
         <ImageButton
             android:id="@+id/btnMailSelected"
@@ -89,7 +91,7 @@
             android:text="Not Selected Entrants"
             android:textStyle="bold"
             android:textColor="#9EFFF1"
-            android:textSize="22sp" />
+            android:textSize="24sp" />
 
         <!-- Mail Icon -->
         <ImageButton
@@ -152,7 +154,7 @@
             android:text="Cancelled Entrants"
             android:textStyle="bold"
             android:textColor="#9EFFF1"
-            android:textSize="22sp" />
+            android:textSize="24sp" />
 
         <ImageButton
             android:id="@+id/btnMailCancelled"
