@@ -3,6 +3,7 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
+    android:fitsSystemWindows="true"
     android:layout_height="match_parent"
     android:background="@color/ee_navy_dark">
 
@@ -281,46 +282,40 @@
                 android:id="@+id/rgEntrants"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:layout_marginBottom="16dp">
+                android:orientation="vertical">
 
                 <RadioButton
                     android:id="@+id/rbAny"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
                     android:checked="true"
                     android:text="Any Number"
                     android:textColor="@color/ee_text_light"
-                    android:textSize="16sp"
+                    android:textSize="16sp"/>
+
+                <RadioButton
+                    android:id="@+id/rbSpecific"
                     android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"/>
-
-                <LinearLayout
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content">
-
-                    <RadioButton
-                        android:id="@+id/rbSpecific"
-                        android:text="Specific Number"
-                        android:textColor="@color/ee_text_light"
-                        android:textSize="16sp"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"/>
-
-                    <EditText
-                        android:id="@+id/etCapacity"
-                        android:layout_marginStart="12dp"
-                        android:enabled="false"
-                        android:layout_width="84dp"
-                        android:layout_height="56dp"
-                        android:background="@drawable/ee_card_bg"
-                        android:padding="18dp"
-                        android:hint="0"
-                        android:inputType="number"
-                        android:textColor="@color/ee_text_light"
-                        android:textColorHint="#80FFFFFF"/>
-                </LinearLayout>
+                    android:layout_height="wrap_content"
+                    android:text="Specific Number"
+                    android:textColor="@color/ee_text_light"
+                    android:textSize="16sp"/>
             </RadioGroup>
+
+            <EditText
+                android:id="@+id/etCapacity"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="16dp"
+                android:background="@drawable/ee_card_bg"
+                android:enabled="false"
+                android:hint="Enter capacity"
+                android:inputType="number"
+                android:padding="18dp"
+                android:textColor="@color/ee_text_light"
+                android:textColorHint="#80FFFFFF"
+                android:visibility="gone"/>
 
         </LinearLayout>
     </ScrollView>

@@ -1,4 +1,4 @@
-package com.example.eventease;
+package com.example.eventease.ui.organizer;
 
 import android.net.Uri;
 import android.os.Bundle;
@@ -14,6 +14,7 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.bumptech.glide.Glide;
+import com.example.eventease.R;
 import com.example.eventease.util.AuthHelper;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.firebase.auth.FirebaseAuth;

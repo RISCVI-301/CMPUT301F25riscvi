@@ -1,22 +1,37 @@
 package com.example.eventease.ui.organizer;
 
 import android.app.DatePickerDialog;
+import android.app.Dialog;
 import android.app.TimePickerDialog;
+import android.content.ContentValues;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Build;
+import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
 import android.util.Log;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.Window;
 import android.widget.*;
+import android.provider.MediaStore;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.annotation.LayoutRes;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.FileProvider;
 
 import com.bumptech.glide.Glide;
 import com.example.eventease.R;
 import com.example.eventease.util.AuthHelper;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.button.MaterialButton;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
@@ -25,6 +40,16 @@ import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageMetadata;
 import com.google.firebase.storage.StorageReference;
 
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.WriterException;
+import com.google.zxing.common.BitMatrix;
+import com.google.zxing.qrcode.QRCodeWriter;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Map;
@@ -92,7 +117,19 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         rgEntrants.setOnCheckedChangeListener((g, checkedId) -> {
             boolean specific = (checkedId == R.id.rbSpecific);
             etCapacity.setEnabled(specific);
-            if (!specific) etCapacity.setText("");
+            etCapacity.setVisibility(specific ? View.VISIBLE : View.GONE);
+            if (!specific) {
+                etCapacity.setText("");
+            } else {
+                etCapacity.requestFocus();
+            }
+        });
+
+        etCapacity.setOnClickListener(v -> rgEntrants.check(R.id.rbSpecific));
+        etCapacity.setOnFocusChangeListener((v, hasFocus) -> {
+            if (hasFocus) {
+                rgEntrants.check(R.id.rbSpecific);
+            }
         });
 
         btnStart.setOnClickListener(v -> pickDateTime(true));
@@ -247,7 +284,6 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         doc.put("organizerId", organizerId);
         doc.put("createdAt", System.currentTimeMillis());
         doc.put("qrPayload", generateQr ? ("event:" + id) : null);
-
         FirebaseFirestore.getInstance()
                 .collection("events")
                 .document(id)
@@ -266,32 +302,212 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
     }
 
     private void showSuccessDialog(String id, String title, @Nullable String qrPayload) {
-        StringBuilder msg = new StringBuilder("Your event was created.\n\n");
-        msg.append("Title: ").append(title).append("\n");
-        msg.append("ID: ").append(id);
-        if (qrPayload != null) {
-            msg.append("\nQR payload: ").append(qrPayload);
+        if (qrPayload == null) {
+            showEventOptionsDialog(title);
+        } else {
+            showQrPreparationDialog(title, qrPayload);
+        }
+    }
+
+    private void showQrPreparationDialog(String title, String qrPayload) {
+        Dialog preparingDialog = createCardDialog(R.layout.dialog_event_created);
+        TextView subtitle = preparingDialog.findViewById(R.id.tvSubtitle);
+        TextView header = preparingDialog.findViewById(R.id.tvTitle);
+        if (header != null) {
+            header.setText("Event Created Successfully");
+        }
+        if (subtitle != null) {
+            subtitle.setText("Generating QR code…");
+        }
+        preparingDialog.show();
+
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            preparingDialog.dismiss();
+            showQrDialog(title, qrPayload);
+        }, 1200);
+    }
+
+    private void showEventOptionsDialog(String title) {
+        Dialog dialog = createCardDialog(R.layout.dialog_event_options);
+        TextView titleView = dialog.findViewById(R.id.tvEventTitle);
+        TextView subtitleView = dialog.findViewById(R.id.tvEventSubtitle);
+        MaterialButton btnViewEvents = dialog.findViewById(R.id.btnViewEvents);
+
+        if (titleView != null) {
+            titleView.setText("Event Created Successfully");
+        }
+        if (subtitleView != null) {
+            subtitleView.setText("\"" + title + "\" is ready to share.");
         }
 
-        new MaterialAlertDialogBuilder(this)
-                .setTitle("Event created")
-                .setMessage(msg.toString())
-                .setPositiveButton("View My Events", (d, w) -> {
-                    startActivity(new Intent(
-                            this, com.example.eventease.ui.organizer.OrganizerMyEventActivity.class));
-                    finish();
-                })
-                .setNegativeButton("Create Another", (d, w) -> {
-                    resetForm();
-                })
-                .show();
+        if (btnViewEvents != null) {
+            btnViewEvents.setOnClickListener(v -> {
+                dialog.dismiss();
+                goToMyEvents();
+            });
+        }
+
+        dialog.show();
+    }
+
+    private void showQrDialog(String title, String qrPayload) {
+        Dialog dialog = createCardDialog(R.layout.dialog_qr_preview);
+        TextView titleView = dialog.findViewById(R.id.tvEventTitle);
+        ImageView imgQr = dialog.findViewById(R.id.imgQr);
+        MaterialButton btnShare = dialog.findViewById(R.id.btnShare);
+        MaterialButton btnSave = dialog.findViewById(R.id.btnSave);
+        MaterialButton btnViewEvents = dialog.findViewById(R.id.btnViewEvents);
+
+        if (titleView != null) {
+            titleView.setText(title);
+        }
+
+        Bitmap qrBitmap = generateQrBitmap(qrPayload);
+        if (imgQr != null) {
+            if (qrBitmap != null) {
+                imgQr.setImageBitmap(qrBitmap);
+            } else {
+                imgQr.setImageResource(R.drawable.ic_launcher_foreground);
+            }
+        }
+
+        if (btnShare != null) {
+            btnShare.setOnClickListener(v -> {
+                if (qrBitmap != null) {
+                    shareQrBitmap(qrBitmap, qrPayload);
+                } else {
+                    shareQrText(qrPayload);
+                }
+            });
+        }
+
+        if (btnSave != null) {
+            btnSave.setOnClickListener(v -> {
+                if (qrBitmap != null) {
+                    boolean saved = saveQrToGallery(qrBitmap, title);
+                    if (saved) {
+                        toast("Saved to gallery");
+                    }
+                } else {
+                    toast("QR not ready yet.");
+                }
+            });
+        }
+
+        if (btnViewEvents != null) {
+            btnViewEvents.setOnClickListener(v -> {
+                dialog.dismiss();
+                goToMyEvents();
+            });
+        }
+
+        dialog.show();
+    }
+
+    private Dialog createCardDialog(@LayoutRes int layoutRes) {
+        Dialog dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setContentView(layoutRes);
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            dialog.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+        dialog.setCanceledOnTouchOutside(false);
+        return dialog;
+    }
+
+    private Bitmap generateQrBitmap(String payload) {
+        try {
+            QRCodeWriter writer = new QRCodeWriter();
+            BitMatrix matrix = writer.encode(payload, BarcodeFormat.QR_CODE, 512, 512);
+            int width = matrix.getWidth();
+            int height = matrix.getHeight();
+            Bitmap bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            for (int x = 0; x < width; x++) {
+                for (int y = 0; y < height; y++) {
+                    bmp.setPixel(x, y, matrix.get(x, y) ? Color.BLACK : Color.WHITE);
+                }
+            }
+            return bmp;
+        } catch (WriterException e) {
+            Log.e(TAG, "QR code generation failed", e);
+            return null;
+        }
+    }
+
+    private void shareQrBitmap(Bitmap bitmap, String payload) {
+        try {
+            File cacheDir = new File(getCacheDir(), "qr");
+            if (!cacheDir.exists() && !cacheDir.mkdirs()) {
+                throw new IOException("Unable to create cache directory");
+            }
+            File file = new File(cacheDir, "qr_" + System.currentTimeMillis() + ".png");
+            try (FileOutputStream out = new FileOutputStream(file)) {
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
+            }
+
+            Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", file);
+            Intent shareIntent = new Intent(Intent.ACTION_SEND);
+            shareIntent.setType("image/png");
+            shareIntent.putExtra(Intent.EXTRA_STREAM, uri);
+            shareIntent.putExtra(Intent.EXTRA_TEXT, "Scan this QR to view the event: " + payload);
+            shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(Intent.createChooser(shareIntent, "Share QR code"));
+        } catch (IOException e) {
+            Log.e(TAG, "Failed to share QR bitmap", e);
+            toast("Unable to share QR. Try again.");
+        }
+    }
+
+    private void shareQrText(String payload) {
+        Intent shareIntent = new Intent(Intent.ACTION_SEND);
+        shareIntent.setType("text/plain");
+        shareIntent.putExtra(Intent.EXTRA_TEXT, payload);
+        startActivity(Intent.createChooser(shareIntent, "Share event link"));
+    }
+
+    private boolean saveQrToGallery(Bitmap bitmap, String title) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            toast("Saving to gallery requires Android 10 or newer. Use Share instead.");
+            return false;
+        }
+
+        String fileName = "EventEase_" + System.currentTimeMillis() + ".png";
+        try {
+            ContentValues values = new ContentValues();
+            values.put(MediaStore.MediaColumns.DISPLAY_NAME, fileName);
+            values.put(MediaStore.MediaColumns.MIME_TYPE, "image/png");
+            values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/EventEase");
+
+            Uri uri = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+            if (uri == null) {
+                throw new IOException("Unable to create MediaStore entry");
+            }
+            try (OutputStream out = getContentResolver().openOutputStream(uri)) {
+                if (out == null) throw new IOException("Unable to open output stream");
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
+            }
+            return true;
+        } catch (IOException e) {
+            Log.e(TAG, "Failed to save QR to gallery", e);
+            toast("Unable to save QR. Try again.");
+            return false;
+        }
+    }
+
+    private void goToMyEvents() {
+        Intent intent = new Intent(this, com.example.eventease.ui.organizer.OrganizerMyEventActivity.class);
+        startActivity(intent);
+        finish();
     }
 
     private void resetForm() {
         etTitle.setText("");
         etDescription.setText("");
         etCapacity.setText("");
-        rbAny.setChecked(true);
+        rgEntrants.check(R.id.rbAny);
+        etCapacity.setVisibility(View.GONE);
+        etCapacity.setEnabled(false);
         regStartEpochMs = 0L;
         regEndEpochMs = 0L;
         btnStart.setText("Select");

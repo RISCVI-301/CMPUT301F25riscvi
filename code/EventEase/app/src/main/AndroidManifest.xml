@@ -33,9 +33,22 @@
             android:exported="false" />
 
         <activity
-            android:name=".OrganizerAccountActivity"
+            android:name=".ui.organizer.OrganizerAccountActivity"
             android:exported="false" />
-        <activity android:name=".OrganizerWaitlistActivity" />
+        <activity android:name=".ui.organizer.OrganizerWaitlistActivity" />
+        <activity
+            android:name=".ui.organizer.OrganizerViewEntrantsActivity"
+            android:exported="false" />
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>

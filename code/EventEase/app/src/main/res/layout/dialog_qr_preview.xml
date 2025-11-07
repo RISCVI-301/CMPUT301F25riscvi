@@ -5,38 +5,92 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_margin="24dp"
-    android:padding="20dp"
-    app:cardBackgroundColor="@color/ee_card">
+    android:padding="24dp"
+    app:cardBackgroundColor="@color/ee_mint_aqua"
+    app:cardCornerRadius="24dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:gravity="center_horizontal">
-
-        <ImageView
-            android:id="@+id/imgQr"
-            android:layout_width="220dp"
-            android:layout_height="220dp"
-            android:contentDescription="QR code" />
+        android:gravity="center_horizontal"
+        android:orientation="vertical">
 
         <TextView
+            android:id="@+id/tvEventTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_marginBottom="16dp"
+            android:text="Ice Skating Night"
+            android:textColor="@color/ee_navy_dark"
+            android:textSize="20sp"
+            android:textStyle="bold"/>
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            app:cardBackgroundColor="@android:color/white"
+            app:cardCornerRadius="20dp">
+
+            <ImageView
+                android:id="@+id/imgQr"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:adjustViewBounds="true"
+                android:contentDescription="QR code"
+                android:padding="24dp"
+                android:scaleType="fitCenter" />
+        </com.google.android.material.card.MaterialCardView>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:padding="12dp"
             android:text="SCAN ME"
+            android:textAllCaps="true"
             android:textColor="@color/ee_text_light"
+            android:textSize="16sp"
             android:textStyle="bold"
-            android:textSize="16sp"/>
+            android:background="@drawable/qr_scan_label_bg"/>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:orientation="horizontal"
+            android:gravity="center">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnShare"
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_marginEnd="12dp"
+                android:layout_weight="1"
+                android:text="Share"
+                android:textStyle="bold"
+                android:textColor="@color/ee_navy_dark"
+                app:backgroundTint="@android:color/white"/>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnSave"
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_weight="1"
+                android:text="Save to Gallery"
+                android:textStyle="bold"
+                android:textColor="@color/ee_text_light"
+                app:backgroundTint="@color/ee_navy_dark"/>
+        </LinearLayout>
 
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnShare"
+            android:id="@+id/btnViewEvents"
             android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_marginTop="18dp"
-            android:text="Share"
+            android:layout_height="52dp"
+            android:layout_marginTop="16dp"
+            android:text="View My Events"
             android:textStyle="bold"
             android:textColor="@color/ee_navy_dark"
-            app:backgroundTint="@color/ee_mint_aqua"/>
+            app:backgroundTint="@android:color/white"/>
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>
