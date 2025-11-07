@@ -17,11 +17,16 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.bumptech.glide.Glide;
 import com.example.eventease.R;
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.QuerySnapshot;
+import com.google.firebase.firestore.WriteBatch;
 import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.StorageReference;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -93,7 +98,7 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
                 pickImageLauncher.launch("image/*");
             }
         });
-        deleteEventButton.setOnClickListener(v -> Toast.makeText(this, "Delete coming soon", Toast.LENGTH_SHORT).show());
+        deleteEventButton.setOnClickListener(v -> showDeleteEventConfirmation());
 
         signInAndLoadData();
     }
@@ -101,12 +106,38 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
     private void signInAndLoadData() {
         FirebaseUser currentUser = mAuth.getCurrentUser();
         if (currentUser != null) {
+            checkAndProcessSelection();
             loadEventDataFromFirestore(currentEventId);
         } else {
             mAuth.signInAnonymously()
-                    .addOnSuccessListener(r -> loadEventDataFromFirestore(currentEventId))
+                    .addOnSuccessListener(r -> {
+                        checkAndProcessSelection();
+                        loadEventDataFromFirestore(currentEventId);
+                    })
                     .addOnFailureListener(e -> Toast.makeText(this, "Auth failed", Toast.LENGTH_SHORT).show());
         }
+    }
+    
+    private void checkAndProcessSelection() {
+        if (currentEventId == null || currentEventId.isEmpty()) {
+            return;
+        }
+        
+        EventSelectionHelper selectionHelper = new EventSelectionHelper();
+        selectionHelper.checkAndProcessEventSelection(currentEventId, new EventSelectionHelper.SelectionCallback() {
+            @Override
+            public void onComplete(int selectedCount) {
+                if (selectedCount > 0) {
+                    Log.d(TAG, "Selection processed: " + selectedCount + " entrants selected");
+                    loadEventDataFromFirestore(currentEventId);
+                }
+            }
+            
+            @Override
+            public void onError(String error) {
+                Log.w(TAG, "Selection processing error: " + error);
+            }
+        });
     }
 
     private void loadEventDataFromFirestore(String eventId) {
@@ -202,6 +233,184 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
     private void uploadPosterImage(Uri uri) {
         // Placeholder: implement upload if needed
         Toast.makeText(this, "Upload not implemented yet", Toast.LENGTH_SHORT).show();
+    }
+
+    private void showDeleteEventConfirmation() {
+        if (currentEventId == null || currentEventId.isEmpty()) {
+            Toast.makeText(this, "Event ID not found", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        String eventTitle = eventNameTextView != null ? eventNameTextView.getText().toString() : "this event";
+        
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Delete Event")
+                .setMessage("Are you sure you want to delete \"" + eventTitle + "\"? This action cannot be undone. All event data including waitlists, entrants, and invitations will be permanently deleted.")
+                .setPositiveButton("Delete", (dialog, which) -> deleteEvent())
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void deleteEvent() {
+        if (currentEventId == null || currentEventId.isEmpty()) {
+            Toast.makeText(this, "Event ID not found", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        deleteEventButton.setEnabled(false);
+        Toast.makeText(this, "Deleting event...", Toast.LENGTH_SHORT).show();
+
+        DocumentReference eventRef = db.collection("events").document(currentEventId);
+        
+        eventRef.get().addOnSuccessListener(eventDoc -> {
+            if (eventDoc == null || !eventDoc.exists()) {
+                Toast.makeText(this, "Event not found", Toast.LENGTH_SHORT).show();
+                deleteEventButton.setEnabled(true);
+                return;
+            }
+
+            String posterUrl = eventDoc.getString("posterUrl");
+            boolean hasPoster = posterUrl != null && !posterUrl.isEmpty();
+            
+            deleteEventSubcollections(eventRef, () -> {
+                deletePosterImage(hasPoster, () -> {
+                    deleteInvitationsForEvent(() -> {
+                        eventRef.delete()
+                                .addOnSuccessListener(aVoid -> {
+                                    Log.d(TAG, "Event document deleted successfully");
+                                    Toast.makeText(this, "Event deleted successfully", Toast.LENGTH_SHORT).show();
+                                    finish();
+                                })
+                                .addOnFailureListener(e -> {
+                                    Log.e(TAG, "Failed to delete event document", e);
+                                    Toast.makeText(this, "Failed to delete event: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                                    deleteEventButton.setEnabled(true);
+                                });
+                    });
+                });
+            });
+        }).addOnFailureListener(e -> {
+            Log.e(TAG, "Failed to load event document", e);
+            Toast.makeText(this, "Failed to load event: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            deleteEventButton.setEnabled(true);
+        });
+    }
+
+    private void deleteEventSubcollections(DocumentReference eventRef, Runnable onComplete) {
+        String[] subcollections = {
+            "WaitlistedEntrants",
+            "SelectedEntrants",
+            "NonSelectedEntrants",
+            "CancelledEntrants"
+        };
+
+        List<com.google.android.gms.tasks.Task<QuerySnapshot>> getTasks = new ArrayList<>();
+        
+        for (String subcollectionName : subcollections) {
+            getTasks.add(eventRef.collection(subcollectionName).get());
+        }
+
+        com.google.android.gms.tasks.Tasks.whenAllComplete(getTasks)
+                .addOnSuccessListener(tasks -> {
+                    List<com.google.android.gms.tasks.Task<Void>> deleteTasks = new ArrayList<>();
+                    WriteBatch batch = db.batch();
+                    int batchCount = 0;
+                    final int MAX_BATCH_SIZE = 500;
+
+                    for (int i = 0; i < getTasks.size(); i++) {
+                        com.google.android.gms.tasks.Task<QuerySnapshot> task = getTasks.get(i);
+                        if (task.isSuccessful() && task.getResult() != null) {
+                            QuerySnapshot snapshot = task.getResult();
+                            for (DocumentSnapshot doc : snapshot.getDocuments()) {
+                                batch.delete(doc.getReference());
+                                batchCount++;
+
+                                if (batchCount >= MAX_BATCH_SIZE) {
+                                    final WriteBatch currentBatch = batch;
+                                    deleteTasks.add(currentBatch.commit());
+                                    batch = db.batch();
+                                    batchCount = 0;
+                                }
+                            }
+                        }
+                    }
+
+                    if (batchCount > 0) {
+                        deleteTasks.add(batch.commit());
+                    }
+
+                    if (!deleteTasks.isEmpty()) {
+                        com.google.android.gms.tasks.Tasks.whenAll(deleteTasks)
+                                .addOnSuccessListener(aVoid -> {
+                                    Log.d(TAG, "All subcollections deleted successfully");
+                                    onComplete.run();
+                                })
+                                .addOnFailureListener(e -> {
+                                    Log.e(TAG, "Failed to delete some subcollections", e);
+                                    onComplete.run();
+                                });
+                    } else {
+                        Log.d(TAG, "No subcollections to delete");
+                        onComplete.run();
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to query subcollections", e);
+                    onComplete.run();
+                });
+    }
+
+    private void deletePosterImage(boolean hasPoster, Runnable onComplete) {
+        if (!hasPoster || currentEventId == null || currentEventId.isEmpty()) {
+            onComplete.run();
+            return;
+        }
+
+        StorageReference storageRef = storage.getReference("posters/" + currentEventId + ".jpg");
+        storageRef.delete()
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "Poster image deleted successfully");
+                    onComplete.run();
+                })
+                .addOnFailureListener(e -> {
+                    Log.w(TAG, "Failed to delete poster image", e);
+                    onComplete.run();
+                });
+    }
+
+    private void deleteInvitationsForEvent(Runnable onComplete) {
+        db.collection("invitations")
+                .whereEqualTo("eventId", currentEventId)
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    if (querySnapshot == null || querySnapshot.isEmpty()) {
+                        onComplete.run();
+                        return;
+                    }
+
+                    List<com.google.android.gms.tasks.Task<Void>> deleteTasks = new ArrayList<>();
+                    for (DocumentSnapshot doc : querySnapshot.getDocuments()) {
+                        deleteTasks.add(doc.getReference().delete());
+                    }
+
+                    if (!deleteTasks.isEmpty()) {
+                        com.google.android.gms.tasks.Tasks.whenAll(deleteTasks)
+                                .addOnSuccessListener(aVoid -> {
+                                    Log.d(TAG, "All invitations deleted successfully");
+                                    onComplete.run();
+                                })
+                                .addOnFailureListener(e -> {
+                                    Log.e(TAG, "Failed to delete some invitations", e);
+                                    onComplete.run();
+                                });
+                    } else {
+                        onComplete.run();
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Log.w(TAG, "Failed to query invitations", e);
+                    onComplete.run();
+                });
     }
 }
 

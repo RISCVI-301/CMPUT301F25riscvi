@@ -279,7 +279,12 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
             observeWaitlistCollection();
         }
 
-        if (event.getStartsAtEpochMs() > 0) {
+        if (event.getRegistrationStart() > 0 && event.getRegistrationEnd() > 0) {
+            SimpleDateFormat regDateFormat = new SimpleDateFormat("MMM d, yyyy • h:mm a", Locale.getDefault());
+            String regStartStr = regDateFormat.format(new Date(event.getRegistrationStart()));
+            String regEndStr = regDateFormat.format(new Date(event.getRegistrationEnd()));
+            dateView.setText("Registration Period:\n" + regStartStr + "\n" + regEndStr);
+        } else if (event.getStartsAtEpochMs() > 0) {
             dateView.setText(DATE_FORMAT.format(new Date(event.getStartsAtEpochMs())));
         } else {
             dateView.setText(R.string.event_details_date_tbd);
@@ -297,8 +302,12 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
             capacityView.setText(R.string.event_details_capacity_unknown);
         }
 
-        if (!TextUtils.isEmpty(event.getNotes())) {
-            overviewView.setText(event.getNotes());
+        String overviewContent = event.getNotes();
+        if (TextUtils.isEmpty(overviewContent)) {
+            overviewContent = event.getDescription();
+        }
+        if (!TextUtils.isEmpty(overviewContent)) {
+            overviewView.setText(overviewContent);
         } else {
             overviewView.setText(R.string.event_details_no_overview);
         }

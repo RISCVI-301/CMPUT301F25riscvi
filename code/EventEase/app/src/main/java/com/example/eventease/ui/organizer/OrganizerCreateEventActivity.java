@@ -67,7 +67,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
     private static final String TAG = "CreateEvent";
     // --- UI Elements ---
     private ImageButton btnBack, btnPickPoster;
-    private EditText etTitle, etDescription, etCapacity;
+    private EditText etTitle, etDescription, etGuidelines, etLocation, etCapacity;
     private Button btnStart, btnEnd, btnSave;
     private Switch swGeo, swQr;
     private RadioGroup rgEntrants;
@@ -105,6 +105,8 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         btnPickPoster = findViewById(R.id.btnPickPoster);
         etTitle = findViewById(R.id.etTitle);
         etDescription = findViewById(R.id.etDescription);
+        etGuidelines = findViewById(R.id.etGuidelines);
+        etLocation = findViewById(R.id.etLocation);
         etCapacity = findViewById(R.id.etCapacity);
         btnStart = findViewById(R.id.btnStart);
         btnEnd = findViewById(R.id.btnEnd);
@@ -317,6 +319,8 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
             return;
         }
         String description = safe(etDescription.getText());
+        String guidelines = safe(etGuidelines.getText());
+        String location = safe(etLocation.getText());
         boolean useGeo = swGeo.isChecked();
         boolean generateQr = swQr.isChecked();
 
@@ -324,6 +328,9 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         doc.put("id", id);
         doc.put("title", title);
         doc.put("description", TextUtils.isEmpty(description) ? null : description);
+        doc.put("notes", TextUtils.isEmpty(description) ? null : description);
+        doc.put("guidelines", TextUtils.isEmpty(guidelines) ? null : guidelines);
+        doc.put("location", TextUtils.isEmpty(location) ? null : location);
         doc.put("registrationStart", regStartEpochMs);
         doc.put("registrationEnd", regEndEpochMs);
         doc.put("capacity", chosenCapacity);
@@ -332,6 +339,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         doc.put("posterUrl", posterUrl);
         doc.put("organizerId", organizerId);
         doc.put("createdAt", System.currentTimeMillis());
+        doc.put("createdAtEpochMs", System.currentTimeMillis());
         doc.put("qrPayload", generateQr ? ("event:" + id) : null);
         FirebaseFirestore.getInstance()
                 .collection("events")
@@ -556,6 +564,8 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
     private void resetForm() {
         etTitle.setText("");
         etDescription.setText("");
+        etGuidelines.setText("");
+        etLocation.setText("");
         etCapacity.setText("");
         rgEntrants.check(R.id.rbAny);
         etCapacity.setVisibility(View.GONE);
