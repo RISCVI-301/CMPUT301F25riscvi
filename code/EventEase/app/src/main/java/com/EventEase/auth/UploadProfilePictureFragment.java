@@ -36,7 +36,7 @@ import java.io.IOException;
 import com.EventEase.auth.AuthManager;
 import com.bumptech.glide.Glide;
 import com.EventEase.App;
-import com.example.eventease.R;
+import com.EventEase.R;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
 import com.google.firebase.firestore.FirebaseFirestore;

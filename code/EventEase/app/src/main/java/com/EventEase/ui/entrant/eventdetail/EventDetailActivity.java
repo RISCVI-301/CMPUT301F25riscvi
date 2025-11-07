@@ -15,7 +15,7 @@ import com.EventEase.auth.AuthManager;
 import com.EventEase.data.InvitationRepository;
 import com.EventEase.data.WaitlistRepository;
 import com.EventEase.App;
-import com.example.eventease.R;
+import com.EventEase.R;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions;

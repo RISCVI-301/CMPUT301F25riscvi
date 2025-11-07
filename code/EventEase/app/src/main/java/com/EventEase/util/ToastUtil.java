@@ -9,7 +9,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.bumptech.glide.Glide;
-import com.example.eventease.R;
+import com.EventEase.R;
 
 /**
  * Utility class for showing custom toast messages with logo

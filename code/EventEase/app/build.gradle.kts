@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.eventease"
+    namespace = "com.EventEase"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.eventease"
+        applicationId = "com.EventEase"
         minSdk = 26
         targetSdk = 36
         versionCode = 1

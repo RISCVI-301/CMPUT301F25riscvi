@@ -14,7 +14,7 @@ import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.navigation.Navigation;
 
-import com.example.eventease.R;
+import com.EventEase.R;
 
 public class EventsSelectionFragment extends Fragment {
 

@@ -21,7 +21,7 @@ import com.EventEase.data.WaitlistRepository;
 import com.EventEase.model.Event;
 import com.bumptech.glide.Glide;
 import com.EventEase.App;
-import com.example.eventease.R;
+import com.EventEase.R;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.FirebaseFirestoreException;

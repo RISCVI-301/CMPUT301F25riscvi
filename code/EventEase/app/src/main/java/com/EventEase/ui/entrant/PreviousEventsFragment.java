@@ -15,7 +15,7 @@ import androidx.navigation.Navigation;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.example.eventease.R;
+import com.EventEase.R;
 
 public class PreviousEventsFragment extends Fragment {
 

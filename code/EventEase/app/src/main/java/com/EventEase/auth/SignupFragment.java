@@ -19,7 +19,7 @@ import androidx.navigation.Navigation;
 import androidx.navigation.fragment.NavHostFragment;
 
 
-import com.example.eventease.R;
+import com.EventEase.R;
 import com.EventEase.util.ToastUtil;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;

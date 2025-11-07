@@ -1,4 +1,4 @@
-package com.example.eventease;
+package com.EventEase;
 
 import org.junit.Test;
 
@@ -15,3 +15,4 @@ public class ExampleUnitTest {
         assertEquals(4, 2 + 2);
     }
 }
+

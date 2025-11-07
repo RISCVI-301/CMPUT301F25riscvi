@@ -18,7 +18,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.DialogFragment;
 import androidx.fragment.app.FragmentManager;
 
-import com.example.eventease.R;
+import com.EventEase.R;
 
 /**
  * Displays the event selection guidelines in a modal dialog.

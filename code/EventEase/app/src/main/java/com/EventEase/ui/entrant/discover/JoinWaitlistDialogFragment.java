@@ -22,7 +22,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.DialogFragment;
 import androidx.fragment.app.FragmentManager;
 
-import com.example.eventease.R;
+import com.EventEase.R;
 
 /**
  * Full-screen confirmation dialog shown after an entrant taps Join Waitlist.

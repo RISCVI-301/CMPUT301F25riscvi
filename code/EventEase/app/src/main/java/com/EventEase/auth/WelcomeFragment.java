@@ -11,7 +11,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.navigation.Navigation;
 
-import com.example.eventease.R;
+import com.EventEase.R;
 
 public class WelcomeFragment extends Fragment {
 

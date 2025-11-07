@@ -28,7 +28,7 @@ import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.google.firebase.firestore.QuerySnapshot;
-import com.example.eventease.R;
+import com.EventEase.R;
 import com.EventEase.util.ToastUtil;
 import java.util.ArrayList;
 import java.util.List;

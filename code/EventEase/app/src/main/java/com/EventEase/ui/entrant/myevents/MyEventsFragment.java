@@ -34,7 +34,7 @@ import com.EventEase.data.WaitlistRepository;
 import com.EventEase.model.Event;
 import com.EventEase.model.Invitation;
 import com.EventEase.App;                // ✅ use shared DevGraph
-import com.example.eventease.R;
+import com.EventEase.R;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
 

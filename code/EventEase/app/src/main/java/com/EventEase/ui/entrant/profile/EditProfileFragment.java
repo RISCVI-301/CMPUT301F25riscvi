@@ -38,7 +38,7 @@ import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
-import com.example.eventease.R;
+import com.EventEase.R;
 import com.EventEase.util.ToastUtil;
 import java.util.HashMap;
 import java.util.Map;

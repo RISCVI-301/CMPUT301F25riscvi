@@ -31,7 +31,7 @@ Write-Host "1. Go to Firebase Console: https://console.firebase.google.com/" -Fo
 Write-Host "2. Select your project: eventease-a0e05" -ForegroundColor Cyan
 Write-Host "3. Go to Project Settings (gear icon)" -ForegroundColor Cyan
 Write-Host "4. Scroll down to 'Your apps' section" -ForegroundColor Cyan
-Write-Host "5. Click on your Android app (package: com.example.EventEase)" -ForegroundColor Cyan
+Write-Host "5. Click on your Android app (package: com.EventEase)" -ForegroundColor Cyan
 Write-Host "6. Click 'Add fingerprint' button" -ForegroundColor Cyan
 Write-Host "7. Add both SHA-1 and SHA-256 fingerprints" -ForegroundColor Cyan
 Write-Host "8. Go to Authentication > Sign-in method" -ForegroundColor Cyan

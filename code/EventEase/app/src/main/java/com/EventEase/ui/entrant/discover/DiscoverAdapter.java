@@ -17,7 +17,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.EventEase.model.Event;
 import com.bumptech.glide.Glide;
-import com.example.eventease.R;
+import com.EventEase.R;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;

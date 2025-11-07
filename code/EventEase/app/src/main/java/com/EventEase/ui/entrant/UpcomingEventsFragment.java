@@ -29,7 +29,7 @@ import com.EventEase.model.Event;
 import com.EventEase.ui.entrant.eventdetail.EventDetailActivity;
 import com.bumptech.glide.Glide;
 import com.EventEase.App;
-import com.example.eventease.R;
+import com.EventEase.R;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;

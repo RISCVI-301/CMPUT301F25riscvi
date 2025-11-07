@@ -14,7 +14,7 @@ import androidx.navigation.NavDestination;
 import androidx.navigation.fragment.NavHostFragment;
 
 import com.google.firebase.auth.FirebaseAuth;
-import com.example.eventease.R;
+import com.EventEase.R;
 
 public class MainActivity extends AppCompatActivity {
 

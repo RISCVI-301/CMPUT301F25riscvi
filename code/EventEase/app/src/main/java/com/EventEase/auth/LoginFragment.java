@@ -21,7 +21,7 @@ import androidx.fragment.app.Fragment;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.navigation.fragment.NavHostFragment;
 
-import com.example.eventease.R;
+import com.EventEase.R;
 import com.EventEase.util.ToastUtil;
 
 public class LoginFragment extends Fragment {
