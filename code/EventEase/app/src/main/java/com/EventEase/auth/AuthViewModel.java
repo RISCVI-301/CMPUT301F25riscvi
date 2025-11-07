@@ -6,15 +6,12 @@ import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
 
 
-import com.EventEase.auth.AuthRepository;
-import com.google.android.gms.tasks.Task;
-
-
+// View model
 public class AuthViewModel extends ViewModel {
     public static class State {
         public boolean loading;
-        public String error; // null means no error
-        public boolean success; // set true on success once
+        public String error;
+        public boolean success;
     }
 
 

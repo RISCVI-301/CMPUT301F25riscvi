@@ -1,7 +1,11 @@
 package com.EventEase.auth;
 
-/** Stable auth contract for the app. */
+import androidx.annotation.NonNull;
+
 public interface AuthManager {
-    /** Returns a UID (Firebase UID if signed in; otherwise a dev fallback). */
-    String getUid();
+    boolean isAuthenticated();
+
+    /** Returns the current Firebase UID.
+     * @throws IllegalStateException if no user is signed in. */
+    @NonNull String getUid();
 }

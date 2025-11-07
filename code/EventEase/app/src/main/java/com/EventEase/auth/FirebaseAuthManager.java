@@ -1,25 +1,31 @@
 package com.EventEase.auth;
 
+import androidx.annotation.NonNull;
+
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 
-/**
- * Prod-name implementation backed by FirebaseAuth.
- * If no user is signed in yet, falls back to a provided dev UID so the app can run.
- */
-public class FirebaseAuthManager implements AuthManager {
-
+public final class FirebaseAuthManager implements AuthManager {
     private final FirebaseAuth auth;
-    private final String devFallbackUid; // e.g., "demo-uid-123"
 
-    public FirebaseAuthManager(String devFallbackUid) {
+    public FirebaseAuthManager() {
         this.auth = FirebaseAuth.getInstance();
-        this.devFallbackUid = devFallbackUid;
     }
 
     @Override
+    public boolean isAuthenticated() {
+        return auth.getCurrentUser() != null;
+    }
+
+    @Override
+    @NonNull
     public String getUid() {
         FirebaseUser user = auth.getCurrentUser();
-        return (user != null && user.getUid() != null) ? user.getUid() : devFallbackUid;
+        if (user == null) throw new IllegalStateException("No authenticated user");
+        String uid = user.getUid();
+        if (uid == null || uid.isEmpty()) {
+            throw new IllegalStateException("Authenticated user has no UID");
+        }
+        return uid;
     }
 }

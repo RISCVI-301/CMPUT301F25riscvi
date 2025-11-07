@@ -8,7 +8,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.EventEase"
+        applicationId = "com.example.eventease"
         minSdk = 26
         targetSdk = 36
         versionCode = 1

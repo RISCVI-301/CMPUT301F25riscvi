@@ -8,7 +8,7 @@ import com.EventEase.model.*;
 import java.util.*;
 
 public final class FirebaseDevGraph {
-    public final AuthManager auth; // init in ctor
+    public final AuthManager auth;
     public final FirebaseEventRepository events;
     public final FirebaseWaitlistRepository waitlists;
     public final FirebaseProfileRepository profiles;
@@ -16,21 +16,14 @@ public final class FirebaseDevGraph {
     public final FirebaseAdmittedRepository admitted;
 
     public FirebaseDevGraph() {
-        this.auth = new FirebaseAuthManager("demo-uid-123"); // <-- pass fallback UID
+        this.auth = new FirebaseAuthManager();
         
-        // Initialize repositories with empty seed data - data will be loaded from Firestore
+        // Initialize repositories with empty seed data, datal loads from firebase
         events = new FirebaseEventRepository(new ArrayList<>());
         waitlists = new FirebaseWaitlistRepository(events);
-
         profiles = new FirebaseProfileRepository();
-        
-        // Initialize admitted repository
         admitted = new FirebaseAdmittedRepository(events);
-        
-        // Initialize invitations repository with empty seed data - data will be loaded from Firestore
         invitations = new FirebaseInvitationRepository(new ArrayList<>());
-        
-        // Link admitted repository to invitations
         invitations.setAdmittedRepository(admitted);
     }
 
