@@ -1,0 +1,41 @@
+<resources>
+    <string name="app_name">EventEase</string>
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
+    <string name="no_open_events_right_now">No open events right now</string>
+    <string name="events">Events</string>
+    <string name="event_image">Event image</string>
+    <string name="overview">Overview</string>
+    <string name="number_of_entrants">Number of entrants\non wait-list</string>
+    <string name="guidelines_selection">Guidelines about selection process</string>
+    <string name="register_signup">Register/Sign up</string>
+    <string name="decline">Decline</string>
+    <string name="event_name_default">Event Name</string>
+    <string name="back">Back</string>
+    <string name="share">Share</string>
+    <string name="discover_empty_state">No events available yet. Check back soon!</string>
+    <string name="event_details_missing_id">Unable to open event details.</string>
+    <string name="event_details_waitlist_placeholder">Joining the waitlist is coming soon.</string>
+    <string name="event_details_title_placeholder">Untitled event</string>
+    <string name="event_details_date_tbd">Date to be announced</string>
+    <string name="event_details_location_tbd">Location to be announced</string>
+    <string name="event_details_capacity">Capacity: %1$d entrants</string>
+    <string name="event_details_capacity_unknown">Capacity: TBD</string>
+    <string name="event_details_no_overview">Event overview will be available soon.</string>
+    <string name="event_details_share_location">Location: %1$s</string>
+    <string name="event_details_share_prompt">Share event using</string>
+    <string name="event_details_generic_error">Unable to load event right now.</string>
+    <string name="event_details_load_error_with_reason">Unable to load event: %1$s</string>
+    <string name="event_details_not_found">Event unavailable.</string>
+    <string name="discover_event_meta_placeholder">Details coming soon</string>
+    <string name="filter_events">Filter events</string>
+    <string name="waitlist_dialog_title">You\'re On The List!</string>
+    <string name="waitlist_dialog_message">You have successfully joined the waitlist for this event. We\'ll let you know as soon as spots open up.</string>
+    <string name="waitlist_dialog_done">Done</string>
+    <string name="waitlist_dialog_icon_description">Waitlist joined checkmark</string>
+    <string name="event_details_back">Navigate back</string>
+    <string name="event_details_guidelines_title">Guidelines</string>
+    <string name="event_details_guidelines_body">Please review the event guidelines. Thank you for your interest!</string>
+    <string name="delete_profile">Delete Profile</string>
+</resources>
+

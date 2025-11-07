@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Circle Background -->
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="@color/ee_icon_circle_light"/>
+            <size android:width="48dp" android:height="48dp"/>
+        </shape>
+    </item>
+    <!-- Centered White Icon -->
+    <item>
+        <inset
+            android:inset="140dp"
+            android:drawable="@drawable/entrant_ic_discover"/>
+    </item>
+</layer-list>

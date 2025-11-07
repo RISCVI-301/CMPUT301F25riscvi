@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Main glass background with rounded top corners only.
+         Outside this rounded area is fully transparent. -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#E8F5FF"/>
+            <corners
+                android:topLeftRadius="24dp"
+                android:topRightRadius="24dp"/>
+        </shape>
+    </item>
+</layer-list>
+

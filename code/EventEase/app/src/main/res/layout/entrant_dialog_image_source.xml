@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/dialogBlurBackground"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/entrant_dialog_blur_background"
+    android:clickable="true"
+    android:focusable="true">
+
+    <androidx.cardview.widget.CardView
+        android:id="@+id/dialogCard"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="32dp"
+        android:layout_gravity="center"
+        app:cardCornerRadius="20dp"
+        app:cardElevation="24dp"
+        android:backgroundTint="#FFFFFF">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:animateLayoutChanges="true">
+
+            <!-- Title Section -->
+        
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Select Image Source"
+                android:textSize="36sp"
+                android:textStyle="bold"
+                android:textColor="#223C65"
+                android:padding="20dp"
+                android:paddingBottom="20dp"
+                android:fontFamily="@font/entrant_fredoka_one"
+                android:background="#FFFFFF"
+                android:shadowColor="#80000000"
+                android:shadowDx="0"
+                android:shadowDy="4"
+                android:shadowRadius="8"/>
+
+            <!-- Divider 1 (under title) -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="2dp"
+                android:background="#223C65"/>
+
+            <!-- Content Section -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="28dp">
+
+                <!-- Message -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Choose how you want to add your profile picture"
+                    android:textSize="16sp"
+                    android:textColor="#223C65"
+                    android:paddingBottom="24dp"
+                    android:fontFamily="@font/entrant_fredoka_one"/>
+
+            </LinearLayout>
+
+            <!-- Divider 2 (above buttons) -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="2dp"
+                android:background="#223C65"/>
+
+            <!-- Buttons -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:padding="28dp"
+                android:animateLayoutChanges="true"
+                android:gravity="center_vertical"
+                android:weightSum="2">
+
+                <!-- Camera Button -->
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/btnCamera"
+                    android:layout_width="0dp"
+                    android:layout_height="64dp"
+                    android:layout_weight="1"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:text="Camera"
+                    android:textSize="20sp"
+                    android:textStyle="bold"
+                    android:textColor="#FFFFFF"
+                    android:background="@drawable/entrant_button_guidelines_ok"
+                    android:layout_marginEnd="8dp"
+                    android:fontFamily="@font/entrant_fredoka_one"
+                    android:elevation="8dp"
+                    android:gravity="center"
+                    android:includeFontPadding="false"
+                    style="@style/Widget.AppCompat.Button.Borderless"/>
+
+                <!-- Gallery Button -->
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/btnGallery"
+                    style="@style/Widget.AppCompat.Button.Borderless"
+                    android:layout_width="0dp"
+                    android:layout_height="64dp"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:background="@drawable/entrant_button_guidelines_ok"
+                    android:elevation="8dp"
+                    android:fontFamily="@font/entrant_fredoka_one"
+                    android:gravity="center"
+                    android:includeFontPadding="false"
+                    android:text="Gallery"
+                    android:textColor="#FFFFFF"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </androidx.cardview.widget.CardView>
+
+</FrameLayout>
+
