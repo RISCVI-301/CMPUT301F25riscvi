@@ -25,6 +25,13 @@ import com.google.firebase.storage.StorageReference;
 
 import java.util.HashMap;
 import java.util.Map;
+/**
+ * Manages the organizer's account screen.
+ * <p>
+ * This activity displays the organizer's profile information, such as their name and avatar.
+ * It fetches this data from the 'users' collection in Firestore. It also provides functionality
+ * for the organizer to update their profile picture and navigate to other parts of the app.
+ */
 public class OrganizerAccountActivity extends AppCompatActivity {
 
     private static final String TAG = "OrganizerAccount";
@@ -34,11 +41,18 @@ public class OrganizerAccountActivity extends AppCompatActivity {
     private TextView tvUserId;
     private ImageButton btnEditProfile;
 
+    /**
+     * Handles the result of the image picker to select a new avatar.
+     * On selection, triggers the upload process.
+     */
     private final androidx.activity.result.ActivityResultLauncher<String> pickImage =
             registerForActivityResult(new ActivityResultContracts.GetContent(), uri -> {
                 if (uri != null) uploadNewAvatar(uri);
             });
-
+    /**
+     * Initializes the activity, view components, and loads the organizer's profile data.
+     * @param savedInstanceState If the activity is being re-initialized, this Bundle contains the most recent data.
+     */
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -92,7 +106,9 @@ public class OrganizerAccountActivity extends AppCompatActivity {
         
         setupBottomNavigation();
     }
-    
+    /**
+     * Sets up the listeners for the custom bottom navigation bar.
+     */
     private void setupBottomNavigation() {
         LinearLayout btnMyEvents = findViewById(R.id.btnMyEvents);
         if (btnMyEvents != null) {
@@ -135,7 +151,11 @@ public class OrganizerAccountActivity extends AppCompatActivity {
             });
         }
     }
-
+    /**
+     * Loads the user's profile data from a specific document in the 'users' collection.
+     *
+     * @param documentId The ID of the user document to fetch (could be an Auth UID or a custom organizer ID).
+     */
     private void loadProfile(String documentId) {
         FirebaseFirestore.getInstance()
                 .collection("users")
@@ -154,7 +174,11 @@ public class OrganizerAccountActivity extends AppCompatActivity {
                     }
                 });
     }
-
+    /**
+     * Applies the fetched profile data to the UI elements.
+     *
+     * @param doc The DocumentSnapshot retrieved from Firestore containing the user's data.
+     */
     private void applyProfileFromDoc(DocumentSnapshot doc) {
         if (tvFullName == null || ivAvatar == null) return;
 
@@ -176,7 +200,12 @@ public class OrganizerAccountActivity extends AppCompatActivity {
             Glide.with(this).load(R.drawable.ic_launcher_foreground).circleCrop().into(ivAvatar);
         }
     }
-
+    /**
+     * Uploads a new avatar image to Firebase Storage and updates the URL
+     * in the user's Firestore document.
+     *
+     * @param uri The local URI of the image to be uploaded.
+     */
     private void uploadNewAvatar(Uri uri) {
         FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
         if (user == null) {

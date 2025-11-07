@@ -2,6 +2,7 @@ package com.example.eventease.ui.organizer;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.Toast;
@@ -11,6 +12,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.example.eventease.OrganizerWaitlistActivity;
 import com.example.eventease.R;
 import com.example.eventease.util.AuthHelper;
 import com.google.firebase.auth.FirebaseAuth;
@@ -55,10 +57,21 @@ public class OrganizerMyEventActivity extends AppCompatActivity {
         fabAdd      = findViewById(R.id.fabAdd);
 
         rvMyEvents.setLayoutManager(new LinearLayoutManager(this));
-        adapter = new OrganizerMyEventAdapter(
-                this,
-                eventId -> Toast.makeText(this, "Open event: " + eventId, Toast.LENGTH_SHORT).show()
-        );
+
+        adapter = new OrganizerMyEventAdapter(this, eventId -> {
+            // This is the code that runs when an event card is clicked.
+            Log.d("OrganizerMyEventActivity", "Event clicked. Opening details for ID: " + eventId);
+
+            // Create an Intent to open your details screen.
+            Intent intent = new Intent(OrganizerMyEventActivity.this, OrganizerWaitlistActivity.class);
+
+            // Pass the clicked event's ID to your screen.
+            intent.putExtra("eventId", eventId);
+
+            // Launch your screen.
+            startActivity(intent);
+        });
+
         rvMyEvents.setAdapter(adapter);
 
         db = FirebaseFirestore.getInstance();

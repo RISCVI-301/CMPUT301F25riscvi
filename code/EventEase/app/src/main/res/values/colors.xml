@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Teammate's Original Colors -->
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
     <color name="ee_card">#496788</color>
@@ -10,4 +11,13 @@
     <color name="ee_mint_aqua">#9EFFF1</color>
     <color name="toolbar_button">#C0D0E1</color>
 
+    <!-- Colors from Organizer Waitlist Feature -->
+    <color name="brand_dark_blue">#223C65</color>
+    <color name="brand_light_cyan">#9EFFF1</color>
+    <color name="header_text_green">#114C43</color>
+    <color name="event_name_bg_blue">#9DBCD6</color>
+    <color name="medium_blue_component">#4A628A</color>
+    <color name="dark_green_text_on_cyan">#223C65</color>
+    <color name="white_text">#FFFFFF</color>
 </resources>
+    
