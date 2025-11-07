@@ -51,8 +51,21 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Fragment for displaying user's events.
- * Shows events the user is admitted to or has invitations for.
+ * Fragment for displaying a user's events.
+ * 
+ * <p>This fragment displays events that are relevant to the current user, including:
+ * <ul>
+ *   <li>Upcoming admitted events - Events where the user is in the AdmittedEntrants collection
+ *       and the deadline (or start time) has not yet passed</li>
+ *   <li>Waitlisted/Selected events - Events where the user is on the waitlist or has been selected,
+ *       but is not yet admitted (excluding events already admitted to)</li>
+ *   <li>Previous events - Events where the user was admitted but the deadline has passed</li>
+ * </ul>
+ * 
+ * <p>The fragment listens for invitation updates in real-time and displays invitations with
+ * accept/decline buttons. It also shows a teal notification dot for events with pending invitations.
+ * 
+ * <p>Events are loaded asynchronously from multiple sources and combined to provide a unified view.
  */
 public class MyEventsFragment extends Fragment {
 
@@ -173,54 +186,147 @@ public class MyEventsFragment extends Fragment {
     }
 
     private void loadMyEvents() {
-        Task<List<Event>> openTask = eventRepo.getOpenEvents(new Date());
-        openTask.addOnSuccessListener(events -> {
-            if (!isAdded()) return;
-
-            android.util.Log.d("MyEventsFragment", "Loaded events: " + (events != null ? events.size() : 0));
-            if (events == null || events.isEmpty()) {
-                android.util.Log.d("MyEventsFragment", "No open events found in Firebase");
-                adapter.submit(new ArrayList<>());
-                setLoading(false);
-                showEmptyIfNeeded();
-                return;
-            }
-
-            bg.execute(() -> {
-                List<Event> mine = new ArrayList<>();
-                String uid = auth.getUid();
-                android.util.Log.d("MyEventsFragment", "Checking waitlists for user: " + uid);
-                for (Event e : events) {
-                    try {
-                        Boolean joined = Tasks.await(waitlistRepo.isJoined(e.getId(), uid));
-                        Boolean inSelected = Tasks.await(isInSelectedEntrants(e.getId(), uid));
-                        Boolean admitted = Tasks.await(admittedRepo.isAdmitted(e.getId(), uid));
-                        android.util.Log.d("MyEventsFragment", "Event " + e.getTitle() + " - Joined: " + joined + ", Selected: " + inSelected + ", Admitted: " + admitted);
-                        
-                        // Show if in waitlist OR selected, AND NOT admitted
-                        if ((Boolean.TRUE.equals(joined) || Boolean.TRUE.equals(inSelected)) && !Boolean.TRUE.equals(admitted)) {
-                            mine.add(e);
-                        }
-                    } catch (Exception ex) {
-                        android.util.Log.e("MyEventsFragment", "Error checking waitlist for event " + e.getId(), ex);
-                    }
-                }
-                android.util.Log.d("MyEventsFragment", "Found " + mine.size() + " waitlisted/selected events (excluding admitted) for user");
-                if (!isAdded()) return;
-                ViewCompat.postOnAnimation(requireView(), () -> {
-                    adapter.submit(mine);
-                    setLoading(false);
-                    showEmptyIfNeeded();
-                });
-            });
-
-        }).addOnFailureListener(e -> {
-            if (!isAdded()) return;
-            android.util.Log.e("MyEventsFragment", "Failed to load events", e);
+        String uid = auth.getUid();
+        if (uid == null || uid.isEmpty()) {
+            android.util.Log.e("MyEventsFragment", "User UID is null or empty");
             adapter.submit(new ArrayList<>());
             setLoading(false);
             showEmptyIfNeeded();
-        });
+            return;
+        }
+
+        // Load admitted upcoming events first
+        Task<List<Event>> admittedEventsTask = admittedRepo.getUpcomingEvents(uid);
+        
+        // Load previous events (deadline passed)
+        Task<List<Event>> previousEventsTask = admittedRepo.getPreviousEvents(uid);
+        
+        // Load open events for waitlisted/selected filtering
+        Task<List<Event>> openEventsTask = eventRepo.getOpenEvents(new Date());
+        
+        // Combine all tasks
+        Tasks.whenAllComplete(admittedEventsTask, previousEventsTask, openEventsTask)
+                .addOnSuccessListener(tasks -> {
+                    if (!isAdded()) return;
+                    
+                    // Extract results in UI thread
+                    List<Event> admittedEvents = new ArrayList<>();
+                    List<Event> previousEvents = new ArrayList<>();
+                    List<Event> openEvents = new ArrayList<>();
+                    
+                    // Process admitted upcoming events
+                    try {
+                        @SuppressWarnings("unchecked")
+                        Task<List<Event>> admittedTask = (Task<List<Event>>) tasks.get(0);
+                        if (admittedTask.isSuccessful() && admittedTask.getResult() != null) {
+                            admittedEvents = admittedTask.getResult();
+                            android.util.Log.d("MyEventsFragment", "Loaded " + admittedEvents.size() + " admitted upcoming events");
+                        }
+                    } catch (Exception e) {
+                        android.util.Log.e("MyEventsFragment", "Error processing admitted events", e);
+                    }
+                    
+                    // Process previous events
+                    try {
+                        @SuppressWarnings("unchecked")
+                        Task<List<Event>> previousTask = (Task<List<Event>>) tasks.get(1);
+                        if (previousTask.isSuccessful() && previousTask.getResult() != null) {
+                            previousEvents = previousTask.getResult();
+                            android.util.Log.d("MyEventsFragment", "Loaded " + previousEvents.size() + " previous events");
+                        }
+                    } catch (Exception e) {
+                        android.util.Log.e("MyEventsFragment", "Error processing previous events", e);
+                    }
+                    
+                    // Process open events
+                    try {
+                        @SuppressWarnings("unchecked")
+                        Task<List<Event>> openTask = (Task<List<Event>>) tasks.get(2);
+                        if (openTask.isSuccessful() && openTask.getResult() != null) {
+                            openEvents = openTask.getResult();
+                            android.util.Log.d("MyEventsFragment", "Loaded " + openEvents.size() + " open events, checking for waitlisted/selected");
+                        }
+                    } catch (Exception e) {
+                        android.util.Log.e("MyEventsFragment", "Error processing open events", e);
+                    }
+                    
+                    // Process in background thread to avoid blocking UI
+                    final List<Event> finalAdmittedEvents = admittedEvents;
+                    final List<Event> finalPreviousEvents = previousEvents;
+                    final List<Event> finalOpenEvents = openEvents;
+                    
+                    bg.execute(() -> {
+                        List<Event> allMyEvents = new ArrayList<>();
+                        Set<String> eventIds = new HashSet<>();
+                        
+                        // Add admitted upcoming events first
+                        for (Event event : finalAdmittedEvents) {
+                            if (event != null && event.getId() != null && !eventIds.contains(event.getId())) {
+                                allMyEvents.add(event);
+                                eventIds.add(event.getId());
+                                android.util.Log.d("MyEventsFragment", "Added admitted upcoming event: " + event.getTitle() + " (id: " + event.getId() + ")");
+                            }
+                        }
+                        
+                        int admittedCount = allMyEvents.size();
+                        
+                        // Process waitlisted/selected events
+                        List<Event> waitlistedSelected = new ArrayList<>();
+                        for (Event e : finalOpenEvents) {
+                            try {
+                                // Skip if already added as admitted event
+                                if (eventIds.contains(e.getId())) {
+                                    continue;
+                                }
+                                
+                                Boolean joined = Tasks.await(waitlistRepo.isJoined(e.getId(), uid));
+                                Boolean inSelected = Tasks.await(isInSelectedEntrants(e.getId(), uid));
+                                Boolean admitted = Tasks.await(admittedRepo.isAdmitted(e.getId(), uid));
+                                
+                                android.util.Log.d("MyEventsFragment", "Event " + e.getTitle() + " - Joined: " + joined + ", Selected: " + inSelected + ", Admitted: " + admitted);
+                                
+                                // Show if in waitlist OR selected, AND NOT admitted
+                                // (admitted events are already added from getUpcomingEvents)
+                                if ((Boolean.TRUE.equals(joined) || Boolean.TRUE.equals(inSelected)) && !Boolean.TRUE.equals(admitted)) {
+                                    waitlistedSelected.add(e);
+                                    eventIds.add(e.getId());
+                                }
+                            } catch (Exception ex) {
+                                android.util.Log.e("MyEventsFragment", "Error checking waitlist for event " + e.getId(), ex);
+                            }
+                        }
+                        
+                        // Add waitlisted/selected events
+                        allMyEvents.addAll(waitlistedSelected);
+                        
+                        // Add previous events at the end (they have deadline passed)
+                        for (Event event : finalPreviousEvents) {
+                            if (event != null && event.getId() != null && !eventIds.contains(event.getId())) {
+                                allMyEvents.add(event);
+                                eventIds.add(event.getId());
+                                android.util.Log.d("MyEventsFragment", "Added previous event: " + event.getTitle() + " (id: " + event.getId() + ")");
+                            }
+                        }
+                        
+                        android.util.Log.d("MyEventsFragment", "Total events for user: " + allMyEvents.size() + " (upcoming admitted: " + admittedCount + ", waitlisted/selected: " + waitlistedSelected.size() + ", previous: " + finalPreviousEvents.size() + ")");
+                        
+                        if (!isAdded()) return;
+                        
+                        // Update UI on main thread
+                        ViewCompat.postOnAnimation(requireView(), () -> {
+                            adapter.submit(allMyEvents);
+                            setLoading(false);
+                            showEmptyIfNeeded();
+                        });
+                    });
+                })
+                .addOnFailureListener(e -> {
+                    if (!isAdded()) return;
+                    android.util.Log.e("MyEventsFragment", "Failed to load events", e);
+                    adapter.submit(new ArrayList<>());
+                    setLoading(false);
+                    showEmptyIfNeeded();
+                });
     }
 
     private Task<Boolean> isInSelectedEntrants(String eventId, String uid) {
@@ -268,6 +374,7 @@ public class MyEventsFragment extends Fragment {
                 intent.putExtra("eventTitle", event.getTitle());
                 intent.putExtra("eventLocation", event.getLocation());
                 intent.putExtra("eventStartTime", event.getStartsAtEpochMs());
+                intent.putExtra("eventDeadline", event.getDeadlineEpochMs());
                 intent.putExtra("eventCapacity", event.getCapacity());
                 intent.putExtra("eventNotes", event.getNotes());
                 intent.putExtra("eventGuidelines", event.getGuidelines());

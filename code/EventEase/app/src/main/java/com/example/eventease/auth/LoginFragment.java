@@ -26,7 +26,24 @@ import com.example.eventease.util.ToastUtil;
 
 /**
  * Fragment for user login with email and password.
- * Handles authentication, remember me functionality, and password visibility toggle.
+ * 
+ * <p>This fragment provides a login interface with the following features:
+ * <ul>
+ *   <li>Email and password input fields</li>
+ *   <li>Password visibility toggle</li>
+ *   <li>Remember me functionality that saves credentials</li>
+ *   <li>Forgot password link</li>
+ *   <li>Role-based navigation (redirects admins to AdminMainActivity)</li>
+ * </ul>
+ * 
+ * <p>After successful login, the fragment checks the user's role and navigates accordingly:
+ * <ul>
+ *   <li>Admin users are redirected to AdminMainActivity</li>
+ *   <li>Other users are navigated to the Discover fragment</li>
+ * </ul>
+ * 
+ * <p>The fragment uses SharedPreferences to store and restore credentials when
+ * "Remember Me" is checked.
  */
 public class LoginFragment extends Fragment {
 

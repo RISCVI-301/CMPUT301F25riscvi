@@ -14,15 +14,20 @@ import java.util.Locale;
 
 /**
  * Utility class for checking user roles from Firestore.
+ * Provides static methods to query and validate user roles stored in the Firestore database.
+ * Supports both array-based roles (stored in "roles" field) and single role (stored in "role" field) for legacy compatibility.
  */
 public class UserRoleChecker {
     private static final FirebaseFirestore db = FirebaseFirestore.getInstance();
     private static final FirebaseAuth auth = FirebaseAuth.getInstance();
 
     /**
-     * Checks if the current user has the specified role.
-     * @param role The role to check (e.g., "admin", "entrant", "organizer")
-     * @return Task that completes with true if user has the role, false otherwise
+     * Checks if the currently authenticated user has the specified role.
+     * Queries the Firestore users collection to check both the "roles" array and "role" field.
+     *
+     * @param role the role to check (e.g., "admin", "entrant", "organizer"), case-insensitive
+     * @return a Task that completes with true if the user has the role, false otherwise.
+     *         Returns false if no user is signed in or if an error occurs.
      */
     @NonNull
     public static Task<Boolean> hasRole(@NonNull String role) {
@@ -43,10 +48,13 @@ public class UserRoleChecker {
     }
 
     /**
-     * Checks if a document has the specified role.
-     * @param documentSnapshot The document to check
-     * @param targetRole The role to check for
-     * @return true if the document has the role, false otherwise
+     * Checks if a Firestore document has the specified role.
+     * Examines both the "roles" array field and the "role" string field for compatibility.
+     * Role comparison is case-insensitive.
+     *
+     * @param documentSnapshot the Firestore document to check
+     * @param targetRole the role to check for, case-insensitive
+     * @return true if the document contains the role, false otherwise
      */
     public static boolean hasRole(@NonNull DocumentSnapshot documentSnapshot, @NonNull String targetRole) {
         // Check roles array field
@@ -69,8 +77,11 @@ public class UserRoleChecker {
     }
 
     /**
-     * Gets the user's roles as a list.
-     * @return Task that completes with a list of roles
+     * Gets all roles for the currently authenticated user as a list.
+     * Returns roles from either the "roles" array field or the "role" string field.
+     *
+     * @return a Task that completes with a list of roles for the user.
+     *         Returns an empty list if no user is signed in, the user has no roles, or an error occurs.
      */
     @NonNull
     public static Task<List<String>> getUserRoles() {
@@ -107,8 +118,10 @@ public class UserRoleChecker {
     }
 
     /**
-     * Checks if the current user is an admin.
-     * @return Task that completes with true if user is admin, false otherwise
+     * Checks if the currently authenticated user is an admin.
+     * This is a convenience method that calls hasRole("admin").
+     *
+     * @return a Task that completes with true if the user has the "admin" role, false otherwise
      */
     @NonNull
     public static Task<Boolean> isAdmin() {

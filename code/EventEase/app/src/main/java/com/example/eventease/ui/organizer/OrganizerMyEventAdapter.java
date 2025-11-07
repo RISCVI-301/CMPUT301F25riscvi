@@ -55,16 +55,24 @@ public class OrganizerMyEventAdapter extends RecyclerView.Adapter<OrganizerMyEve
 
         long start = asLong(m.get("registrationStart"));
         long end = asLong(m.get("registrationEnd"));
+        long deadline = asLong(m.get("deadlineEpochMs"));
         int cap = asInt(m.get("capacity"), -1);
 
         h.tvTitle.setText(title != null && !title.isEmpty() ? title : "Untitled");
 
         String startTxt = start > 0 ? DateFormat.format("EEE, MMM d · h:mm a", start).toString() : "";
         String endTxt = end > 0 ? DateFormat.format("EEE, MMM d · h:mm a", end).toString() : "";
+        String deadlineTxt = deadline > 0 ? DateFormat.format("EEE, MMM d · h:mm a", deadline).toString() : "";
         String capTxt = cap <= 0 ? "Any" : String.valueOf(cap);
         String meta = String.format(Locale.getDefault(), "%s  —  %s\ncap: %s%s",
                 startTxt, endTxt, capTxt,
                 (location != null && !location.isEmpty() ? "  ·  " + location : ""));
+        
+        // Add deadline if available
+        if (deadline > 0) {
+            meta += "\nDeadline: " + deadlineTxt;
+        }
+        
         h.tvMeta.setText(meta.trim());
 
         Glide.with(ctx)

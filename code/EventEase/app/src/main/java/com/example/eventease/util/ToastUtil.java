@@ -12,14 +12,20 @@ import com.bumptech.glide.Glide;
 import com.example.eventease.R;
 
 /**
- * Utility class for showing custom toast messages with logo
+ * Utility class for showing custom toast messages with the app logo.
+ * 
+ * <p>This class provides methods to display toast notifications with a custom layout that includes
+ * the app logo. It offers convenience methods for showing short, long, and resource-based toast messages.
+ * 
+ * <p>All methods are static and can be called from anywhere in the application.
  */
 public class ToastUtil {
     
     /**
-     * Shows a custom toast with the app logo
-     * @param context The context to show the toast in
-     * @param message The message to display
+     * Shows a custom toast with the app logo.
+     * 
+     * @param context the context to show the toast in
+     * @param message the message to display
      * @param duration Toast.LENGTH_SHORT or Toast.LENGTH_LONG
      */
     public static void showToast(Context context, String message, int duration) {
@@ -52,21 +58,31 @@ public class ToastUtil {
     }
     
     /**
-     * Shows a short toast with logo
+     * Shows a short toast with the app logo.
+     * 
+     * @param context the context to show the toast in
+     * @param message the message to display
      */
     public static void showShort(Context context, String message) {
         showToast(context, message, Toast.LENGTH_SHORT);
     }
     
     /**
-     * Shows a long toast with logo
+     * Shows a long toast with the app logo.
+     * 
+     * @param context the context to show the toast in
+     * @param message the message to display
      */
     public static void showLong(Context context, String message) {
         showToast(context, message, Toast.LENGTH_LONG);
     }
     
     /**
-     * Shows a toast with logo using string resource ID
+     * Shows a toast with the app logo using a string resource ID.
+     * 
+     * @param context the context to show the toast in
+     * @param messageResId the string resource ID of the message to display
+     * @param duration Toast.LENGTH_SHORT or Toast.LENGTH_LONG
      */
     public static void show(Context context, int messageResId, int duration) {
         if (context == null) return;

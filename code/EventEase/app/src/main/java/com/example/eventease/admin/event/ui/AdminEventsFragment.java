@@ -18,6 +18,23 @@ import com.example.eventease.admin.event.data.Event;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Fragment for admin users to view and manage all events in the system.
+ * 
+ * <p>This fragment displays a list of all events from the Firestore database and provides
+ * administrative functionality to view and delete events. Admins can see all events regardless
+ * of which organizer created them.
+ * 
+ * <p>Features:
+ * <ul>
+ *   <li>View all events in a scrollable list</li>
+ *   <li>Delete events with confirmation dialog</li>
+ *   <li>Refresh event list after deletion</li>
+ * </ul>
+ * 
+ * <p>The fragment uses AdminEventDatabaseController to fetch events and perform deletions.
+ * Only users with admin role can access this functionality.
+ */
 public class AdminEventsFragment extends Fragment {
 
     private final AdminEventDatabaseController AEDC = new AdminEventDatabaseController();

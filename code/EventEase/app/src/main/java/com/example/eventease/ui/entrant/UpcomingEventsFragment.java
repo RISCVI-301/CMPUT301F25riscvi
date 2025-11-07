@@ -94,24 +94,50 @@ public class UpcomingEventsFragment extends Fragment {
     @Override
     public void onStart() {
         super.onStart();
+        // Initialize repositories if needed
+        if (admittedRepo == null) {
+            admittedRepo = App.graph().admitted;
+        }
+        if (authManager == null) {
+            authManager = App.graph().auth;
+        }
         loadUpcomingEvents();
     }
 
+    @Override
+    public void onResume() {
+        super.onResume();
+        // Refresh events when fragment becomes visible (e.g., after accepting invitation)
+        // Only refresh if repositories are already initialized (to avoid double-loading on first start)
+        if (admittedRepo != null && authManager != null) {
+            loadUpcomingEvents();
+        }
+    }
+
     private void loadUpcomingEvents() {
+        if (admittedRepo == null || authManager == null) {
+            android.util.Log.w("UpcomingEventsFragment", "Repositories not initialized");
+            return;
+        }
+        
         setLoading(true);
         String uid = authManager.getUid();
+        android.util.Log.d("UpcomingEventsFragment", "Loading upcoming events for uid: " + uid);
         
         admittedRepo.getUpcomingEvents(uid)
                 .addOnSuccessListener(events -> {
                     if (!isAdded()) return;
+                    android.util.Log.d("UpcomingEventsFragment", "Loaded " + (events != null ? events.size() : 0) + " upcoming events");
                     setLoading(false);
-                    adapter.submitEvents(events);
-                    updateEmptyState(events.isEmpty());
+                    adapter.submitEvents(events != null ? events : new ArrayList<>());
+                    updateEmptyState(events == null || events.isEmpty());
                 })
                 .addOnFailureListener(e -> {
                     if (!isAdded()) return;
+                    android.util.Log.e("UpcomingEventsFragment", "Failed to load upcoming events", e);
                     setLoading(false);
                     updateEmptyState(true);
+                    adapter.submitEvents(new ArrayList<>());
                 });
     }
 
@@ -192,6 +218,7 @@ public class UpcomingEventsFragment extends Fragment {
                         intent.putExtra("eventTitle", event.getTitle());
                         intent.putExtra("eventLocation", event.getLocation());
                         intent.putExtra("eventStartTime", event.getStartsAtEpochMs());
+                        intent.putExtra("eventDeadline", event.getDeadlineEpochMs());
                         intent.putExtra("eventCapacity", event.getCapacity());
                         intent.putExtra("eventNotes", event.getNotes());
                         intent.putExtra("eventGuidelines", event.getGuidelines());

@@ -34,7 +34,20 @@ import java.util.List;
 
 /**
  * Fragment for discovering and browsing available events.
- * Displays a list of open events and allows users to join waitlists.
+ * 
+ * <p>This fragment displays a list of events that are currently open for registration.
+ * An event is considered open if the current time falls within its registration period
+ * (between registrationStart and registrationEnd).
+ * 
+ * <p>Features:
+ * <ul>
+ *   <li>Real-time event updates using Firestore listeners</li>
+ *   <li>Event cards showing title, date, location, and poster image</li>
+ *   <li>Click to view event details and join waitlist</li>
+ *   <li>Empty state message when no events are available</li>
+ * </ul>
+ * 
+ * <p>The fragment automatically updates when events are added, modified, or removed from Firestore.
  */
 public class DiscoverFragment extends Fragment {
 
