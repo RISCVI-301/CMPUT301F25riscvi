@@ -28,6 +28,14 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * An activity for organizers to view and manage the details of a specific event.
+ * This screen displays the event's name, description, and poster. It also shows a list of
+ * entrants who are on the waitlist. Organizers can perform actions such as updating the
+ * event poster and deleting the event entirely.
+ *
+ * This activity requires an `eventId` to be passed via an Intent to function correctly.
+ */
 public class OrganizerWaitlistActivity extends AppCompatActivity {
 
     private static final String TAG = "OrganizerWaitlist";
@@ -49,7 +57,9 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
     private ArrayList<String> entrantNamesList;
     private ArrayAdapter<String> waitlistAdapter;
 
-    // --- The Activity Result Launcher for image picking ---
+    /**
+     * An ActivityResultLauncher that handles the result of picking an image from the device's gallery.
+     */
     private final ActivityResultLauncher<String> pickImageLauncher =
             registerForActivityResult(new ActivityResultContracts.GetContent(), uri -> {
                 if (uri != null) {
@@ -58,7 +68,14 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
                     Toast.makeText(this, "No image selected", Toast.LENGTH_SHORT).show();
                 }
             });
-
+    /**
+     * Called when the activity is first created. This is where you should do all of your normal
+     * static set up: create views, bind data to lists, etc.
+     *
+     * @param savedInstanceState If the activity is being re-initialized after previously being
+     *                           shut down then this Bundle contains the data it most recently
+     *                           supplied in onSaveInstanceState(Bundle). Otherwise it is null.
+     */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -110,7 +127,11 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
         signInAndLoadData();
     }
 
-    // --- NEW: Method to sign in as a test user, then load data ---
+    /**
+     * Handles the authentication state and triggers the data loading process.
+     * If a user is already signed in, it proceeds to load data. If not, it attempts a
+     * temporary sign-in with test credentials for development purposes.
+     */
     private void signInAndLoadData() {
         FirebaseUser currentUser = mAuth.getCurrentUser();
         // If a user is already signed in from a previous screen, use them.
@@ -146,12 +167,22 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
                     });
         }
     }
-
+    /**
+     * Handles the critical error case where the activity is started without an Event ID.
+     * It logs the error and updates the UI to inform the user.
+     */
     private void handleMissingEventId() {
         Log.e(TAG, "CRITICAL: Event ID is null or empty. Cannot load data.");
         eventNameTextView.setText("Error: No Event ID Provided");
     }
 
+    /**
+     * Fetches the event details and waitlist from Firestore using the provided event ID.
+     * Updates the UI with the event's title, description, and poster image. It also
+     * populates the waitlist ListView.
+     *
+     * @param eventId The unique identifier for the event to be loaded.
+     */
     private void loadEventDataFromFirestore(String eventId) {
         // This method remains the same, but it will now succeed because we are logged in.
         db.collection("events").document(eventId).get().addOnSuccessListener(documentSnapshot -> {
@@ -195,7 +226,13 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
             }
         });
     }
-
+    /**
+     * Uploads a new image to Firebase Storage to serve as the event poster.
+     * Upon successful upload, it retrieves the download URL and updates the corresponding
+     * event document in Firestore.
+     *
+     * @param imageUri The local URI of the image file to be uploaded.
+     */
     private void uploadPosterImage(Uri imageUri) {
         // This method remains the same
         Toast.makeText(this, "Uploading new poster...", Toast.LENGTH_SHORT).show();
@@ -219,6 +256,10 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
                 })
                 .addOnFailureListener(e -> Toast.makeText(this, "Image upload failed: " + e.getMessage(), Toast.LENGTH_LONG).show());
     }
+    /**
+     * Deletes the current event document from the Firestore "events" collection.
+     * If successful, it displays a confirmation toast and finishes the activity.
+     */
     private void deleteEventFromFirestore() {
         if (currentEventId == null || currentEventId.isEmpty()) {
             Toast.makeText(this, "Cannot delete, event ID is missing.", Toast.LENGTH_SHORT).show();
