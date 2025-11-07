@@ -10,6 +10,7 @@
     android:fitsSystemWindows="true"
     tools:context=".ViewEntrantsActivity">
 
+
     <!-- Header -->
     <TextView
         android:id="@+id/titleText"
