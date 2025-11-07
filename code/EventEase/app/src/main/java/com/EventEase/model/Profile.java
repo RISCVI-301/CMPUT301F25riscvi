@@ -4,7 +4,7 @@ public class Profile {
     private String uid;
     private String displayName;
     private String email;
-    private String phoneNumber;   // ✅ added
+    private String phoneNumber;
     private String photoUrl;
 
     public Profile() { }

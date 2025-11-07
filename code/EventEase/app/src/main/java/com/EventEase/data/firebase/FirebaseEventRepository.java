@@ -107,7 +107,7 @@ public class FirebaseEventRepository implements EventRepository {
     public ListenerRegistration listenWaitlistCount(String eventId, WaitlistCountListener l) {
         listeners.computeIfAbsent(eventId, k -> new ArrayList<>()).add(l);
         
-        // First, get the real count from Firebase by querying waitlist documents
+        // get the real count from Firebase by querying waitlist documents
         queryWaitlistCount(eventId);
         
         // Then notify with current cached count

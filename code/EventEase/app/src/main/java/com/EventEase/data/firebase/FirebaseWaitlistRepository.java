@@ -85,12 +85,12 @@ public class FirebaseWaitlistRepository implements WaitlistRepository {
                             .document(eventId)
                             .update("waitlist", FieldValue.arrayUnion(uid))
                             .addOnSuccessListener(aVoid -> {
-                                Log.d(TAG, "✅ SUCCESS: User " + uid + " added to waitlist for event " + eventId + " (Capacity: " + capacity + ", Admitted: " + admittedCount + ")");
+                                Log.d(TAG, "SUCCESS: User " + uid + " added to waitlist for event " + eventId + " (Capacity: " + capacity + ", Admitted: " + admittedCount + ")");
                                 membership.add(key(eventId, uid));
                                 eventRepo.incrementWaitlist(eventId);
                             })
                             .addOnFailureListener(e -> {
-                                Log.e(TAG, "❌ FAILED to add user " + uid + " to waitlist for event " + eventId, e);
+                                Log.e(TAG, "FAILED to add user " + uid + " to waitlist for event " + eventId, e);
                             })
                             .continueWith(t -> null);
                 });
@@ -133,12 +133,12 @@ public class FirebaseWaitlistRepository implements WaitlistRepository {
                 .document(eventId)
                 .update("waitlist", FieldValue.arrayRemove(uid))
                 .addOnSuccessListener(aVoid -> {
-                    Log.d(TAG, "✅ SUCCESS: User " + uid + " removed from waitlist for event " + eventId);
+                    Log.d(TAG, "SUCCESS: User " + uid + " removed from waitlist for event " + eventId);
                     membership.remove(key(eventId, uid));
                     eventRepo.decrementWaitlist(eventId);
                 })
                 .addOnFailureListener(e -> {
-                    Log.e(TAG, "❌ FAILED to remove user " + uid + " from waitlist for event " + eventId, e);
+                    Log.e(TAG, "FAILED to remove user " + uid + " from waitlist for event " + eventId, e);
                 })
                 .continueWith(task -> {
                     if (task.isSuccessful()) {

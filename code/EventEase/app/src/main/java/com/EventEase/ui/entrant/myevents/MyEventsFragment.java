@@ -52,8 +52,6 @@ import java.util.concurrent.Executors;
 
 public class MyEventsFragment extends Fragment {
 
-    // ✅ no local FirebaseDevGraph here
-
     private EventRepository eventRepo;
     private WaitlistRepository waitlistRepo;
     private InvitationRepository invitationRepo;
@@ -114,7 +112,6 @@ public class MyEventsFragment extends Fragment {
     public void onStart() {
         super.onStart();
 
-        // ✅ pull shared repos/auth from App.graph()
         eventRepo      = App.graph().events;
         waitlistRepo   = App.graph().waitlists;
         invitationRepo = App.graph().invitations;

@@ -9,11 +9,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * FirebaseProfileRepository
- * Prod name. In-memory for Step 1 contracts.
- * TODO(salaar): Swap to Firebase (Auth + user doc).
- */
+
 public class FirebaseProfileRepository implements ProfileRepository {
 
     private final Map<String, Profile> byUid = new ConcurrentHashMap<>();

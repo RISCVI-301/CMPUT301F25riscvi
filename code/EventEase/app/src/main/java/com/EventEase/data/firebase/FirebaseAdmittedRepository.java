@@ -32,7 +32,7 @@ public class FirebaseAdmittedRepository implements AdmittedRepository {
     public Task<Void> admit(String eventId, String uid) {
         Log.d(TAG, "Attempting to admit user " + uid + " to event " + eventId);
         
-        // First, check capacity and remove from waitlist if present, then add to admitted array
+        // check capacity and remove from waitlist if present, then add to admitted array
         return db.collection("events")
                 .document(eventId)
                 .get()
@@ -61,26 +61,26 @@ public class FirebaseAdmittedRepository implements AdmittedRepository {
                     
                     // Check capacity (only enforce if capacity > 0)
                     if (capacity > 0 && currentAdmittedCount >= capacity) {
-                        Log.e(TAG, "❌ Event " + eventId + " is at full capacity (" + capacity + "). Cannot admit user " + uid);
+                        Log.e(TAG, "Event " + eventId + " is at full capacity (" + capacity + "). Cannot admit user " + uid);
                         return Tasks.forException(new Exception("Event is at full capacity"));
                     }
                     
                     Map<String, Object> updates = new HashMap<>();
                     
-                    // Remove from waitlist if present (using arrayRemove)
+                    // Remove from waitlist if present
                     updates.put("waitlist", FieldValue.arrayRemove(uid));
                     
-                    // Add to admitted array (using arrayUnion)
+                    // Add to admitted array
                     updates.put("admitted", FieldValue.arrayUnion(uid));
                     
                     return db.collection("events")
                             .document(eventId)
                             .update(updates)
                             .addOnSuccessListener(aVoid -> {
-                                Log.d(TAG, "✅ SUCCESS: User " + uid + " admitted to event " + eventId + " (" + (currentAdmittedCount + 1) + "/" + capacity + ")");
+                                Log.d(TAG, "SUCCESS: User " + uid + " admitted to event " + eventId + " (" + (currentAdmittedCount + 1) + "/" + capacity + ")");
                             })
                             .addOnFailureListener(e -> {
-                                Log.e(TAG, "❌ FAILED to admit user " + uid + " to event " + eventId, e);
+                                Log.e(TAG, "FAILED to admit user " + uid + " to event " + eventId, e);
                             })
                             .continueWith(t -> null);
                 });

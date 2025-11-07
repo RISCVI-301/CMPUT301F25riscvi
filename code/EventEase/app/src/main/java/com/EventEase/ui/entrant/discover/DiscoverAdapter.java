@@ -26,7 +26,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Adapter showing discoverable events coming from Firestore.
+ * Shows Discover Events
  */
 public class DiscoverAdapter extends RecyclerView.Adapter<DiscoverAdapter.VH> {
 

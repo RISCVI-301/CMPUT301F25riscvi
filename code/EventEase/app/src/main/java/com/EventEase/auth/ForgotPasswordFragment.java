@@ -81,32 +81,21 @@ public class ForgotPasswordFragment extends Fragment {
         });
     }
 
-    /**
-     * Validates email format
-     */
+    // Email Format Validator
     private boolean isValidEmailFormat(String email) {
         return EMAIL_PATTERN.matcher(email).matches();
     }
     
-    /**
-     * Checks if email exists in Firestore users collection, then sends reset email if valid
-     * Since Firestore queries are case-sensitive but emails should be matched case-insensitively,
-     * we query all users and check in memory, or use Firebase Auth's fetchSignInMethodsForEmail
-     * which handles case-insensitive email matching.
-     */
+
+    //Checks if email exists in Firestore users collection, then sends reset email if valid
     private void validateAndSendResetEmail(String email) {
         setLoading(true);
         
         String trimmedEmail = email.trim();
         
-        // Use Firebase Auth's fetchSignInMethodsForEmail which handles case-insensitive matching
-        // Note: Some Firebase projects may have email enumeration disabled, which can cause this to fail
-        // even for valid emails. In that case, we'll fall back to trying to send the reset email.
+
         auth.fetchSignInMethodsForEmail(trimmedEmail)
             .addOnSuccessListener(signInMethods -> {
-                // If signInMethods is not null, email exists
-                // Even if methods list is empty, the email exists (might be a disabled account)
-                // Proceed to send reset email
                 sendPasswordResetEmail(trimmedEmail);
             })
             .addOnFailureListener(e -> {
@@ -125,9 +114,7 @@ public class ForgotPasswordFragment extends Fragment {
                     setLoading(false);
                     ToastUtil.showLong(requireContext(), "No account found with this email address");
                 } else {
-                    // For other errors (might be privacy settings preventing email enumeration),
-                    // try sending the reset email anyway - Firebase will validate it
-                    // If email doesn't exist, sendPasswordResetEmail will fail with appropriate error
+                    // For other errors (might be privacy settings preventing email enumeration)
                     android.util.Log.d("ForgotPasswordFragment", "fetchSignInMethodsForEmail failed (possibly due to privacy settings), trying to send reset email anyway: " + e.getMessage());
                     sendPasswordResetEmail(trimmedEmail);
                 }

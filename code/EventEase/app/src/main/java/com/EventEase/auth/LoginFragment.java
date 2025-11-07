@@ -29,11 +29,11 @@ public class LoginFragment extends Fragment {
     private static final String PREFS_NAME = "EventEasePrefs";
     private static final String KEY_REMEMBER_ME = "rememberMe";
     private static final String KEY_SAVED_UID = "savedUid";
-    private static final String KEY_SAVED_EMAIL = "savedEmail"; // Keep for auto-fill convenience only
-    private static final String KEY_SAVED_PASSWORD = "savedPassword"; // Keep for auto-fill convenience only
+    private static final String KEY_SAVED_EMAIL = "savedEmail"; //Auto fill
+    private static final String KEY_SAVED_PASSWORD = "savedPassword"; // Auto fill
 
     private com.EventEase.auth.AuthViewModel vm;
-    private boolean navigateOnSuccess = false; // only true for login, not for reset
+    private boolean navigateOnSuccess = false; // only true for login
     private boolean isPasswordVisible = false;
 
     @Nullable

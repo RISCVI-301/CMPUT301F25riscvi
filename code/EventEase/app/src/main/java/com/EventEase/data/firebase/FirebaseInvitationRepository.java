@@ -10,16 +10,15 @@ import com.EventEase.model.Invitation;
 import com.EventEase.model.Invitation.Status;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
+import com.google.firebase.Firebase;
 import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
-/**
- * FirebaseInvitationRepository
- * Handles invitation management with Firebase backend
- */
+//Handles invitation management with Firebase backend
+
 public class FirebaseInvitationRepository implements InvitationRepository {
 
     private static final String TAG = "InvitationRepository";
@@ -78,15 +77,15 @@ public class FirebaseInvitationRepository implements InvitationRepository {
             Log.d(TAG, "Calling admittedRepo.admit() for eventId: " + eventId + ", uid: " + uid);
             admitTask = admittedRepo.admit(eventId, uid);
         } else {
-            Log.e(TAG, "⚠️ admittedRepo is NULL! Cannot admit user to event.");
+            Log.e(TAG, "admittedRepo is NULL! Cannot admit user to event.");
             admitTask = Tasks.forResult(null);
         }
         
         return admitTask.continueWithTask(task -> {
             if (task.isSuccessful()) {
-                Log.d(TAG, "✅ Successfully completed admit task");
+                Log.d(TAG, "Successfully completed admit task");
             } else {
-                Log.e(TAG, "❌ Admit task failed", task.getException());
+                Log.e(TAG, "Admit task failed", task.getException());
             }
             notifyUid(uid);
             Log.d(TAG, "User " + uid + " accepted invitation for event " + eventId);
@@ -116,11 +115,11 @@ public class FirebaseInvitationRepository implements InvitationRepository {
                 .document(invitationId)
                 .update(updates)
                 .addOnSuccessListener(aVoid -> {
-                    Log.d(TAG, "✅ SUCCESS: Invitation " + invitationId + " declined in Firebase");
+                    Log.d(TAG, "SUCCESS: Invitation " + invitationId + " declined in Firebase");
                     notifyUid(uid);
                 })
                 .addOnFailureListener(e -> {
-                    Log.e(TAG, "❌ FAILED to decline invitation " + invitationId, e);
+                    Log.e(TAG, "FAILED to decline invitation " + invitationId, e);
                 })
                 .continueWith(task -> {
                     if (task.isSuccessful()) {
