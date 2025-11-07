@@ -1,5 +1,6 @@
 package com.example.eventease.ui.organizer;
 
+import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
@@ -15,7 +16,6 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.bumptech.glide.Glide;
 import com.example.eventease.R;
-import com.example.eventease.util.AuthHelper;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
@@ -41,6 +41,9 @@ public class OrganizerAccountActivity extends AppCompatActivity {
     private TextView tvFullName;
     private TextView tvUserId;
     private ImageButton btnEditProfile;
+    private String organizerId;
+    private boolean isResolvingOrganizerId;
+    private String userEmail;
 
     /**
      * Handles the result of the image picker to select a new avatar.
@@ -64,33 +67,25 @@ public class OrganizerAccountActivity extends AppCompatActivity {
         tvUserId = findViewById(R.id.tvUserId);
         btnEditProfile = findViewById(R.id.btnEditProfile);
 
+        organizerId = getIntent().getStringExtra(OrganizerMyEventActivity.EXTRA_ORGANIZER_ID);
+
         if (tvFullName == null || ivAvatar == null) {
             Log.e(TAG, "organizer_account.xml must define tvFullName and ivAvatar");
             return;
         }
 
         tvFullName.setText("Loading...");
-        Glide.with(this).load(R.drawable.ic_launcher_foreground).circleCrop().into(ivAvatar);
-        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        Glide.with(this).load(R.drawable.entrant_icon).circleCrop().into(ivAvatar);
+        final FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
         if (user == null) {
             Toast.makeText(this, "Please sign in to view your account", Toast.LENGTH_LONG).show();
             finish();
             return;
         }
         
-        if (tvUserId != null) {
-            String organizerId = AuthHelper.getCurrentOrganizerIdOrNull();
-            String displayText = "Auth UID: " + user.getUid() + "\nOrganizer ID: " + 
-                    (organizerId != null ? organizerId : "N/A");
-            tvUserId.setText(displayText);
-        }
-        
-        String organizerId = AuthHelper.getCurrentOrganizerIdOrNull();
-        if (organizerId != null) {
-            loadProfile(organizerId);
-        } else {
-            loadProfile(user.getUid());
-        }
+        updateUserIdLabel(user.getUid());
+        loadProfile(user.getUid());
+        resolveOrganizerId(() -> updateUserIdLabel(user.getUid()));
 
         ivAvatar.setOnClickListener(v -> pickImage.launch("image/*"));
 
@@ -107,6 +102,63 @@ public class OrganizerAccountActivity extends AppCompatActivity {
         
         setupBottomNavigation();
     }
+
+    private void updateUserIdLabel(String authUid) {
+        if (tvUserId == null) {
+            return;
+        }
+        String organizerLabel = (organizerId != null && !organizerId.trim().isEmpty())
+                ? organizerId
+                : "Loading…";
+        StringBuilder sb = new StringBuilder();
+        if (userEmail != null && !userEmail.isEmpty()) {
+            sb.append("Email: ").append(userEmail).append('\n');
+        }
+        sb.append("Auth UID: ").append(authUid).append('\n');
+        sb.append("Organizer ID: ").append(organizerLabel);
+        tvUserId.setText(sb.toString());
+    }
+
+    private void resolveOrganizerId(@Nullable Runnable onReady) {
+        if (organizerId != null && !organizerId.trim().isEmpty()) {
+            FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+            updateUserIdLabel(user != null ? user.getUid() : "");
+            if (onReady != null) {
+                onReady.run();
+            }
+            return;
+        }
+        if (isResolvingOrganizerId) {
+            return;
+        }
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        if (user == null) {
+            Toast.makeText(this, "Please sign in again", Toast.LENGTH_LONG).show();
+            return;
+        }
+        isResolvingOrganizerId = true;
+        FirebaseFirestore.getInstance()
+                .collection("users")
+                .document(user.getUid())
+                .get()
+                .addOnSuccessListener(doc -> {
+                    organizerId = doc != null ? doc.getString("organizerId") : null;
+                    if (organizerId == null || organizerId.trim().isEmpty()) {
+                        organizerId = doc != null ? doc.getId() : user.getUid();
+                    }
+                    isResolvingOrganizerId = false;
+                    updateUserIdLabel(user.getUid());
+                    if (organizerId == null || organizerId.trim().isEmpty()) {
+                        Toast.makeText(this, "Organizer profile not configured yet.", Toast.LENGTH_LONG).show();
+                    } else if (onReady != null) {
+                        onReady.run();
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    isResolvingOrganizerId = false;
+                    Toast.makeText(this, "Failed to load organizer profile: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                });
+    }
     /**
      * Sets up the listeners for the custom bottom navigation bar.
      */
@@ -114,7 +166,11 @@ public class OrganizerAccountActivity extends AppCompatActivity {
         LinearLayout btnMyEvents = findViewById(R.id.btnMyEvents);
         if (btnMyEvents != null) {
             btnMyEvents.setOnClickListener(v -> {
-                startActivity(new android.content.Intent(this, com.example.eventease.ui.organizer.OrganizerMyEventActivity.class));
+                android.content.Intent intent = new android.content.Intent(this, com.example.eventease.ui.organizer.OrganizerMyEventActivity.class);
+                if (organizerId != null && !organizerId.trim().isEmpty()) {
+                    intent.putExtra(OrganizerMyEventActivity.EXTRA_ORGANIZER_ID, organizerId);
+                }
+                startActivity(intent);
                 finish();
             });
         }
@@ -127,14 +183,22 @@ public class OrganizerAccountActivity extends AppCompatActivity {
         com.google.android.material.floatingactionbutton.FloatingActionButton fabAdd = findViewById(R.id.fabAdd);
         if (fabAdd != null) {
             fabAdd.setOnClickListener(v -> {
-                startActivity(new android.content.Intent(this, com.example.eventease.ui.organizer.OrganizerCreateEventActivity.class));
+                android.content.Intent intent = new android.content.Intent(this, com.example.eventease.ui.organizer.OrganizerCreateEventActivity.class);
+                if (organizerId != null && !organizerId.trim().isEmpty()) {
+                    intent.putExtra(OrganizerMyEventActivity.EXTRA_ORGANIZER_ID, organizerId);
+                }
+                startActivity(intent);
             });
         }
         
         com.google.android.material.button.MaterialButton btnSwitchRole = findViewById(R.id.btnSwitchRole);
         if (btnSwitchRole != null) {
             btnSwitchRole.setOnClickListener(v -> {
-                Toast.makeText(this, "Switch to entrant view - Coming soon", Toast.LENGTH_SHORT).show();
+                Intent intent = new Intent(this, com.example.eventease.MainActivity.class);
+                intent.putExtra("nav_target", "account");
+                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                startActivity(intent);
+                finish();
             });
         }
         
@@ -158,21 +222,22 @@ public class OrganizerAccountActivity extends AppCompatActivity {
      * @param documentId The ID of the user document to fetch (could be an Auth UID or a custom organizer ID).
      */
     private void loadProfile(String documentId) {
+        if (documentId == null || documentId.trim().isEmpty()) {
+            FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+            documentId = user != null ? user.getUid() : "";
+        }
+        final String docId = documentId;
         FirebaseFirestore.getInstance()
                 .collection("users")
-                .document(documentId)
+                .document(docId)
                 .get()
                 .addOnSuccessListener(this::applyProfileFromDoc)
                 .addOnFailureListener(e -> {
-                    Log.e(TAG, "Fetch user failed for document: " + documentId, e);
-                    if (!documentId.equals("organizer_test_1")) {
-                        loadProfile("organizer_test_1");
-                    } else {
-                        if (tvFullName != null)
-                            tvFullName.setText("Organizer");
-                        if (ivAvatar != null)
-                            Glide.with(this).load(R.drawable.ic_launcher_foreground).circleCrop().into(ivAvatar);
-                    }
+                    Log.e(TAG, "Fetch user failed for document: " + docId, e);
+                    if (tvFullName != null)
+                        tvFullName.setText("Organizer");
+                    if (ivAvatar != null)
+                        Glide.with(this).load(R.drawable.entrant_icon).circleCrop().into(ivAvatar);
                 });
     }
     /**
@@ -186,19 +251,29 @@ public class OrganizerAccountActivity extends AppCompatActivity {
         if (doc == null || !doc.exists()) {
             Log.w(TAG, "User document not found");
             tvFullName.setText("Organizer");
-            Glide.with(this).load(R.drawable.ic_launcher_foreground).circleCrop().into(ivAvatar);
+            Glide.with(this).load(R.drawable.entrant_icon).circleCrop().into(ivAvatar);
             return;
         }
 
         String name = doc.getString("fullName");
+        if (name == null || name.trim().isEmpty()) {
+            name = doc.getString("name");
+        }
+
         String photoUrl = doc.getString("photoUrl");
+        userEmail = doc.getString("email");
 
         tvFullName.setText((name != null && !name.isEmpty()) ? name : "Organizer");
 
         if (photoUrl != null && !photoUrl.isEmpty()) {
             Glide.with(this).load(photoUrl).circleCrop().into(ivAvatar);
         } else {
-            Glide.with(this).load(R.drawable.ic_launcher_foreground).circleCrop().into(ivAvatar);
+            Glide.with(this).load(R.drawable.entrant_icon).circleCrop().into(ivAvatar);
+        }
+
+        FirebaseUser authUser = FirebaseAuth.getInstance().getCurrentUser();
+        if (authUser != null) {
+            updateUserIdLabel(authUser.getUid());
         }
     }
     /**
@@ -214,9 +289,9 @@ public class OrganizerAccountActivity extends AppCompatActivity {
             return;
         }
 
-        String organizerId = AuthHelper.getCurrentOrganizerIdOrNull();
-        if (organizerId == null) {
-            Toast.makeText(this, "Organizer ID not found", Toast.LENGTH_SHORT).show();
+        if (organizerId == null || organizerId.trim().isEmpty()) {
+            Toast.makeText(this, "Organizer profile not ready", Toast.LENGTH_SHORT).show();
+            resolveOrganizerId(() -> uploadNewAvatar(uri));
             return;
         }
         

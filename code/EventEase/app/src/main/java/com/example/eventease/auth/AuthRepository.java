@@ -8,6 +8,7 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.FirebaseFirestore;
 
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -39,6 +40,7 @@ public class AuthRepository {
                         profile.put("phoneNumber", phoneNumber.trim());
                     }
                     profile.put("createdAt", System.currentTimeMillis());
+                    profile.put("roles", Arrays.asList("entrant"));
                     return db.collection("users").document(uid).set(profile);
                 });
     }

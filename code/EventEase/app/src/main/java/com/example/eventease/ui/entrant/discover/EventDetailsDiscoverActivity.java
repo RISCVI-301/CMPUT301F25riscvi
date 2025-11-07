@@ -379,9 +379,9 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
 
     private void observeWaitlistCollection() {
         if (waitlistRegistration != null) return;
-        // Listen to the event document to get waitlist array size
         waitlistRegistration = firestore.collection("events")
                 .document(eventId)
+                .collection("WaitlistedEntrants")
                 .addSnapshotListener((snapshot, error) -> {
                     if (error != null) {
                         if (waitlistCountView != null) {
@@ -389,14 +389,8 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
                         }
                         return;
                     }
-                    if (snapshot != null && snapshot.exists()) {
-                        @SuppressWarnings("unchecked")
-                        List<String> waitlist = (List<String>) snapshot.get("waitlist");
-                        int count = waitlist != null ? waitlist.size() : 0;
-                        updateWaitlistCount(count);
-                    } else {
-                        updateWaitlistCount(0);
-                    }
+                    int count = snapshot != null ? snapshot.size() : 0;
+                    updateWaitlistCount(count);
                 });
     }
 

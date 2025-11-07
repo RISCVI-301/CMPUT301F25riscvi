@@ -24,6 +24,7 @@ public class FirebaseEventRepository implements EventRepository {
     private final Map<String, Event> events = new ConcurrentHashMap<>();
     private final Map<String, Integer> waitlistCounts = new ConcurrentHashMap<>();
     private final Map<String, List<WaitlistCountListener>> listeners = new ConcurrentHashMap<>();
+    private final Map<String, com.google.firebase.firestore.ListenerRegistration> waitlistCountRegistrations = new ConcurrentHashMap<>();
     private final FirebaseFirestore db;
 
     public FirebaseEventRepository(List<Event> seed) {
@@ -106,13 +107,12 @@ public class FirebaseEventRepository implements EventRepository {
     @Override
     public ListenerRegistration listenWaitlistCount(String eventId, WaitlistCountListener l) {
         listeners.computeIfAbsent(eventId, k -> new ArrayList<>()).add(l);
-        
-        // get the real count from Firebase by querying waitlist documents
-        queryWaitlistCount(eventId);
-        
-        // Then notify with current cached count
+
+        ensureWaitlistListener(eventId);
+
+        // Notify with the latest cached value (or zero if none yet)
         l.onChanged(waitlistCounts.getOrDefault(eventId, 0));
-        
+
         return new ListenerRegistration() {
             private boolean removed = false;
             @Override public void remove() {
@@ -120,51 +120,42 @@ public class FirebaseEventRepository implements EventRepository {
                 List<WaitlistCountListener> ls = listeners.get(eventId);
                 if (ls != null) ls.remove(l);
                 removed = true;
+
+                if (ls == null || ls.isEmpty()) {
+                    com.google.firebase.firestore.ListenerRegistration reg = waitlistCountRegistrations.remove(eventId);
+                    if (reg != null) {
+                        reg.remove();
+                    }
+                }
             }
         };
     }
     
     private void queryWaitlistCount(String eventId) {
-        // Get event document and count waitlist array size
         db.collection("events")
                 .document(eventId)
+                .collection("WaitlistedEntrants")
                 .get()
-                .addOnSuccessListener(documentSnapshot -> {
-                    if (documentSnapshot != null && documentSnapshot.exists()) {
-                        @SuppressWarnings("unchecked")
-                        List<String> waitlist = (List<String>) documentSnapshot.get("waitlist");
-                        int actualCount = waitlist != null ? waitlist.size() : 0;
-                        Log.d(TAG, "Queried waitlist count for event " + eventId + ": " + actualCount);
-                        
-                        // Update cached count
-                        waitlistCounts.put(eventId, actualCount);
-                        
-                        // Also update the event's waitlistCount in Firestore for backward compatibility
-                        db.collection("events").document(eventId)
-                                .update("waitlistCount", actualCount)
-                                .addOnSuccessListener(aVoid -> {
-                                    Log.d(TAG, "Updated waitlistCount in event document for " + eventId);
-                                })
-                                .addOnFailureListener(e -> {
-                                    Log.e(TAG, "Failed to update waitlistCount in event document", e);
-                                });
-                        
-                        // Notify all listeners
-                        notifyCount(eventId);
-                    }
+                .addOnSuccessListener(snap -> {
+                    int actualCount = snap != null ? snap.size() : 0;
+                    Log.d(TAG, "Queried waitlist subcollection count for event " + eventId + ": " + actualCount);
+
+                    waitlistCounts.put(eventId, actualCount);
+
+                    db.collection("events").document(eventId)
+                            .update("waitlistCount", actualCount)
+                            .addOnFailureListener(e -> Log.e(TAG, "Failed to sync waitlistCount field", e));
+
+                    notifyCount(eventId);
                 })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Failed to query waitlist count for event " + eventId, e);
-                });
+                .addOnFailureListener(e -> Log.e(TAG, "Failed to query waitlist count for event " + eventId, e));
     }
 
     /* package */ void incrementWaitlist(String eventId) {
-        // Waitlist count is now managed by the array size, so we just refresh from Firestore
         queryWaitlistCount(eventId);
     }
 
     /* package */ void decrementWaitlist(String eventId) {
-        // Waitlist count is now managed by the array size, so we just refresh from Firestore
         queryWaitlistCount(eventId);
     }
 
@@ -180,5 +171,42 @@ public class FirebaseEventRepository implements EventRepository {
                 l.onChanged(count);
             }
         }
+    }
+
+    @Override
+    public Task<Void> create(Event event) {
+        if (event == null || event.getId() == null) {
+            return Tasks.forException(new IllegalArgumentException("Event must have an ID"));
+        }
+        events.put(event.getId(), event);
+        waitlistCounts.put(event.getId(), event.getWaitlistCount());
+        return db.collection("events").document(event.getId()).set(event.toMap());
+    }
+
+    private void ensureWaitlistListener(String eventId) {
+        if (waitlistCountRegistrations.containsKey(eventId)) {
+            return;
+        }
+
+        com.google.firebase.firestore.ListenerRegistration reg = db.collection("events")
+                .document(eventId)
+                .collection("WaitlistedEntrants")
+                .addSnapshotListener((snap, error) -> {
+                    if (error != null) {
+                        Log.w(TAG, "Waitlist listener failed for " + eventId, error);
+                        return;
+                    }
+
+                    int count = snap != null ? snap.size() : 0;
+                    waitlistCounts.put(eventId, count);
+
+                    db.collection("events").document(eventId)
+                            .update("waitlistCount", count)
+                            .addOnFailureListener(e -> Log.e(TAG, "Failed to sync waitlistCount field", e));
+
+                    notifyCount(eventId);
+                });
+
+        waitlistCountRegistrations.put(eventId, reg);
     }
 }

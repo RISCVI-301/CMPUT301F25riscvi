@@ -14,4 +14,5 @@ public interface EventRepository {
     Task<List<Event>> getOpenEvents(Date now);
     Task<Event> getEvent(String eventId);
     ListenerRegistration listenWaitlistCount(String eventId, WaitlistCountListener l);
-    Task<Void> create(Event event);}
+    Task<Void> create(Event event);
+}

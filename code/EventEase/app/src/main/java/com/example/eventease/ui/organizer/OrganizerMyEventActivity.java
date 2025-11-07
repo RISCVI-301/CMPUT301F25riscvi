@@ -12,9 +12,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.example.eventease.ui.organizer.OrganizerWaitlistActivity;
 import com.example.eventease.R;
-import com.example.eventease.util.AuthHelper;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentReference;
@@ -28,10 +26,13 @@ import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.google.firebase.firestore.QuerySnapshot;
 import com.google.firebase.firestore.Source;
 import com.google.firebase.firestore.SetOptions;
+import com.google.android.gms.tasks.Task;
+import com.google.android.gms.tasks.Tasks;
 import com.google.firebase.firestore.WriteBatch;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -39,21 +40,28 @@ import java.util.Map;
 
 public class OrganizerMyEventActivity extends AppCompatActivity {
 
+    public static final String EXTRA_ORGANIZER_ID = "extra_organizer_id";
+
     private LinearLayout emptyState;
     private RecyclerView rvMyEvents;
     private LinearLayout btnMyEvents, btnAccount;
     private View fabAdd;
+    private String organizerId;
+    private boolean isResolvingOrganizerId;
 
     private OrganizerMyEventAdapter adapter;
     private final List<Map<String, Object>> items = new ArrayList<>();
 
     private FirebaseFirestore db;
     private ListenerRegistration registration;
+    private ListenerRegistration legacyRegistration;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.organizer_my_events);
+
+        organizerId = getIntent().getStringExtra(EXTRA_ORGANIZER_ID);
 
         emptyState  = findViewById(R.id.emptyState);
         rvMyEvents  = findViewById(R.id.rvMyEvents);
@@ -88,27 +96,70 @@ public class OrganizerMyEventActivity extends AppCompatActivity {
             );
         } catch (Throwable ignored) { }
 
-        fabAdd.setOnClickListener(v ->
-                startActivity(new Intent(this, OrganizerCreateEventActivity.class))
-        );
+        fabAdd.setOnClickListener(v -> {
+            Intent intent = new Intent(this, OrganizerCreateEventActivity.class);
+            intent.putExtra(EXTRA_ORGANIZER_ID, organizerId);
+            startActivity(intent);
+        });
         btnMyEvents.setOnClickListener(v -> refreshFromServer());
-        btnAccount.setOnClickListener(v ->
-                startActivity(new Intent(this, OrganizerAccountActivity.class))
-        );
+        btnAccount.setOnClickListener(v -> {
+            Intent intent = new Intent(this, OrganizerAccountActivity.class);
+            intent.putExtra(EXTRA_ORGANIZER_ID, organizerId);
+            startActivity(intent);
+        });
         
         seedSampleParticipants();
+    }
+
+    private void ensureOrganizerId(Runnable onReady) {
+        if (organizerId != null && !organizerId.trim().isEmpty()) {
+            if (onReady != null) {
+                onReady.run();
+            }
+            return;
+        }
+        if (isResolvingOrganizerId) {
+            return;
+        }
+        FirebaseUser current = FirebaseAuth.getInstance().getCurrentUser();
+        if (current == null) {
+            return;
+        }
+        isResolvingOrganizerId = true;
+        FirebaseFirestore.getInstance()
+                .collection("users")
+                .document(current.getUid())
+                .get()
+                .addOnSuccessListener(doc -> {
+                    organizerId = doc != null ? doc.getString("organizerId") : null;
+                    if (organizerId == null || organizerId.trim().isEmpty()) {
+                        organizerId = current.getUid();
+                    }
+                    isResolvingOrganizerId = false;
+                    if (organizerId == null || organizerId.trim().isEmpty()) {
+                        Toast.makeText(this, "Organizer ID not set for this account", Toast.LENGTH_LONG).show();
+                    } else if (onReady != null) {
+                        onReady.run();
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    isResolvingOrganizerId = false;
+                    Toast.makeText(this, "Failed to load organizer profile: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                });
     }
     
     @Override
     protected void onStart() {
         super.onStart();
-        if (!AuthHelper.isAuthenticated()) {
+        if (FirebaseAuth.getInstance().getCurrentUser() == null) {
             Toast.makeText(this, "Please sign in to view your events", Toast.LENGTH_LONG).show();
             finish();
             return;
         }
-        refreshFromServer();
-        attachRealtime();
+        ensureOrganizerId(() -> {
+            refreshFromServer();
+            attachRealtime();
+        });
     }
 
     @Override
@@ -117,41 +168,168 @@ public class OrganizerMyEventActivity extends AppCompatActivity {
             registration.remove();
             registration = null;
         }
+        if (legacyRegistration != null) {
+            legacyRegistration.remove();
+            legacyRegistration = null;
+        }
         super.onStop();
     }
 
-    private Query baseQuery() {
-        String organizerId = AuthHelper.getCurrentOrganizerIdOrNull();
-        if (organizerId == null) {
-            return db.collection("events").whereEqualTo("organizerId", "__invalid__");
+    private Query organizerIdQuery() {
+        if (organizerId == null || organizerId.trim().isEmpty()) {
+            return db.collection("events").whereEqualTo("organizerId", "__organizer_not_set__");
         }
         return db.collection("events")
                 .whereEqualTo("organizerId", organizerId);
     }
 
+    private Query legacyOrganizerIdQuery() {
+        if (organizerId == null || organizerId.trim().isEmpty()) {
+            return db.collection("events").whereEqualTo("organizerID", "__organizer_not_set__");
+        }
+        return db.collection("events")
+                .whereEqualTo("organizerID", organizerId);
+    }
+
     private void refreshFromServer() {
-        baseQuery().get(Source.SERVER)
-                .addOnSuccessListener(this::applySnapshot)
-                .addOnFailureListener(e ->
-                        Toast.makeText(this, "Server refresh failed: " + e.getMessage(), Toast.LENGTH_LONG).show()
-                );
+        if (organizerId == null || organizerId.trim().isEmpty()) {
+            Toast.makeText(this, "Organizer profile not configured yet", Toast.LENGTH_LONG).show();
+            return;
+        }
+        Task<QuerySnapshot> primaryTask = organizerIdQuery().get(Source.SERVER);
+        Task<QuerySnapshot> legacyTask = legacyOrganizerIdQuery().get(Source.SERVER);
+
+        Tasks.whenAllComplete(primaryTask, legacyTask)
+                .addOnCompleteListener(all -> {
+                    QuerySnapshot primarySnap = primaryTask.isSuccessful() ? primaryTask.getResult() : null;
+                    QuerySnapshot legacySnap = legacyTask.isSuccessful() ? legacyTask.getResult() : null;
+
+                    if (!primaryTask.isSuccessful() && primaryTask.getException() != null) {
+                        Log.w("OrganizerMyEventActivity", "Primary query failed", primaryTask.getException());
+                    }
+                    if (!legacyTask.isSuccessful() && legacyTask.getException() != null) {
+                        Log.w("OrganizerMyEventActivity", "Legacy query failed", legacyTask.getException());
+                    }
+
+                    int primaryCount = primarySnap != null ? primarySnap.size() : 0;
+                    int legacyCount = legacySnap != null ? legacySnap.size() : 0;
+                    Log.d("OrganizerMyEventActivity", "Initial load counts primary=" + primaryCount + " legacy=" + legacyCount);
+
+                    if ((primarySnap == null || primarySnap.isEmpty()) && (legacySnap == null || legacySnap.isEmpty())) {
+                        loadAllEventsFallback();
+                        return;
+                    }
+
+                    mergeSnapshotsAndDisplay(primarySnap, legacySnap);
+                    backfillLegacy(legacySnap);
+                });
+    }
+
+    private void loadAllEventsFallback() {
+        Log.d("OrganizerMyEventActivity", "Fallback: loading all events for filtering");
+        db.collection("events")
+                .get(Source.SERVER)
+                .addOnSuccessListener(all -> {
+                    List<DocumentSnapshot> matches = new ArrayList<>();
+                    for (DocumentSnapshot doc : all) {
+                        String primary = doc.getString("organizerId");
+                        String legacy = doc.getString("organizerID");
+                        if ((primary != null && primary.equals(organizerId)) ||
+                                (legacy != null && legacy.equals(organizerId))) {
+                            matches.add(doc);
+                        }
+                    }
+                    Log.d("OrganizerMyEventActivity", "Fallback matched=" + matches.size());
+                    mergeSnapshotsAndDisplay(matches, null);
+                    backfillLegacyFromDocs(matches);
+                })
+                .addOnFailureListener(e -> Log.e("OrganizerMyEventActivity", "Fallback load failed", e));
     }
 
     private void attachRealtime() {
+        if (organizerId == null || organizerId.trim().isEmpty()) {
+            return;
+        }
         if (registration != null) {
             registration.remove();
             registration = null;
         }
-        registration = baseQuery().addSnapshotListener(
+        if (legacyRegistration != null) {
+            legacyRegistration.remove();
+            legacyRegistration = null;
+        }
+        registration = organizerIdQuery().addSnapshotListener(
                 MetadataChanges.INCLUDE,
                 (snapshots, e) -> {
                     if (e != null) {
                         Toast.makeText(this, "Listen failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
                         return;
                     }
-                    if (snapshots != null) applySnapshot(snapshots);
+                    if (snapshots != null) mergeSnapshotsAndDisplay(snapshots, null);
+                    else loadAllEventsFallback();
                 }
         );
+
+        legacyRegistration = legacyOrganizerIdQuery().addSnapshotListener(
+                MetadataChanges.INCLUDE,
+                (snapshots, e) -> {
+                    if (e != null) {
+                        Log.w("OrganizerMyEventActivity", "Legacy listen failed", e);
+                        return;
+                    }
+                    if (snapshots != null && !snapshots.isEmpty()) {
+                        mergeSnapshotsAndDisplay(null, snapshots);
+                        backfillLegacy(snapshots);
+                    }
+                }
+        );
+    }
+
+    private void mergeSnapshotsAndDisplay(@Nullable Iterable<? extends DocumentSnapshot> primary,
+                                          @Nullable Iterable<? extends DocumentSnapshot> legacy) {
+        Map<String, Map<String, Object>> merged = new LinkedHashMap<>();
+
+        int primaryCount = 0;
+        int legacyCount = 0;
+
+        if (primary != null) {
+            for (DocumentSnapshot d : primary) {
+                primaryCount++;
+                Log.d("OrganizerMyEventActivity", "Primary event doc=" + d.getId());
+                Map<String, Object> m = toAdapterMap(d);
+                if (m != null) merged.put(d.getId(), m);
+            }
+        }
+
+        if (legacy != null) {
+            for (DocumentSnapshot d : legacy) {
+                legacyCount++;
+                Log.d("OrganizerMyEventActivity", "Legacy event doc=" + d.getId());
+                Map<String, Object> m = toAdapterMap(d);
+                if (m != null) merged.put(d.getId(), m);
+            }
+        }
+
+        Log.d("OrganizerMyEventActivity", "Merging events: primary=" + primaryCount + " legacy=" + legacyCount);
+        items.clear();
+        items.addAll(merged.values());
+        adapter.setData(items);
+        toggleEmpty(!items.isEmpty());
+    }
+
+    private void backfillLegacy(@Nullable QuerySnapshot legacySnap) {
+        if (legacySnap == null || legacySnap.isEmpty()) return;
+        backfillLegacyFromDocs(legacySnap.getDocuments());
+    }
+
+    private void backfillLegacyFromDocs(@Nullable Iterable<DocumentSnapshot> docs) {
+        if (docs == null) return;
+        for (DocumentSnapshot doc : docs) {
+            String existing = doc.getString("organizerId");
+            if (organizerId != null && (existing == null || existing.trim().isEmpty())) {
+                doc.getReference().set(Collections.singletonMap("organizerId", organizerId), SetOptions.merge());
+            }
+        }
     }
 
     private void applySnapshot(QuerySnapshot snapshots) {

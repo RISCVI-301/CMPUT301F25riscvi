@@ -2,6 +2,7 @@ package com.example.eventease.ui.entrant.profile;
 
 import android.app.Dialog;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Color;
@@ -18,6 +19,7 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.widget.AppCompatButton;
 import androidx.fragment.app.Fragment;
 import androidx.navigation.Navigation;
+import androidx.cardview.widget.CardView;
 import com.bumptech.glide.Glide;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
@@ -25,13 +27,16 @@ import com.google.android.material.imageview.ShapeableImageView;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.google.firebase.firestore.QuerySnapshot;
 import com.example.eventease.R;
 import com.example.eventease.util.ToastUtil;
+import com.example.eventease.ui.organizer.OrganizerMyEventActivity;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import android.renderscript.Allocation;
 import android.renderscript.Element;
 import android.renderscript.RenderScript;
@@ -46,6 +51,8 @@ public class AccountFragment extends Fragment {
     private ShapeableImageView profileImage;
     private FirebaseFirestore db;
     private FirebaseAuth mAuth;
+    private CardView organizerSwitchCard;
+    private String organizerIdForSwitch;
 
     public AccountFragment() { }
 
@@ -63,14 +70,24 @@ public class AccountFragment extends Fragment {
         // Initialize views
         fullNameText = root.findViewById(R.id.fullNameText);
         profileImage = root.findViewById(R.id.profileImage);
+        organizerSwitchCard = root.findViewById(R.id.applyOrganizerCard);
+        if (organizerSwitchCard != null) {
+            organizerSwitchCard.setVisibility(View.GONE);
+            organizerSwitchCard.setOnClickListener(v -> {
+                if (getContext() == null) return;
+                if (organizerIdForSwitch == null || organizerIdForSwitch.trim().isEmpty()) {
+                    ToastUtil.showShort(getContext(), "Organizer profile not ready yet");
+                    return;
+                }
+                Intent intent = new Intent(getContext(), OrganizerMyEventActivity.class);
+                intent.putExtra(OrganizerMyEventActivity.EXTRA_ORGANIZER_ID, organizerIdForSwitch);
+                startActivity(intent);
+            });
+        }
 
         // Set up click listeners
         root.findViewById(R.id.notificationsCard).setOnClickListener(v -> {
             // Handle notifications click
-        });
-
-        root.findViewById(R.id.applyOrganizerCard).setOnClickListener(v -> {
-            // Handle apply for organizer click
         });
 
         root.findViewById(R.id.logoutButton).setOnClickListener(v -> logout());
@@ -116,9 +133,47 @@ public class AccountFragment extends Fragment {
                             .error(R.drawable.entrant_icon)
                             .into(profileImage);
                     }
+
+                    updateOrganizerSwitchVisibility(documentSnapshot);
                 }
             });
         }
+    }
+
+    private void updateOrganizerSwitchVisibility(@NonNull DocumentSnapshot documentSnapshot) {
+        if (organizerSwitchCard == null) return;
+
+        boolean hasOrganizerRole = hasRole(documentSnapshot, "organizer");
+        boolean hasEntrantRole = hasRole(documentSnapshot, "entrant");
+
+        if (hasOrganizerRole && hasEntrantRole) {
+            organizerIdForSwitch = documentSnapshot.getString("organizerId");
+            if (organizerIdForSwitch == null || organizerIdForSwitch.trim().isEmpty()) {
+                organizerIdForSwitch = documentSnapshot.getId();
+            }
+            organizerSwitchCard.setVisibility(View.VISIBLE);
+        } else {
+            organizerIdForSwitch = null;
+            organizerSwitchCard.setVisibility(View.GONE);
+        }
+    }
+
+    private boolean hasRole(@NonNull DocumentSnapshot documentSnapshot, @NonNull String targetRole) {
+        Object rolesObj = documentSnapshot.get("roles");
+        if (rolesObj instanceof List<?>) {
+            for (Object role : (List<?>) rolesObj) {
+                if (role != null && targetRole.equalsIgnoreCase(role.toString())) {
+                    return true;
+                }
+            }
+        }
+
+        String roleField = documentSnapshot.getString("role");
+        if (roleField != null && roleField.toLowerCase(Locale.US).contains(targetRole.toLowerCase(Locale.US))) {
+            return true;
+        }
+
+        return false;
     }
 
     private void logout() {
@@ -292,7 +347,7 @@ public class AccountFragment extends Fragment {
     }
 
     private void deleteUserReferences(String uid, Runnable onComplete) {
-        // Query all events where user is in waitlist or admitted arrays
+        // Query all events or subcollections where the user might appear
         Task<QuerySnapshot> waitlistEventsTask = db.collection("events")
             .whereArrayContains("waitlist", uid)
             .get();
@@ -301,60 +356,106 @@ public class AccountFragment extends Fragment {
             .whereArrayContains("admitted", uid)
             .get();
 
+        Task<QuerySnapshot> waitlistSubTask = db.collectionGroup("WaitlistedEntrants")
+            .whereEqualTo("userId", uid)
+            .get();
+
+        Task<QuerySnapshot> selectedSubTask = db.collectionGroup("SelectedEntrants")
+            .whereEqualTo("userId", uid)
+            .get();
+
+        Task<QuerySnapshot> nonSelectedSubTask = db.collectionGroup("NonSelectedEntrants")
+            .whereEqualTo("userId", uid)
+            .get();
+
+        Task<QuerySnapshot> cancelledSubTask = db.collectionGroup("CancelledEntrants")
+            .whereEqualTo("userId", uid)
+            .get();
+
         // Delete all invitations
         Task<QuerySnapshot> invitationsTask = db.collection("invitations")
             .whereEqualTo("uid", uid)
             .get();
 
-        // Wait for all queries to complete, then remove UID from all events
-        Tasks.whenAllComplete(waitlistEventsTask, admittedEventsTask, invitationsTask)
+        Tasks.whenAllComplete(waitlistEventsTask, admittedEventsTask, waitlistSubTask,
+                selectedSubTask, nonSelectedSubTask, cancelledSubTask, invitationsTask)
             .addOnSuccessListener(results -> {
                 List<Task<Void>> updateTasks = new ArrayList<>();
 
-                // Remove UID from waitlist arrays
                 if (waitlistEventsTask.isSuccessful() && waitlistEventsTask.getResult() != null) {
                     for (QueryDocumentSnapshot document : waitlistEventsTask.getResult()) {
-                        updateTasks.add(document.getReference().update("waitlist", 
-                            com.google.firebase.firestore.FieldValue.arrayRemove(uid)));
+                        updateTasks.add(document.getReference().update("waitlist",
+                                com.google.firebase.firestore.FieldValue.arrayRemove(uid)));
                     }
                 }
 
-                // Remove UID from admitted arrays
                 if (admittedEventsTask.isSuccessful() && admittedEventsTask.getResult() != null) {
                     for (QueryDocumentSnapshot document : admittedEventsTask.getResult()) {
-                        updateTasks.add(document.getReference().update("admitted", 
-                            com.google.firebase.firestore.FieldValue.arrayRemove(uid)));
+                        updateTasks.add(document.getReference().update("admitted",
+                                com.google.firebase.firestore.FieldValue.arrayRemove(uid)));
                     }
                 }
 
-                // Collect delete tasks from invitations results
+                if (waitlistSubTask.isSuccessful() && waitlistSubTask.getResult() != null) {
+                    for (DocumentSnapshot document : waitlistSubTask.getResult()) {
+                        updateTasks.add(removeSubcollectionEntry(document));
+                    }
+                }
+
+                if (selectedSubTask.isSuccessful() && selectedSubTask.getResult() != null) {
+                    for (DocumentSnapshot document : selectedSubTask.getResult()) {
+                        updateTasks.add(document.getReference().delete());
+                    }
+                }
+
+                if (nonSelectedSubTask.isSuccessful() && nonSelectedSubTask.getResult() != null) {
+                    for (DocumentSnapshot document : nonSelectedSubTask.getResult()) {
+                        updateTasks.add(document.getReference().delete());
+                    }
+                }
+
+                if (cancelledSubTask.isSuccessful() && cancelledSubTask.getResult() != null) {
+                    for (DocumentSnapshot document : cancelledSubTask.getResult()) {
+                        updateTasks.add(document.getReference().delete());
+                    }
+                }
+
                 if (invitationsTask.isSuccessful() && invitationsTask.getResult() != null) {
                     for (QueryDocumentSnapshot document : invitationsTask.getResult()) {
                         updateTasks.add(document.getReference().delete());
                     }
                 }
 
-                // Execute all update/delete tasks
                 if (!updateTasks.isEmpty()) {
                     Tasks.whenAll(updateTasks)
-                        .addOnSuccessListener(aVoid -> {
-                            onComplete.run();
-                        })
-                        .addOnFailureListener(e -> {
-                            // Even if some updates fail, continue with user deletion
-                            android.util.Log.e("AccountFragment", "Some cascade updates failed", e);
-                            onComplete.run();
-                        });
+                            .addOnSuccessListener(aVoid -> onComplete.run())
+                            .addOnFailureListener(e -> {
+                                android.util.Log.e("AccountFragment", "Some cascade updates failed", e);
+                                onComplete.run();
+                            });
                 } else {
-                    // No references found, proceed with user deletion
                     onComplete.run();
                 }
             })
             .addOnFailureListener(e -> {
-                // Even if queries fail, try to continue with user deletion
                 android.util.Log.e("AccountFragment", "Failed to query user references", e);
                 onComplete.run();
             });
+    }
+
+    private Task<Void> removeSubcollectionEntry(DocumentSnapshot document) {
+        com.google.firebase.firestore.WriteBatch batch = db.batch();
+        batch.delete(document.getReference());
+
+        DocumentReference parentEvent = null;
+        if (document.getReference().getParent() != null) {
+            parentEvent = document.getReference().getParent().getParent();
+        }
+        if (parentEvent != null) {
+            batch.update(parentEvent, "waitlistCount", com.google.firebase.firestore.FieldValue.increment(-1));
+        }
+
+        return batch.commit();
     }
 
     private void deleteUserDocumentAndAuth(String uid) {

@@ -30,7 +30,6 @@ import androidx.core.content.FileProvider;
 
 import com.bumptech.glide.Glide;
 import com.example.eventease.R;
-import com.example.eventease.util.AuthHelper;
 import com.google.android.material.button.MaterialButton;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.auth.FirebaseAuth;
@@ -77,6 +76,8 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
     // --- Data Holders ---
     private long regStartEpochMs = 0L, regEndEpochMs = 0L;
     private Uri posterUri = null;
+    private String organizerId;
+    private boolean isResolvingOrganizerId;
 
     /**
      * Handles the result of the image picker intent.
@@ -113,6 +114,11 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         rgEntrants = findViewById(R.id.rgEntrants);
         rbAny = findViewById(R.id.rbAny);
         rbSpecific = findViewById(R.id.rbSpecific);
+
+        organizerId = getIntent().getStringExtra(OrganizerMyEventActivity.EXTRA_ORGANIZER_ID);
+        if (organizerId == null || organizerId.trim().isEmpty()) {
+            resolveOrganizerId(null);
+        }
 
         rgEntrants.setOnCheckedChangeListener((g, checkedId) -> {
             boolean specific = (checkedId == R.id.rbSpecific);
@@ -190,6 +196,44 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
             doValidateAndSave();
         }
     }
+
+    private void resolveOrganizerId(@Nullable Runnable onReady) {
+        if (organizerId != null && !organizerId.trim().isEmpty()) {
+            if (onReady != null) {
+                onReady.run();
+            }
+            return;
+        }
+        if (isResolvingOrganizerId) {
+            return;
+        }
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        if (user == null) {
+            toast("Please sign in again.");
+            return;
+        }
+        isResolvingOrganizerId = true;
+        FirebaseFirestore.getInstance()
+                .collection("users")
+                .document(user.getUid())
+                .get()
+                .addOnSuccessListener(doc -> {
+                    organizerId = doc != null ? doc.getString("organizerId") : null;
+                    if (organizerId == null || organizerId.trim().isEmpty()) {
+                        organizerId = doc != null ? doc.getId() : user.getUid();
+                    }
+                    isResolvingOrganizerId = false;
+                    if (organizerId == null || organizerId.trim().isEmpty()) {
+                        toast("Organizer profile not configured yet.");
+                    } else if (onReady != null) {
+                        onReady.run();
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    isResolvingOrganizerId = false;
+                    toast("Failed to load organizer profile: " + e.getMessage());
+                });
+    }
     /**
      * Validates all the user-entered form data. If validation passes, it proceeds
      * to upload the event poster and save the event details.
@@ -216,6 +260,12 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
             } catch (NumberFormatException e) {
                 etCapacity.setError("Enter a number"); etCapacity.requestFocus(); return;
             }
+        }
+
+        if (organizerId == null || organizerId.trim().isEmpty()) {
+            toast("Fetching organizer profile…");
+            resolveOrganizerId(this::doValidateAndSave);
+            return;
         }
 
         btnSave.setEnabled(false);
@@ -260,9 +310,8 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
      * @param posterUrl      The public URL of the uploaded poster in Firebase Storage.
      */
     private void writeEventDoc(String id, String title, int chosenCapacity, String posterUrl) {
-        String organizerId = AuthHelper.getCurrentOrganizerIdOrNull();
-        if (organizerId == null) {
-            toast("Not signed in. Please sign in again.");
+        if (organizerId == null || organizerId.trim().isEmpty()) {
+            toast("Organizer profile not configured.");
             btnSave.setEnabled(true);
             btnSave.setText("SAVE CHANGES");
             return;
@@ -367,7 +416,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
             if (qrBitmap != null) {
                 imgQr.setImageBitmap(qrBitmap);
             } else {
-                imgQr.setImageResource(R.drawable.ic_launcher_foreground);
+                imgQr.setImageResource(R.drawable.ic_event_poster_placeholder);
             }
         }
 
@@ -497,6 +546,9 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
 
     private void goToMyEvents() {
         Intent intent = new Intent(this, com.example.eventease.ui.organizer.OrganizerMyEventActivity.class);
+        if (organizerId != null && !organizerId.trim().isEmpty()) {
+            intent.putExtra(OrganizerMyEventActivity.EXTRA_ORGANIZER_ID, organizerId);
+        }
         startActivity(intent);
         finish();
     }

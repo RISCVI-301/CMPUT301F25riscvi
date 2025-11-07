@@ -5,12 +5,17 @@ import android.util.Log;
 import com.example.eventease.data.WaitlistRepository;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
+import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QuerySnapshot;
+import com.google.firebase.firestore.SetOptions;
+import com.google.firebase.firestore.WriteBatch;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -37,58 +42,51 @@ public class FirebaseWaitlistRepository implements WaitlistRepository {
     @Override
     public Task<Void> join(String eventId, String uid) {
         Log.d(TAG, "Attempting to add user " + uid + " to waitlist for event " + eventId);
-        
-        // First, check if user is already admitted
-        return db.collection("events")
-                .document(eventId)
-                .get()
-                .continueWithTask(task -> {
-                    if (!task.isSuccessful() || task.getResult() == null || !task.getResult().exists()) {
-                        Log.e(TAG, "Event " + eventId + " not found");
-                        return Tasks.forException(new Exception("Event not found"));
-                    }
-                    
-                    DocumentSnapshot eventDoc = task.getResult();
-                    
-                    // Check if already admitted
-                    @SuppressWarnings("unchecked")
-                    List<String> admitted = (List<String>) eventDoc.get("admitted");
-                    if (admitted != null && admitted.contains(uid)) {
-                        Log.d(TAG, "User " + uid + " is already admitted to event " + eventId + ". Cannot join waitlist.");
-                        return Tasks.forException(new Exception("User is already admitted to this event"));
-                    }
-                    
-                    // Check if already in waitlist
-                    @SuppressWarnings("unchecked")
-                    List<String> waitlist = (List<String>) eventDoc.get("waitlist");
-                    if (waitlist != null && waitlist.contains(uid)) {
-                        Log.d(TAG, "User " + uid + " is already in waitlist for event " + eventId);
-                        return Tasks.forResult(null);
-                    }
-                    
-                    // Get capacity and admitted count to check if event is full
-                    Object capacityObj = eventDoc.get("capacity");
-                    int capacity = capacityObj != null ? ((Number) capacityObj).intValue() : 0;
-                    int admittedCount = admitted != null ? admitted.size() : 0;
-                    
-                    // If capacity is set and event is full, allow joining waitlist
-                    // (Capacity check is only enforced when admitting, not when joining waitlist)
-                    // Users can join waitlist even if event is full
-                    
-                    // Add UID to event's waitlist array using arrayUnion
-                    return db.collection("events")
-                            .document(eventId)
-                            .update("waitlist", FieldValue.arrayUnion(uid))
+
+        DocumentReference eventRef = db.collection("events").document(eventId);
+
+        return eventRef.get().continueWithTask(task -> {
+            if (!task.isSuccessful() || task.getResult() == null || !task.getResult().exists()) {
+                Log.e(TAG, "Event " + eventId + " not found");
+                return Tasks.forException(new Exception("Event not found"));
+            }
+
+            DocumentSnapshot eventDoc = task.getResult();
+
+            @SuppressWarnings("unchecked")
+            List<String> admitted = (List<String>) eventDoc.get("admitted");
+            if (admitted != null && admitted.contains(uid)) {
+                Log.d(TAG, "User " + uid + " is already admitted to event " + eventId);
+                return Tasks.forException(new Exception("User is already admitted to this event"));
+            }
+
+            DocumentReference waitlistDoc = eventRef.collection("WaitlistedEntrants").document(uid);
+            return waitlistDoc.get().continueWithTask(waitlistTask -> {
+                if (waitlistTask.isSuccessful() && waitlistTask.getResult() != null && waitlistTask.getResult().exists()) {
+                    Log.d(TAG, "User " + uid + " already has a waitlist entry for event " + eventId);
+                    membership.add(key(eventId, uid));
+                    return Tasks.forResult(null);
+                }
+
+                return db.collection("users").document(uid).get().continueWithTask(userTask -> {
+                    DocumentSnapshot userDoc = userTask.isSuccessful() ? userTask.getResult() : null;
+                    Map<String, Object> payload = buildWaitlistEntry(uid, userDoc);
+
+                    WriteBatch batch = db.batch();
+                    batch.set(waitlistDoc, payload, SetOptions.merge());
+                    batch.update(eventRef, "waitlistCount", FieldValue.increment(1));
+
+                    return batch.commit()
                             .addOnSuccessListener(aVoid -> {
-                                Log.d(TAG, "SUCCESS: User " + uid + " added to waitlist for event " + eventId + " (Capacity: " + capacity + ", Admitted: " + admittedCount + ")");
+                                Log.d(TAG, "SUCCESS: User " + uid + " added to waitlist subcollection for event " + eventId);
                                 membership.add(key(eventId, uid));
                                 eventRepo.incrementWaitlist(eventId);
                             })
-                            .addOnFailureListener(e -> {
-                                Log.e(TAG, "FAILED to add user " + uid + " to waitlist for event " + eventId, e);
-                            })
+                            .addOnFailureListener(e -> Log.e(TAG, "FAILED to add user " + uid + " to waitlist for event " + eventId, e))
                             .continueWith(t -> null);
                 });
+            });
+        });
     }
 
     @Override
@@ -98,24 +96,18 @@ public class FirebaseWaitlistRepository implements WaitlistRepository {
             return Tasks.forResult(true);
         }
         
-        // Query Firestore - get event document and check if waitlist array contains uid
+        // Query Firestore - check waitlist subcollection document
         return db.collection("events")
                 .document(eventId)
+                .collection("WaitlistedEntrants")
+                .document(uid)
                 .get()
                 .continueWith(task -> {
-                    if (task.isSuccessful() && task.getResult() != null) {
-                        DocumentSnapshot doc = task.getResult();
-                        if (doc.exists()) {
-                            @SuppressWarnings("unchecked")
-                            List<String> waitlist = (List<String>) doc.get("waitlist");
-                            boolean exists = waitlist != null && waitlist.contains(uid);
-                            if (exists) {
-                                membership.add(key(eventId, uid));
-                            }
-                            return exists;
-                        }
+                    boolean exists = task.isSuccessful() && task.getResult() != null && task.getResult().exists();
+                    if (exists) {
+                        membership.add(key(eventId, uid));
                     }
-                    return false;
+                    return exists;
                 });
     }
 
@@ -123,25 +115,55 @@ public class FirebaseWaitlistRepository implements WaitlistRepository {
     public Task<Void> leave(String eventId, String uid) {
         Log.d(TAG, "Attempting to remove user " + uid + " from waitlist for event " + eventId);
         
-        // Remove UID from event's waitlist array using arrayRemove
-        return db.collection("events")
-                .document(eventId)
-                .update("waitlist", FieldValue.arrayRemove(uid))
+        DocumentReference eventRef = db.collection("events").document(eventId);
+        DocumentReference waitlistDoc = eventRef.collection("WaitlistedEntrants").document(uid);
+
+        WriteBatch batch = db.batch();
+        batch.delete(waitlistDoc);
+        batch.update(eventRef, "waitlistCount", FieldValue.increment(-1));
+
+        return batch.commit()
                 .addOnSuccessListener(aVoid -> {
                     Log.d(TAG, "SUCCESS: User " + uid + " removed from waitlist for event " + eventId);
                     membership.remove(key(eventId, uid));
                     eventRepo.decrementWaitlist(eventId);
                 })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "FAILED to remove user " + uid + " from waitlist for event " + eventId, e);
-                })
-                .continueWith(task -> {
-                    if (task.isSuccessful()) {
-                        Log.d(TAG, "Task completed successfully for leave operation");
-                    } else {
-                        Log.e(TAG, "Task failed for leave operation", task.getException());
-                    }
-                    return null;
-                });
+                .addOnFailureListener(e -> Log.e(TAG, "FAILED to remove user " + uid + " from waitlist for event " + eventId, e))
+                .continueWith(task -> null);
+    }
+
+    private Map<String, Object> buildWaitlistEntry(String uid, DocumentSnapshot userDoc) {
+        Map<String, Object> data = new HashMap<>();
+        data.put("userId", uid);
+        data.put("joinedAt", System.currentTimeMillis());
+
+        if (userDoc != null && userDoc.exists()) {
+            String displayName = userDoc.getString("fullName");
+            if (displayName == null || displayName.trim().isEmpty()) {
+                displayName = userDoc.getString("name");
+            }
+            if (displayName == null || displayName.trim().isEmpty()) {
+                String first = userDoc.getString("firstName");
+                String last = userDoc.getString("lastName");
+                displayName = ((first != null ? first : "") + " " + (last != null ? last : "")).trim();
+            }
+
+            putIfString(data, "displayName", displayName);
+            putIfString(data, "fullName", userDoc.getString("fullName"));
+            putIfString(data, "name", userDoc.getString("name"));
+            putIfString(data, "firstName", userDoc.getString("firstName"));
+            putIfString(data, "lastName", userDoc.getString("lastName"));
+            putIfString(data, "email", userDoc.getString("email"));
+            putIfString(data, "phoneNumber", userDoc.getString("phoneNumber"));
+            putIfString(data, "photoUrl", userDoc.getString("photoUrl"));
+        }
+
+        return data;
+    }
+
+    private void putIfString(Map<String, Object> target, String key, String value) {
+        if (value != null && !value.trim().isEmpty()) {
+            target.put(key, value);
+        }
     }
 }
