@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#223C65"
+    android:fitsSystemWindows="true"
+    android:fillViewport="true"
+    tools:context=".OrganizerWaitlistActivity">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Header: "EventEase" with back arrow -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@color/brand_light_cyan"
+            android:elevation="4dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="12dp">
+
+            <ImageView
+                android:id="@+id/back_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:src="@drawable/baseline_arrow_back_24"
+                android:tint="@color/header_text_green" />
+
+            <TextView
+                android:id="@+id/header_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:fontFamily="@font/fredoka_bold"
+                android:gravity="start"
+                android:text="EventEase"
+                android:textColor="@color/header_text_green"
+                android:textSize="34sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/event_name_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:fontFamily="@font/fredoka_bold"
+            android:gravity="center"
+            android:text="Event 1"
+            android:textColor="@color/white_text"
+            android:textSize="28sp" />
+
+
+        <androidx.cardview.widget.CardView
+            android:id="@+id/image_upload_box"
+            android:layout_width="match_parent"
+            android:layout_height="150dp"
+            android:layout_marginStart="24dp"
+            android:layout_marginTop="16dp"
+            android:layout_marginEnd="24dp"
+            app:cardBackgroundColor="#4A628A"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="0dp">
+
+            <!-- The ImageView now fills its parent CardView perfectly -->
+            <ImageView
+                android:id="@+id/event_poster_placeholder"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop" />
+
+        </androidx.cardview.widget.CardView>
+
+        <!-- Overview Section -->
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/fredoka_bold"
+            android:gravity="center_horizontal"
+            android:text="Overview"
+            android:textColor="@color/white_text"
+            android:textSize="30sp"
+            android:textStyle="bold"
+            android:layout_marginTop="8dp" />
+
+        <!-- FrameLayout to position the icon over the text box -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="24dp"
+            android:layout_marginTop="0dp"
+            android:layout_marginEnd="24dp">
+
+            <!-- The Description Text Box -->
+            <EditText
+                android:id="@+id/overview_edittext"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="0dp"
+                android:layout_marginTop="0dp"
+                android:layout_marginEnd="0dp"
+                android:layout_marginBottom="0dp"
+                android:background="@drawable/rounded_panel_bg"
+                android:gravity="start|top"
+                android:hint="Write details here…"
+                android:inputType="textMultiLine"
+                android:padding="16dp"
+                android:lines="3"
+                android:minLines="2"
+                android:maxLines="4"
+                android:scrollbars="vertical"
+                android:overScrollMode="ifContentScrolls"
+                android:maxHeight="120dp"
+                android:textColor="@color/white_text"
+                android:textColorHint="#C0FFFFFF"
+                android:textSize="16sp" />
+
+
+            <ImageView
+                android:id="@+id/edit_description_button"
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_gravity="end|center_vertical"
+                android:layout_marginEnd="12dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true"
+                android:src="@drawable/ic_edit"
+                app:tint="@color/white_text" />
+
+        </FrameLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/delete_event_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginStart="24dp"
+            android:layout_marginTop="12dp"
+            android:layout_marginEnd="24dp"
+            android:fontFamily="@font/fredoka_bold"
+            android:paddingVertical="10dp"
+            android:text="Delete Event"
+            android:textColor="#223C65"
+            android:textSize="26sp"
+            android:textStyle="bold"
+            app:backgroundTint="#F89393"
+            app:cornerRadius="12dp" />
+
+
+        <!-- Entrant Details Button using MaterialButton -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/entrant_details_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginStart="24dp"
+            android:layout_marginTop="16dp"
+            android:layout_marginEnd="24dp"
+            android:fontFamily="@font/fredoka_bold"
+            android:paddingVertical="10dp"
+            android:text="Entrant Details"
+            android:textColor="#223C65"
+            android:textSize="26sp"
+            android:textStyle="bold"
+            app:backgroundTint="#9EFFF1"
+            app:cornerRadius="12dp" />
+
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="24dp"
+            android:layout_marginTop="24dp"
+            android:layout_marginEnd="24dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:fontFamily="@font/fredoka_bold"
+                android:text="Waitlisted Entrants"
+                android:textColor="@color/white_text"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+            <ImageView
+                android:id="@+id/mail_icon"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:src="@drawable/baseline_mark_email_unread_24"
+                app:tint="@color/white_text" />
+
+            <ImageView
+                android:id="@+id/location_icon"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:src="@drawable/baseline_location_on_24"
+                app:tint="@color/white_text" />
+        </LinearLayout>
+
+
+        <ListView
+            android:id="@+id/waitlist_listview"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:layout_marginStart="24dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="24dp"
+            android:layout_marginBottom="24dp"
+            android:background="@drawable/bg_waitlist_card"
+            android:padding="8dp"
+            android:divider="@color/white_text"
+            android:dividerHeight="1dp" />
+
+    </LinearLayout>
+</ScrollView>

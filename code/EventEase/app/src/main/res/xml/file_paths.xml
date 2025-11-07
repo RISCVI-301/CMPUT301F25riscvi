@@ -8,5 +8,6 @@
     <external-files-path name="external_files" path="." />
     <!-- Files directory for compatibility -->
     <files-path name="files" path="." />
+    <cache-path name="qr" path="qr/" />
 </paths>
 

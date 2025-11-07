@@ -1,0 +1,21 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/nav_events"
+        android:icon="@drawable/event"
+        android:title="Events" />
+
+    <item
+        android:id="@+id/nav_profiles"
+        android:icon="@drawable/person"
+        android:title="Profiles" />
+
+    <item
+        android:id="@+id/nav_images"
+        android:icon="@drawable/camera"
+        android:title="Images" />
+
+    <item
+        android:id="@+id/nav_logs"
+        android:icon="@drawable/logs"
+        android:title="Logs" />
+</menu>
