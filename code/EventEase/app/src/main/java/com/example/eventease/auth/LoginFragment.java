@@ -26,7 +26,24 @@ import com.example.eventease.util.ToastUtil;
 
 /**
  * Fragment for user login with email and password.
- * Handles authentication, remember me functionality, and password visibility toggle.
+ * 
+ * <p>This fragment provides a login interface with the following features:
+ * <ul>
+ *   <li>Email and password input fields</li>
+ *   <li>Password visibility toggle</li>
+ *   <li>Remember me functionality that saves credentials</li>
+ *   <li>Forgot password link</li>
+ *   <li>Role-based navigation (redirects admins to AdminMainActivity)</li>
+ * </ul>
+ * 
+ * <p>After successful login, the fragment checks the user's role and navigates accordingly:
+ * <ul>
+ *   <li>Admin users are redirected to AdminMainActivity</li>
+ *   <li>Other users are navigated to the Discover fragment</li>
+ * </ul>
+ * 
+ * <p>The fragment uses SharedPreferences to store and restore credentials when
+ * "Remember Me" is checked.
  */
 public class LoginFragment extends Fragment {
 
@@ -96,7 +113,7 @@ public class LoginFragment extends Fragment {
                 ToastUtil.showLong(requireContext(), s.error);
             }
             if (s.success && navigateOnSuccess) {
-                // Successful login → save Remember Me preference and navigate
+                // Successful login → save Remember Me preference and check role
                 SharedPreferences.Editor editor = prefs.edit();
                 String emailText = email.getText().toString().trim();
                 String passwordText = password.getText().toString();
@@ -117,15 +134,32 @@ public class LoginFragment extends Fragment {
                 }
                 editor.apply();
 
-                try {
-                    if (isAdded() && getView() != null) {
-                        NavHostFragment.findNavController(LoginFragment.this).navigate(R.id.action_login_to_discover);
-                    }
-                } catch (Exception e) {
-                    ToastUtil.showLong(requireContext(), "Navigation error: " + e.getMessage());
-                    e.printStackTrace();
+                // Check if user is admin and navigate accordingly
+                if (currentUser != null) {
+                    UserRoleChecker.isAdmin().addOnCompleteListener(task -> {
+                        if (isAdded() && getView() != null) {
+                            try {
+                                if (task.isSuccessful() && Boolean.TRUE.equals(task.getResult())) {
+                                    // User is admin - navigate to admin flow
+                                    android.content.Intent adminIntent = new android.content.Intent(requireContext(), com.example.eventease.admin.AdminMainActivity.class);
+                                    startActivity(adminIntent);
+                                    if (getActivity() != null) {
+                                        getActivity().finish();
+                                    }
+                                } else {
+                                    // User is not admin - navigate to entrant flow
+                                    NavHostFragment.findNavController(LoginFragment.this).navigate(R.id.action_login_to_discover);
+                                }
+                            } catch (Exception e) {
+                                ToastUtil.showLong(requireContext(), "Navigation error: " + e.getMessage());
+                                e.printStackTrace();
+                            }
+                        }
+                        navigateOnSuccess = false; // reset
+                    });
+                } else {
+                    navigateOnSuccess = false; // reset
                 }
-                navigateOnSuccess = false; // reset
             } else if (s.success && !navigateOnSuccess) {
                 // Success for reset password path
                 ToastUtil.showLong(requireContext(), "Reset email sent");

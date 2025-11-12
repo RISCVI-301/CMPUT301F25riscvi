@@ -34,7 +34,20 @@ import java.util.List;
 
 /**
  * Fragment for discovering and browsing available events.
- * Displays a list of open events and allows users to join waitlists.
+ * 
+ * <p>This fragment displays a list of events that are currently open for registration.
+ * An event is considered open if the current time falls within its registration period
+ * (between registrationStart and registrationEnd).
+ * 
+ * <p>Features:
+ * <ul>
+ *   <li>Real-time event updates using Firestore listeners</li>
+ *   <li>Event cards showing title, date, location, and poster image</li>
+ *   <li>Click to view event details and join waitlist</li>
+ *   <li>Empty state message when no events are available</li>
+ * </ul>
+ * 
+ * <p>The fragment automatically updates when events are added, modified, or removed from Firestore.
  */
 public class DiscoverFragment extends Fragment {
 
@@ -83,13 +96,11 @@ public class DiscoverFragment extends Fragment {
     private void ensureBottomNavVisible() {
         if (getActivity() == null) return;
         
-        // Check if user is authenticated
+        // Check if user is authenticated - simply check if Firebase Auth has a current user
+        // "Remember Me" only affects persistence across app restarts, not current authentication state
         FirebaseAuth auth = FirebaseAuth.getInstance();
-        android.content.SharedPreferences prefs = getActivity().getSharedPreferences("EventEasePrefs", android.content.Context.MODE_PRIVATE);
-        boolean rememberMe = prefs.getBoolean("rememberMe", false);
-        String savedUid = prefs.getString("savedUid", null);
         FirebaseUser currentUser = auth.getCurrentUser();
-        boolean isAuthenticated = rememberMe && savedUid != null && currentUser != null && savedUid.equals(currentUser.getUid());
+        boolean isAuthenticated = currentUser != null;
         
         if (isAuthenticated) {
             View bottomNav = getActivity().findViewById(R.id.include_bottom);

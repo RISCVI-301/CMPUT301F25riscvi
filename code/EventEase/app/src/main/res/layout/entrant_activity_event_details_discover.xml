@@ -118,12 +118,13 @@
 
                 <TextView
                     android:id="@+id/tvEventDate"
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="Date to be announced"
                     android:textColor="@android:color/white"
                     android:textSize="18sp"
-                    android:fontFamily="@font/entrant_fredoka_one" />
+                    android:fontFamily="@font/entrant_fredoka_one"
+                    android:maxLines="3" />
 
                 <TextView
                     android:id="@+id/tvEventLocation"

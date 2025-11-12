@@ -357,6 +357,7 @@ public class OrganizerMyEventActivity extends AppCompatActivity {
 
         long regStart = coerceLong(d.get("registrationStart"));
         long regEnd   = coerceLong(d.get("registrationEnd"));
+        long deadline = coerceLong(d.get("deadlineEpochMs"));
         int capacity  = coerceInt(d.get("capacity"), -1);
 
         m.put("id", id);
@@ -365,6 +366,7 @@ public class OrganizerMyEventActivity extends AppCompatActivity {
         m.put("location", location);
         m.put("registrationStart", regStart);
         m.put("registrationEnd", regEnd);
+        m.put("deadlineEpochMs", deadline);
         m.put("capacity", capacity);
 
         return m;

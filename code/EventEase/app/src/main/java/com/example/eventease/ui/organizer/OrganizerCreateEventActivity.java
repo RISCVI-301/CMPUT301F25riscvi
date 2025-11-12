@@ -56,25 +56,40 @@ import java.util.UUID;
 
 /**
  * Activity for an organizer to create a new event.
- * <p>
- * This class provides a form for organizers to input event details such as title,
- * description, registration times, capacity, and an event poster. It performs
- * validation on the user's input before saving the new event to Firestore.
- * The process involves uploading the poster image to Firebase Storage and then
- * creating a new document in the 'events' collection in Firestore.
+ * 
+ * <p>This class provides a comprehensive form for organizers to input event details including:
+ * <ul>
+ *   <li>Event title, description, location, and guidelines</li>
+ *   <li>Registration period (start and end times)</li>
+ *   <li>Event deadline</li>
+ *   <li>Event capacity</li>
+ *   <li>Event poster image</li>
+ *   <li>QR code generation options</li>
+ *   <li>Geolocation tracking options</li>
+ * </ul>
+ * 
+ * <p>The activity performs validation on user input before saving the event. The creation process involves:
+ * <ol>
+ *   <li>Uploading the poster image to Firebase Storage (if provided)</li>
+ *   <li>Generating a QR code for the event (if enabled)</li>
+ *   <li>Creating a new document in the 'events' collection in Firestore</li>
+ *   <li>Initializing subcollections for waitlist, admitted entrants, etc.</li>
+ * </ol>
+ * 
+ * <p>After successful creation, the organizer is returned to the event list view.
  */
 public class OrganizerCreateEventActivity extends AppCompatActivity {
     private static final String TAG = "CreateEvent";
     // --- UI Elements ---
     private ImageButton btnBack, btnPickPoster;
-    private EditText etTitle, etDescription, etCapacity;
-    private Button btnStart, btnEnd, btnSave;
+    private EditText etTitle, etDescription, etGuidelines, etLocation, etCapacity;
+    private Button btnStart, btnEnd, btnDeadline, btnSave;
     private Switch swGeo, swQr;
     private RadioGroup rgEntrants;
     private RadioButton rbAny, rbSpecific;
 
     // --- Data Holders ---
-    private long regStartEpochMs = 0L, regEndEpochMs = 0L;
+    private long regStartEpochMs = 0L, regEndEpochMs = 0L, deadlineEpochMs = 0L;
     private Uri posterUri = null;
     private String organizerId;
     private boolean isResolvingOrganizerId;
@@ -105,9 +120,12 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         btnPickPoster = findViewById(R.id.btnPickPoster);
         etTitle = findViewById(R.id.etTitle);
         etDescription = findViewById(R.id.etDescription);
+        etGuidelines = findViewById(R.id.etGuidelines);
+        etLocation = findViewById(R.id.etLocation);
         etCapacity = findViewById(R.id.etCapacity);
         btnStart = findViewById(R.id.btnStart);
         btnEnd = findViewById(R.id.btnEnd);
+        btnDeadline = findViewById(R.id.btnDeadline);
         btnSave = findViewById(R.id.btnSave);
         swGeo = findViewById(R.id.swGeo);
         swQr = findViewById(R.id.swQr);
@@ -140,6 +158,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
 
         btnStart.setOnClickListener(v -> pickDateTime(true));
         btnEnd.setOnClickListener(v -> pickDateTime(false));
+        btnDeadline.setOnClickListener(v -> pickDeadline());
         btnBack.setOnClickListener(v -> finish());
         btnPickPoster.setOnClickListener(v -> pickImage.launch("image/*"));
         btnSave.setOnClickListener(v -> beginSaveEvent());
@@ -170,6 +189,24 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                     btnEnd.setText(android.text.format.DateFormat
                             .format("MMM d, yyyy  h:mm a", chosen));
                 }
+            }, now.get(Calendar.HOUR_OF_DAY), now.get(Calendar.MINUTE), false);
+            tp.show();
+        }, now.get(Calendar.YEAR), now.get(Calendar.MONTH), now.get(Calendar.DAY_OF_MONTH));
+        dp.show();
+    }
+
+    private void pickDeadline() {
+        final Calendar now = Calendar.getInstance();
+        DatePickerDialog dp = new DatePickerDialog(
+                this, (view, y, m, d) -> {
+            TimePickerDialog tp = new TimePickerDialog(
+                    this, (vv, hh, mm) -> {
+                Calendar chosen = Calendar.getInstance();
+                chosen.set(y, m, d, hh, mm, 0);
+                chosen.set(Calendar.MILLISECOND, 0);
+                deadlineEpochMs = chosen.getTimeInMillis();
+                btnDeadline.setText(android.text.format.DateFormat
+                        .format("MMM d, yyyy  h:mm a", chosen));
             }, now.get(Calendar.HOUR_OF_DAY), now.get(Calendar.MINUTE), false);
             tp.show();
         }, now.get(Calendar.YEAR), now.get(Calendar.MONTH), now.get(Calendar.DAY_OF_MONTH));
@@ -246,6 +283,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         if (regStartEpochMs == 0L) { toast("Please pick Registration Start"); return; }
         if (regEndEpochMs == 0L) { toast("Please pick Registration End"); return; }
         if (regEndEpochMs < regStartEpochMs) { toast("End must be after Start"); return; }
+        if (deadlineEpochMs == 0L) { toast("Please pick Event Deadline"); return; }
 
         if (posterUri == null) { toast("Please select an event poster"); return; }
 
@@ -317,6 +355,8 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
             return;
         }
         String description = safe(etDescription.getText());
+        String guidelines = safe(etGuidelines.getText());
+        String location = safe(etLocation.getText());
         boolean useGeo = swGeo.isChecked();
         boolean generateQr = swQr.isChecked();
 
@@ -324,14 +364,19 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         doc.put("id", id);
         doc.put("title", title);
         doc.put("description", TextUtils.isEmpty(description) ? null : description);
+        doc.put("notes", TextUtils.isEmpty(description) ? null : description);
+        doc.put("guidelines", TextUtils.isEmpty(guidelines) ? null : guidelines);
+        doc.put("location", TextUtils.isEmpty(location) ? null : location);
         doc.put("registrationStart", regStartEpochMs);
         doc.put("registrationEnd", regEndEpochMs);
+        doc.put("deadlineEpochMs", deadlineEpochMs);
         doc.put("capacity", chosenCapacity);
         doc.put("geolocation", useGeo);
         doc.put("qrEnabled", generateQr);
         doc.put("posterUrl", posterUrl);
         doc.put("organizerId", organizerId);
         doc.put("createdAt", System.currentTimeMillis());
+        doc.put("createdAtEpochMs", System.currentTimeMillis());
         doc.put("qrPayload", generateQr ? ("event:" + id) : null);
         FirebaseFirestore.getInstance()
                 .collection("events")
@@ -556,14 +601,18 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
     private void resetForm() {
         etTitle.setText("");
         etDescription.setText("");
+        etGuidelines.setText("");
+        etLocation.setText("");
         etCapacity.setText("");
         rgEntrants.check(R.id.rbAny);
         etCapacity.setVisibility(View.GONE);
         etCapacity.setEnabled(false);
         regStartEpochMs = 0L;
         regEndEpochMs = 0L;
+        deadlineEpochMs = 0L;
         btnStart.setText("Select");
         btnEnd.setText("Select");
+        btnDeadline.setText("Select Deadline");
         posterUri = null;
         btnPickPoster.setImageResource(android.R.drawable.ic_menu_camera);
     }

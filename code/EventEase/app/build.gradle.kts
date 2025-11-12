@@ -36,7 +36,8 @@ android {
 }
 
 dependencies {
-
+    implementation("com.github.bumptech.glide:glide:4.16.0")
+    annotationProcessor("com.github.bumptech.glide:compiler:4.16.0")
     implementation(libs.appcompat)
     implementation(libs.material)
     implementation(libs.activity)
@@ -44,15 +45,16 @@ dependencies {
     implementation(libs.navigation.fragment)
     implementation(libs.navigation.ui)
 
+    // Firebase BOM - must be declared before other Firebase dependencies
     implementation(platform("com.google.firebase:firebase-bom:34.4.0"))
+    // Firebase dependencies (versions managed by BOM)
     implementation("com.google.firebase:firebase-analytics")
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.firebase:firebase-firestore")
     implementation("com.google.firebase:firebase-storage")
+    implementation("com.google.firebase:firebase-messaging")
     implementation("com.google.android.gms:play-services-location:21.1.0")
 
-    implementation(libs.glide)
-    annotationProcessor("com.github.bumptech.glide:compiler:4.16.0")
     implementation("com.google.zxing:core:3.5.3")
 
     testImplementation(libs.junit)

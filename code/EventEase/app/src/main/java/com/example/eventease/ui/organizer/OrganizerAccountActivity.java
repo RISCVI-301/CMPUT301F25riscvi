@@ -16,9 +16,11 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.bumptech.glide.Glide;
 import com.example.eventease.R;
+import com.example.eventease.ui.entrant.profile.ProfileDeletionHelper;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.storage.FirebaseStorage;
@@ -209,7 +211,7 @@ public class OrganizerAccountActivity extends AppCompatActivity {
                         .setTitle("Delete Profile")
                         .setMessage("Are you sure you want to delete your profile? This action cannot be undone.")
                         .setPositiveButton("Delete", (d, w) -> {
-                            Toast.makeText(this, "Delete profile - Coming soon", Toast.LENGTH_SHORT).show();
+                            deleteProfile();
                         })
                         .setNegativeButton("Cancel", null)
                         .show();
@@ -319,5 +321,60 @@ public class OrganizerAccountActivity extends AppCompatActivity {
                 })
                 .addOnFailureListener(e ->
                         Toast.makeText(this, "Upload failed: " + e.getMessage(), Toast.LENGTH_LONG).show());
+    }
+
+    private void deleteProfile() {
+        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+        if (currentUser == null) {
+            Toast.makeText(this, "Not signed in", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        String uid = currentUser.getUid();
+        
+        Toast.makeText(this, "Deleting profile...", Toast.LENGTH_SHORT).show();
+
+        ProfileDeletionHelper deletionHelper = new ProfileDeletionHelper(this);
+        deletionHelper.deleteAllUserReferences(uid, new ProfileDeletionHelper.DeletionCallback() {
+            @Override
+            public void onDeletionComplete() {
+                deleteUserDocumentAndAuth(uid);
+            }
+
+            @Override
+            public void onDeletionFailure(String error) {
+                Log.e(TAG, "Failed to delete user references: " + error);
+                deleteUserDocumentAndAuth(uid);
+            }
+        });
+    }
+
+    private void deleteUserDocumentAndAuth(String uid) {
+        DocumentReference userRef = FirebaseFirestore.getInstance().collection("users").document(uid);
+        userRef.delete()
+            .addOnSuccessListener(aVoid -> {
+                FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+                if (currentUser != null) {
+                    currentUser.delete()
+                        .addOnSuccessListener(aVoid1 -> {
+                            FirebaseAuth.getInstance().signOut();
+                            Toast.makeText(this, "Profile deleted successfully", Toast.LENGTH_SHORT).show();
+                            finish();
+                        })
+                        .addOnFailureListener(e -> {
+                            Log.e(TAG, "Failed to delete auth account", e);
+                            FirebaseAuth.getInstance().signOut();
+                            Toast.makeText(this, "Profile deleted (some cleanup may be pending)", Toast.LENGTH_SHORT).show();
+                            finish();
+                        });
+                } else {
+                    Toast.makeText(this, "Profile deleted successfully", Toast.LENGTH_SHORT).show();
+                    finish();
+                }
+            })
+            .addOnFailureListener(e -> {
+                Log.e(TAG, "Failed to delete user document", e);
+                Toast.makeText(this, "Failed to delete profile: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            });
     }
 }
