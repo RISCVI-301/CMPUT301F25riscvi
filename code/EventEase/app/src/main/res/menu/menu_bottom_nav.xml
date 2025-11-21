@@ -1,15 +1,21 @@
-<?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item
-        android:id="@+id/eventsSelectionFragment"
-        android:icon="@drawable/sel_ic_my_events"
-        android:title="My Events"/>
+        android:id="@+id/nav_events"
+        android:icon="@drawable/event"
+        android:title="Events" />
+
     <item
-        android:id="@+id/discoverFragment"
-        android:icon="@drawable/sel_ic_discover"
-        android:title="Discover"/>
+        android:id="@+id/nav_profiles"
+        android:icon="@drawable/person"
+        android:title="Profiles" />
+
     <item
-        android:id="@+id/accountFragment"
-        android:icon="@drawable/sel_ic_account"
-        android:title="Account"/>
+        android:id="@+id/nav_images"
+        android:icon="@drawable/camera"
+        android:title="Images" />
+
+    <item
+        android:id="@+id/nav_logs"
+        android:icon="@drawable/logs"
+        android:title="Logs" />
 </menu>

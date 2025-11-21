@@ -1,6 +1,6 @@
 # CMPUT 301 F25 - Team RISCVI
 
-## Team Members
+## Team Memberss
 
 | Name        | CCID   | GitHub Username |
 | ----------- | ------ | --------------- |
