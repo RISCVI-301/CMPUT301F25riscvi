@@ -486,6 +486,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         doc.put("registrationEnd", regEndEpochMs);
         doc.put("deadlineEpochMs", deadlineEpochMs);
         doc.put("eventStart", eventStartEpochMs);
+        doc.put("eventStartEpochMs", eventStartEpochMs); // Also save with consistent naming
         doc.put("capacity", chosenCapacity);
         doc.put("geolocation", useGeo);
         doc.put("qrEnabled", generateQr);

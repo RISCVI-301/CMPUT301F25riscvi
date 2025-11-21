@@ -40,11 +40,32 @@ public class EventNotificationService extends FirebaseMessagingService {
             Log.d(TAG, "Message data payload: " + remoteMessage.getData());
             
             String type = remoteMessage.getData().get("type");
+            String eventId = remoteMessage.getData().get("eventId");
+            String eventTitle = remoteMessage.getData().get("eventTitle");
+            
             if ("invitation".equals(type)) {
-                String eventId = remoteMessage.getData().get("eventId");
-                String eventTitle = remoteMessage.getData().get("eventTitle");
                 String title = "Yay! You are chosen for the " + (eventTitle != null ? eventTitle : "event") + " event 🎉";
                 String body = "You've been selected! Tap to view details and accept your invitation.";
+                showNotification(title, body, remoteMessage.getData());
+            } else if ("waitlist".equals(type) || "selected".equals(type) || "cancelled".equals(type) || 
+                      "nonSelected".equals(type) || "replacement".equals(type)) {
+                // Handle organizer notifications (including replacement notifications)
+                // These come from Cloud Functions with notification payload, but handle data-only as fallback
+                String title = remoteMessage.getData().get("title");
+                String message = remoteMessage.getData().get("message");
+                if (title == null) {
+                    title = "Event Update";
+                }
+                if (message == null) {
+                    message = "You have an update regarding " + (eventTitle != null ? eventTitle : "an event") + ".";
+                }
+                showNotification(title, message, remoteMessage.getData());
+            } else {
+                // Generic notification fallback
+                String title = remoteMessage.getData().get("title");
+                String body = remoteMessage.getData().get("body");
+                if (title == null) title = "Event Update";
+                if (body == null) body = "You have a new notification.";
                 showNotification(title, body, remoteMessage.getData());
             }
         }
