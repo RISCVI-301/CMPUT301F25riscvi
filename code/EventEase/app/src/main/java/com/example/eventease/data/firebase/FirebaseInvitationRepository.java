@@ -308,6 +308,11 @@ public class FirebaseInvitationRepository implements InvitationRepository {
                                 inv.setStatus(Status.DECLINED);
                             }
                             notifyUid(uid);
+                            
+                            // Automatically replace cancelled entrant with waitlisted entrant
+                            com.example.eventease.ui.organizer.ReplacementHelper replacementHelper = 
+                                    new com.example.eventease.ui.organizer.ReplacementHelper();
+                            replacementHelper.autoReplaceCancelledEntrants(eventId, null);
                         } else {
                             Log.e(TAG, "FAILED to decline invitation and move to cancelled", commitTask.getException());
                         }

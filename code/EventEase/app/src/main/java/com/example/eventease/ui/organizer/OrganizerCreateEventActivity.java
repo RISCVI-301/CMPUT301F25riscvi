@@ -56,18 +56,20 @@ import java.util.UUID;
 
 /**
  * Activity for an organizer to create a new event.
- * 
+ *
  * <p>This class provides a comprehensive form for organizers to input event details including:
  * <ul>
  *   <li>Event title, description, location, and guidelines</li>
  *   <li>Registration period (start and end times)</li>
- *   <li>Event deadline</li>
+ *   <li>Deadline to accept/decline invitations</li>
+ *   <li>Event date and event start date</li>
+ *   <li>Event deadline (for replacements)</li>
  *   <li>Event capacity</li>
  *   <li>Event poster image</li>
  *   <li>QR code generation options</li>
  *   <li>Geolocation tracking options</li>
  * </ul>
- * 
+ *
  * <p>The activity performs validation on user input before saving the event. The creation process involves:
  * <ol>
  *   <li>Uploading the poster image to Firebase Storage (if provided)</li>
@@ -75,7 +77,7 @@ import java.util.UUID;
  *   <li>Creating a new document in the 'events' collection in Firestore</li>
  *   <li>Initializing subcollections for waitlist, admitted entrants, etc.</li>
  * </ol>
- * 
+ *
  * <p>After successful creation, the organizer is returned to the event list view.
  */
 public class OrganizerCreateEventActivity extends AppCompatActivity {
@@ -83,13 +85,14 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
     // --- UI Elements ---
     private ImageButton btnBack, btnPickPoster;
     private EditText etTitle, etDescription, etGuidelines, etLocation, etCapacity;
-    private Button btnStart, btnEnd, btnDeadline, btnSave;
+    private Button btnStart, btnEnd, btnDeadline, btnEventStart, btnSave;
     private Switch swGeo, swQr;
     private RadioGroup rgEntrants;
     private RadioButton rbAny, rbSpecific;
 
     // --- Data Holders ---
     private long regStartEpochMs = 0L, regEndEpochMs = 0L, deadlineEpochMs = 0L;
+    private long eventStartEpochMs = 0L;
     private Uri posterUri = null;
     private String organizerId;
     private boolean isResolvingOrganizerId;
@@ -126,6 +129,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         btnStart = findViewById(R.id.btnStart);
         btnEnd = findViewById(R.id.btnEnd);
         btnDeadline = findViewById(R.id.btnDeadline);
+        btnEventStart = findViewById(R.id.btnEventStart);
         btnSave = findViewById(R.id.btnSave);
         swGeo = findViewById(R.id.swGeo);
         swQr = findViewById(R.id.swQr);
@@ -159,6 +163,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         btnStart.setOnClickListener(v -> pickDateTime(true));
         btnEnd.setOnClickListener(v -> pickDateTime(false));
         btnDeadline.setOnClickListener(v -> pickDeadline());
+        btnEventStart.setOnClickListener(v -> pickEventStartDate());
         btnBack.setOnClickListener(v -> finish());
         btnPickPoster.setOnClickListener(v -> pickImage.launch("image/*"));
         btnSave.setOnClickListener(v -> beginSaveEvent());
@@ -172,6 +177,14 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
      */
     private void pickDateTime(boolean isStart) {
         final Calendar now = Calendar.getInstance();
+        
+        // Calculate minimum date - prevent past dates
+        long minDateMs = System.currentTimeMillis();
+        if (!isStart && regStartEpochMs > 0) {
+            // Registration end must be after registration start
+            minDateMs = Math.max(minDateMs, regStartEpochMs);
+        }
+        
         DatePickerDialog dp = new DatePickerDialog(
                 this, (view, y, m, d) -> {
             TimePickerDialog tp = new TimePickerDialog(
@@ -179,6 +192,19 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                 Calendar chosen = Calendar.getInstance();
                 chosen.set(y, m, d, hh, mm, 0);
                 chosen.set(Calendar.MILLISECOND, 0);
+                
+                // Validate not in the past
+                if (chosen.getTimeInMillis() < System.currentTimeMillis()) {
+                    toast("Cannot select a past date/time");
+                    return;
+                }
+                
+                // Validate registration end is after start
+                if (!isStart && regStartEpochMs > 0 && chosen.getTimeInMillis() <= regStartEpochMs) {
+                    toast("Registration End must be after Registration Start");
+                    return;
+                }
+                
                 long ts = chosen.getTimeInMillis();
                 if (isStart) {
                     regStartEpochMs = ts;
@@ -192,11 +218,24 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
             }, now.get(Calendar.HOUR_OF_DAY), now.get(Calendar.MINUTE), false);
             tp.show();
         }, now.get(Calendar.YEAR), now.get(Calendar.MONTH), now.get(Calendar.DAY_OF_MONTH));
+        
+        // Prevent selecting past dates
+        dp.getDatePicker().setMinDate(minDateMs - 1000);
         dp.show();
     }
 
     private void pickDeadline() {
         final Calendar now = Calendar.getInstance();
+        
+        // Minimum date should be registration end if it's set
+        long minDateMs = System.currentTimeMillis();
+        if (regEndEpochMs > 0) {
+            minDateMs = Math.max(minDateMs, regEndEpochMs);
+        }
+        
+        Calendar minDate = Calendar.getInstance();
+        minDate.setTimeInMillis(minDateMs);
+        
         DatePickerDialog dp = new DatePickerDialog(
                 this, (view, y, m, d) -> {
             TimePickerDialog tp = new TimePickerDialog(
@@ -204,12 +243,75 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                 Calendar chosen = Calendar.getInstance();
                 chosen.set(y, m, d, hh, mm, 0);
                 chosen.set(Calendar.MILLISECOND, 0);
+                
+                // Validate not in the past
+                if (chosen.getTimeInMillis() < System.currentTimeMillis()) {
+                    toast("Cannot select a past date/time");
+                    return;
+                }
+                
+                // Validate deadline is after registration end
+                if (regEndEpochMs > 0 && chosen.getTimeInMillis() <= regEndEpochMs) {
+                    toast("Deadline to Accept/Reject must be after Registration End");
+                    return;
+                }
+                
+                // Validate deadline is before event start if event start is set
+                if (eventStartEpochMs > 0 && chosen.getTimeInMillis() >= eventStartEpochMs) {
+                    toast("Deadline to Accept/Reject must be before Event Start Date");
+                    return;
+                }
+                
                 deadlineEpochMs = chosen.getTimeInMillis();
                 btnDeadline.setText(android.text.format.DateFormat
                         .format("MMM d, yyyy  h:mm a", chosen));
             }, now.get(Calendar.HOUR_OF_DAY), now.get(Calendar.MINUTE), false);
             tp.show();
         }, now.get(Calendar.YEAR), now.get(Calendar.MONTH), now.get(Calendar.DAY_OF_MONTH));
+        
+        // Prevent selecting past dates and dates before registration end
+        dp.getDatePicker().setMinDate(minDateMs - 1000);
+        dp.show();
+    }
+
+    private void pickEventStartDate() {
+        final Calendar now = Calendar.getInstance();
+        
+        // Minimum date should be after deadline to accept/reject if it's set
+        long minDateMs = System.currentTimeMillis();
+        if (deadlineEpochMs > 0) {
+            minDateMs = Math.max(minDateMs, deadlineEpochMs);
+        }
+        
+        DatePickerDialog dp = new DatePickerDialog(
+                this, (view, y, m, d) -> {
+            TimePickerDialog tp = new TimePickerDialog(
+                    this, (vv, hh, mm) -> {
+                Calendar chosen = Calendar.getInstance();
+                chosen.set(y, m, d, hh, mm, 0);
+                chosen.set(Calendar.MILLISECOND, 0);
+                
+                // Validate not in the past
+                if (chosen.getTimeInMillis() < System.currentTimeMillis()) {
+                    toast("Cannot select a past date/time");
+                    return;
+                }
+                
+                // Validate event start is after deadline to accept/reject
+                if (deadlineEpochMs > 0 && chosen.getTimeInMillis() <= deadlineEpochMs) {
+                    toast("Event Start Date must be after Deadline to Accept/Reject");
+                    return;
+                }
+                
+                eventStartEpochMs = chosen.getTimeInMillis();
+                btnEventStart.setText(android.text.format.DateFormat
+                        .format("MMM d, yyyy  h:mm a", chosen));
+            }, now.get(Calendar.HOUR_OF_DAY), now.get(Calendar.MINUTE), false);
+            tp.show();
+        }, now.get(Calendar.YEAR), now.get(Calendar.MONTH), now.get(Calendar.DAY_OF_MONTH));
+        
+        // Prevent selecting past dates and dates before deadline
+        dp.getDatePicker().setMinDate(minDateMs - 1000);
         dp.show();
     }
     /**
@@ -282,8 +384,21 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
 
         if (regStartEpochMs == 0L) { toast("Please pick Registration Start"); return; }
         if (regEndEpochMs == 0L) { toast("Please pick Registration End"); return; }
-        if (regEndEpochMs < regStartEpochMs) { toast("End must be after Start"); return; }
-        if (deadlineEpochMs == 0L) { toast("Please pick Event Deadline"); return; }
+        if (regEndEpochMs < regStartEpochMs) { toast("Registration End must be after Registration Start"); return; }
+        if (deadlineEpochMs == 0L) { toast("Please pick Deadline to Accept/Reject"); return; }
+        if (eventStartEpochMs == 0L) { toast("Please pick Event Start Date"); return; }
+
+        // Validation: Deadline to Accept/Reject must be after Registration End
+        if (deadlineEpochMs <= regEndEpochMs) {
+            toast("Deadline to Accept/Reject must be after Registration End");
+            return;
+        }
+
+        // Validation: Deadline to Accept/Reject must be before Event Start Date
+        if (deadlineEpochMs >= eventStartEpochMs) {
+            toast("Deadline to Accept/Reject must be before Event Start Date");
+            return;
+        }
 
         if (posterUri == null) { toast("Please select an event poster"); return; }
 
@@ -370,6 +485,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         doc.put("registrationStart", regStartEpochMs);
         doc.put("registrationEnd", regEndEpochMs);
         doc.put("deadlineEpochMs", deadlineEpochMs);
+        doc.put("eventStart", eventStartEpochMs);
         doc.put("capacity", chosenCapacity);
         doc.put("geolocation", useGeo);
         doc.put("qrEnabled", generateQr);
@@ -610,9 +726,11 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         regStartEpochMs = 0L;
         regEndEpochMs = 0L;
         deadlineEpochMs = 0L;
+        eventStartEpochMs = 0L;
         btnStart.setText("Select");
         btnEnd.setText("Select");
         btnDeadline.setText("Select Deadline");
+        if (btnEventStart != null) btnEventStart.setText("Select Event Start Date");
         posterUri = null;
         btnPickPoster.setImageResource(android.R.drawable.ic_menu_camera);
     }

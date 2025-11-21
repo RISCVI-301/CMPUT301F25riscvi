@@ -8,92 +8,108 @@
     android:clickable="true"
     android:focusable="true">
 
-<androidx.cardview.widget.CardView
-    android:id="@+id/dialogCardView"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:layout_margin="32dp"
-    android:layout_gravity="center"
-    app:cardCornerRadius="20dp"
-    app:cardElevation="24dp"
-    android:backgroundTint="#FFFFFF">
-
-    <LinearLayout
+    <androidx.cardview.widget.CardView
+        android:id="@+id/dialogCardView"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:layout_margin="32dp"
+        android:layout_gravity="center"
+        app:cardCornerRadius="20dp"
+        app:cardElevation="24dp"
+        android:backgroundTint="#FFFFFF">
 
-        <!-- Title Section -->
-        <TextView
-            android:id="@+id/tvDialogTitle"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Final Entrant List"
-            android:textSize="36sp"
-            android:textStyle="bold"
-            android:textColor="#223C65"
-            android:padding="28dp"
-            android:paddingBottom="20dp"
-            android:fontFamily="@font/fredoka_bold"
-            android:background="#FFFFFF"
-            android:shadowColor="#80000000"
-            android:shadowDx="0"
-            android:shadowDy="4"
-            android:shadowRadius="8"/>
+            android:orientation="vertical">
 
-        <!-- Divider 1 (under title) -->
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="2dp"
-            android:background="#223C65"/>
-
-        <!-- Content Section - List of Entrants -->
-        <ScrollView
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:maxHeight="500dp"
-            android:padding="28dp"
-            android:paddingTop="24dp"
-            android:paddingBottom="24dp">
-
-            <LinearLayout
-                android:id="@+id/entrantListContainer"
+            <!-- Title Section -->
+            <TextView
+                android:id="@+id/tvDialogTitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical">
+                android:text="Final Entrant List"
+                android:textSize="36sp"
+                android:textStyle="bold"
+                android:textColor="#223C65"
+                android:padding="28dp"
+                android:paddingBottom="20dp"
+                android:fontFamily="@font/fredoka_bold"
+                android:background="#FFFFFF"
+                android:shadowColor="#80000000"
+                android:shadowDx="0"
+                android:shadowDy="4"
+                android:shadowRadius="8"/>
 
-                <!-- Entrant names will be added here programmatically -->
-                
-            </LinearLayout>
+            <!-- Divider 1 (under title) -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="2dp"
+                android:background="#223C65"/>
 
-        </ScrollView>
+            <!-- Content Section - List of Entrants -->
+            <ScrollView
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:maxHeight="500dp"
+                android:padding="28dp"
+                android:paddingTop="24dp"
+                android:paddingBottom="24dp">
 
-        <!-- Divider 2 (above button) -->
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="2dp"
-            android:background="#223C65"/>
+                <LinearLayout
+                    android:id="@+id/entrantListContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
 
-        <!-- OK Button -->
-        <androidx.appcompat.widget.AppCompatButton
-            android:id="@+id/btnDialogOk"
-            android:layout_width="match_parent"
-            android:layout_height="64dp"
-            android:text="Close"
-            android:textSize="20sp"
-            android:textStyle="bold"
-            android:textColor="#FFFFFF"
-            android:backgroundTint="#223C65"
-            android:layout_margin="28dp"
-            android:layout_marginTop="20dp"
-            android:fontFamily="@font/fredoka_bold"
-            android:elevation="8dp"
-            style="@style/Widget.AppCompat.Button.Borderless"/>
+                    <!-- Entrant names will be added here programmatically -->
 
-    </LinearLayout>
+                </LinearLayout>
 
-</androidx.cardview.widget.CardView>
+            </ScrollView>
+
+            <!-- Divider 2 (above buttons) -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="2dp"
+                android:background="#223C65"/>
+
+            <!-- Export to CSV Button -->
+            <Button
+                android:id="@+id/btnExportCSV"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:text="Export to CSV"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#9EFFF1"
+                android:layout_margin="28dp"
+                android:layout_marginTop="20dp"
+                android:layout_marginBottom="12dp"
+                android:elevation="8dp"/>
+
+            <!-- Close Button -->
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/btnDialogOk"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:text="Close"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#223C65"
+                android:layout_margin="28dp"
+                android:layout_marginTop="0dp"
+                android:layout_marginBottom="20dp"
+                android:fontFamily="@font/fredoka_bold"
+                android:elevation="8dp"
+                style="@style/Widget.AppCompat.Button.Borderless"/>
+
+        </LinearLayout>
+
+    </androidx.cardview.widget.CardView>
 
 </FrameLayout>
 
