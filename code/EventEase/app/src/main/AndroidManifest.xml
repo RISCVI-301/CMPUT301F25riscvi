@@ -85,6 +85,16 @@
         <activity
             android:name=".ui.organizer.OrganizerViewEntrantsActivity"
             android:exported="false" />
+        <activity
+            android:name=".ui.test.WorkflowDemoActivity"
+            android:exported="true"
+            android:label="Workflow Demo"
+            android:theme="@style/Theme.EventEase">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
 
         <provider
             android:name="androidx.core.content.FileProvider"

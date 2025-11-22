@@ -2,6 +2,8 @@ package com.example.eventease.ui.entrant.profile;
 
 import android.Manifest;
 import android.app.Dialog;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -65,6 +67,7 @@ public class AccountFragment extends Fragment {
     private String organizerIdForSwitch;
     private ActivityResultLauncher<String> notificationPermissionLauncher;
     private TextView notificationStatusText;
+    private com.google.android.material.switchmaterial.SwitchMaterial notificationToggle;
 
     public AccountFragment() { }
 
@@ -78,13 +81,25 @@ public class AccountFragment extends Fragment {
                 isGranted -> {
                     if (isGranted) {
                         Log.d(TAG, "Notification permission granted from account page");
-                        ToastUtil.showShort(requireContext(), "Notification permission granted!");
-                        // Initialize FCM after permission is granted
-                        FCMTokenManager.getInstance().initialize();
-                        updateNotificationStatus();
+                        // Enable device notifications
+                        enableDeviceNotifications();
+                        // Save preference
+                        FirebaseUser currentUser = mAuth.getCurrentUser();
+                        if (currentUser != null) {
+                            saveNotificationPreference(currentUser.getUid(), true);
+                        }
                     } else {
                         Log.w(TAG, "Notification permission denied from account page");
-                        ToastUtil.showShort(requireContext(), "Notification permission denied. You can enable it later in Settings.");
+                        // Revert toggle
+                        if (notificationToggle != null) {
+                            notificationToggle.setOnCheckedChangeListener(null);
+                            notificationToggle.setChecked(false);
+                            notificationToggle.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                                handleNotificationToggle(isChecked);
+                            });
+                        }
+                        // Open settings to allow manual enable
+                        openNotificationSettings();
                         updateNotificationStatus();
                     }
                 });
@@ -119,14 +134,31 @@ public class AccountFragment extends Fragment {
             });
         }
 
-        // Set up notification card click listener
-        CardView notificationsCard = root.findViewById(R.id.notificationsCard);
-        if (notificationsCard != null) {
-            notificationsCard.setOnClickListener(v -> handleNotificationPermissionClick());
+        // Set up notification toggle
+        notificationToggle = root.findViewById(R.id.notificationToggle);
+        if (notificationToggle != null) {
+            // Load saved preference
+            loadNotificationPreference();
+            
+            // Set up toggle listener
+            notificationToggle.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                handleNotificationToggle(isChecked);
+            });
         }
         
-        // Find notification status text (we'll add it to layout or use existing TextView)
-        // For now, we'll show status in a toast and update the card appearance
+        // Set up notification card click listener (for requesting permission if needed)
+        CardView notificationsCard = root.findViewById(R.id.notificationsCard);
+        if (notificationsCard != null) {
+            notificationsCard.setOnClickListener(v -> {
+                // If toggle is off, turn it on (which will request permission if needed)
+                if (notificationToggle != null && !notificationToggle.isChecked()) {
+                    notificationToggle.setChecked(true);
+                } else {
+                    // If already on, just show status
+                    handleNotificationPermissionClick();
+                }
+            });
+        }
 
         root.findViewById(R.id.logoutButton).setOnClickListener(v -> logout());
 
@@ -170,6 +202,189 @@ public class AccountFragment extends Fragment {
     }
     
     /**
+     * Loads the user's notification preference from Firestore.
+     */
+    private void loadNotificationPreference() {
+        FirebaseUser currentUser = mAuth.getCurrentUser();
+        if (currentUser == null || notificationToggle == null) {
+            return;
+        }
+        
+        db.collection("users").document(currentUser.getUid())
+                .get()
+                .addOnSuccessListener(documentSnapshot -> {
+                    if (documentSnapshot != null && documentSnapshot.exists()) {
+                        Boolean notificationsEnabled = documentSnapshot.getBoolean("notificationsEnabled");
+                        // Default to true if not set
+                        boolean enabled = notificationsEnabled != null ? notificationsEnabled : true;
+                        
+                        // Temporarily remove listener to avoid triggering on load
+                        notificationToggle.setOnCheckedChangeListener(null);
+                        notificationToggle.setChecked(enabled);
+                        notificationToggle.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                            handleNotificationToggle(isChecked);
+                        });
+                        
+                        updateNotificationStatus();
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to load notification preference", e);
+                    // Default to enabled
+                    if (notificationToggle != null) {
+                        notificationToggle.setOnCheckedChangeListener(null);
+                        notificationToggle.setChecked(true);
+                        notificationToggle.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                            handleNotificationToggle(isChecked);
+                        });
+                    }
+                });
+    }
+    
+    /**
+     * Handles notification toggle change.
+     * This actually controls device notification settings for the app.
+     */
+    private void handleNotificationToggle(boolean isEnabled) {
+        FirebaseUser currentUser = mAuth.getCurrentUser();
+        if (currentUser == null) {
+            if (notificationToggle != null) {
+                notificationToggle.setChecked(false);
+            }
+            ToastUtil.showShort(getContext(), "Please log in to change notification settings");
+            return;
+        }
+        
+        if (isEnabled) {
+            // If enabling, check and request permission if needed
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.POST_NOTIFICATIONS) 
+                        != PackageManager.PERMISSION_GRANTED) {
+                    // Request permission
+                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS);
+                    // Don't save preference yet - wait for permission result
+                    return;
+                }
+            }
+            
+            // Enable notifications at device level
+            enableDeviceNotifications();
+            
+            // Save preference to Firestore
+            saveNotificationPreference(currentUser.getUid(), true);
+        } else {
+            // Disable notifications at device level
+            disableDeviceNotifications();
+            
+            // Save preference to Firestore
+            saveNotificationPreference(currentUser.getUid(), false);
+        }
+    }
+    
+    /**
+     * Enables notifications at the device level by ensuring the notification channel is enabled.
+     */
+    private void enableDeviceNotifications() {
+        if (getContext() == null) return;
+        
+        // Use centralized channel manager to ensure channel exists and is properly configured
+        com.example.eventease.notifications.NotificationChannelManager.createNotificationChannel(getContext());
+        
+        NotificationManager notificationManager = 
+            (NotificationManager) getContext().getSystemService(Context.NOTIFICATION_SERVICE);
+        
+        if (notificationManager == null) return;
+        
+        // If notifications are disabled at app level, open settings
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            if (!notificationManager.areNotificationsEnabled()) {
+                openNotificationSettings();
+                return;
+            }
+        }
+        
+        // Check if channel is enabled
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            boolean channelEnabled = com.example.eventease.notifications.NotificationChannelManager.isChannelEnabled(getContext());
+            if (!channelEnabled) {
+                ToastUtil.showShort(getContext(), "Please enable 'Event Invitations' channel in device settings");
+                openNotificationSettings();
+                return;
+            }
+        }
+        
+        ToastUtil.showShort(getContext(), "Notifications enabled ✓");
+        FCMTokenManager.getInstance().initialize();
+    }
+    
+    /**
+     * Disables notifications at the device level.
+     * 
+     * IMPORTANT: We do NOT set the channel to IMPORTANCE_NONE here because:
+     * 1. Once set to NONE, Android prevents programmatic re-enabling
+     * 2. The user must manually enable it in device settings
+     * 3. This causes a poor user experience
+     * 
+     * Instead, we just save the preference and let the user control it via device settings.
+     * The app will respect the user's Firestore preference when sending notifications.
+     */
+    private void disableDeviceNotifications() {
+        if (getContext() == null) return;
+        
+        // Don't modify the channel - just save the preference
+        // The user can control notifications via device settings if they want
+        ToastUtil.showShort(getContext(), "Notifications preference saved. You can control notifications in device settings.");
+    }
+    
+    /**
+     * Opens device notification settings for this app.
+     */
+    private void openNotificationSettings() {
+        if (getContext() == null) return;
+        
+        Intent intent = new Intent();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            intent.setAction(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS);
+            intent.putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, getContext().getPackageName());
+        } else {
+            intent.setAction(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+            intent.setData(android.net.Uri.parse("package:" + getContext().getPackageName()));
+        }
+        
+        try {
+            startActivity(intent);
+            ToastUtil.showShort(getContext(), "Please enable notifications in device settings");
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to open notification settings", e);
+            ToastUtil.showShort(getContext(), "Could not open settings. Please enable notifications manually.");
+        }
+    }
+    
+    /**
+     * Saves notification preference to Firestore.
+     */
+    private void saveNotificationPreference(String uid, boolean enabled) {
+        db.collection("users").document(uid)
+                .update("notificationsEnabled", enabled)
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "Notification preference saved: " + enabled);
+                    updateNotificationStatus();
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to save notification preference", e);
+                    ToastUtil.showShort(getContext(), "Failed to save preference. Please try again.");
+                    // Revert toggle
+                    if (notificationToggle != null) {
+                        notificationToggle.setOnCheckedChangeListener(null);
+                        notificationToggle.setChecked(!enabled);
+                        notificationToggle.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                            handleNotificationToggle(isChecked);
+                        });
+                    }
+                });
+    }
+    
+    /**
      * Updates the notification status display in the account page.
      */
     private void updateNotificationStatus() {
@@ -178,22 +393,36 @@ public class AccountFragment extends Fragment {
         CardView notificationsCard = getView().findViewById(R.id.notificationsCard);
         if (notificationsCard == null) return;
         
-        boolean hasPermission = false;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            hasPermission = ContextCompat.checkSelfPermission(getContext(), Manifest.permission.POST_NOTIFICATIONS) 
-                    == PackageManager.PERMISSION_GRANTED;
+        NotificationManager notificationManager = 
+            (NotificationManager) getContext().getSystemService(Context.NOTIFICATION_SERVICE);
+        
+        boolean notificationsEnabled = false;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            notificationsEnabled = notificationManager != null && notificationManager.areNotificationsEnabled();
         } else {
-            // Android 12 and below - permission granted via manifest
-            hasPermission = true;
+            notificationsEnabled = true; // Android 6 and below - always enabled
         }
         
-        // Update card appearance based on permission status
-        // You can change background color or add an icon to show status
-        if (hasPermission) {
-            // Permission granted - could show green tint or checkmark
+        // Check permission for Android 13+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            notificationsEnabled = notificationsEnabled && 
+                ContextCompat.checkSelfPermission(getContext(), Manifest.permission.POST_NOTIFICATIONS) 
+                    == PackageManager.PERMISSION_GRANTED;
+        }
+        
+        // Update toggle to match device state
+        if (notificationToggle != null) {
+            notificationToggle.setOnCheckedChangeListener(null);
+            notificationToggle.setChecked(notificationsEnabled);
+            notificationToggle.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                handleNotificationToggle(isChecked);
+            });
+        }
+        
+        // Update card appearance
+        if (notificationsEnabled) {
             notificationsCard.setAlpha(1.0f);
         } else {
-            // Permission denied - could show grayed out or warning icon
             notificationsCard.setAlpha(0.7f);
         }
     }

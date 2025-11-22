@@ -27,6 +27,7 @@ import com.example.eventease.R;
 import com.example.eventease.auth.UserRoleChecker;
 import com.example.eventease.notifications.FCMTokenManager;
 import com.example.eventease.notifications.InvitationNotificationListener;
+import com.example.eventease.ui.organizer.AutomaticEntrantSelectionService;
 
 /**
  * Main activity that hosts navigation fragments and manages bottom navigation for entrant users.
@@ -56,6 +57,7 @@ public class MainActivity extends AppCompatActivity {
 
     private InvitationNotificationListener invitationListener;
     private ActivityResultLauncher<String> notificationPermissionLauncher;
+    private static boolean listenersInitialized = false;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -218,11 +220,26 @@ public class MainActivity extends AppCompatActivity {
                     topBar.setVisibility(View.VISIBLE);
                     updateNavigationSelection(id);
 
-                    // Initialize FCM token manager and invitation listener if not already done
-                    if (invitationListener == null) {
-                        FCMTokenManager.getInstance().initialize();
-                        invitationListener = new InvitationNotificationListener(this);
-                        invitationListener.startListening();
+                    // Initialize listeners only once to prevent duplicates
+                    if (!listenersInitialized) {
+                        // Initialize FCM token manager and invitation listener
+                        if (invitationListener == null) {
+                            FCMTokenManager.getInstance().initialize();
+                            invitationListener = new InvitationNotificationListener(this);
+                            invitationListener.startListening();
+                        }
+                        
+                        // Setup automatic entrant selection listener (only once)
+                        AutomaticEntrantSelectionService.setupAutomaticSelectionListener();
+                        
+                        // Setup automatic deadline processor service (only once)
+                        com.example.eventease.ui.organizer.AutomaticDeadlineProcessorService.setupDeadlineProcessorListener();
+                        
+                        // Setup automatic sorry notification service (only once)
+                        com.example.eventease.ui.organizer.SorryNotificationService.setupSorryNotificationListener();
+                        
+                        listenersInitialized = true;
+                        Log.d("MainActivity", "Listeners initialized once");
                     }
                 } else {
                     // User not authenticated, hide bars

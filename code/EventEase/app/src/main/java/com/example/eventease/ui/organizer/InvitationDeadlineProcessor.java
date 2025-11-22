@@ -74,6 +74,17 @@ public class InvitationDeadlineProcessor {
             }
             
             long currentTime = System.currentTimeMillis();
+            
+            // Skip if event start date has already passed
+            Long startsAtEpochMs = eventDoc.getLong("startsAtEpochMs");
+            if (startsAtEpochMs != null && startsAtEpochMs > 0 && currentTime >= startsAtEpochMs) {
+                Log.d(TAG, "Event " + eventId + " start date has already passed, skipping deadline processing");
+                if (callback != null) {
+                    callback.onComplete(0);
+                }
+                return;
+            }
+            
             if (currentTime < deadlineEpochMs) {
                 Log.d(TAG, "Deadline has not passed for event " + eventId + 
                     " (deadline: " + deadlineEpochMs + ", current: " + currentTime + ")");
@@ -205,6 +216,10 @@ public class InvitationDeadlineProcessor {
                                 .addOnSuccessListener(aVoid -> {
                                     Log.d(TAG, "✓ Successfully moved " + userIds.size() + 
                                         " non-responders to CancelledEntrants");
+                                    
+                                    // Send "sorry" notification to those who missed the deadline
+                                    sendDeadlineMissedNotification(eventId, userIds);
+                                    
                                     if (callback != null) {
                                         callback.onComplete(userIds.size());
                                     }
@@ -258,6 +273,84 @@ public class InvitationDeadlineProcessor {
         }
         
         return data;
+    }
+    
+    /**
+     * Sends notification to users who missed the deadline to accept/decline.
+     */
+    private void sendDeadlineMissedNotification(String eventId, List<String> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return;
+        }
+        
+        Log.d(TAG, "Sending deadline missed notification to " + userIds.size() + " users");
+        
+        // Check if deadline notification already sent to avoid duplicates
+        db.collection("events").document(eventId).get()
+                .addOnSuccessListener(eventDoc -> {
+                    if (eventDoc == null || !eventDoc.exists()) {
+                        Log.e(TAG, "Event not found for deadline notification");
+                        return;
+                    }
+                    
+                    // Skip if event start date has already passed
+                    long currentTime = System.currentTimeMillis();
+                    Long startsAtEpochMs = eventDoc.getLong("startsAtEpochMs");
+                    if (startsAtEpochMs != null && startsAtEpochMs > 0 && currentTime >= startsAtEpochMs) {
+                        Log.d(TAG, "Event " + eventId + " start date has already passed, skipping deadline notification");
+                        return;
+                    }
+                    
+                    Boolean deadlineNotificationSent = eventDoc.getBoolean("deadlineNotificationSent");
+                    if (Boolean.TRUE.equals(deadlineNotificationSent)) {
+                        Log.d(TAG, "Deadline notification already sent for event " + eventId);
+                        return;
+                    }
+                    
+                    String eventTitle = eventDoc.getString("title");
+                    if (eventTitle == null || eventTitle.trim().isEmpty()) {
+                        eventTitle = "this event";
+                    }
+                    
+                    String notificationTitle = "Update: " + eventTitle;
+                    String notificationMessage = "Sorry, you won't be in the criteria for " + eventTitle + 
+                        " anymore. The deadline to accept or decline your invitation has passed. " +
+                        "Better luck next time!";
+                    
+                    NotificationHelper notificationHelper = new NotificationHelper();
+                    notificationHelper.sendNotificationsToUsers(userIds, notificationTitle, notificationMessage,
+                            eventId, eventTitle,
+                            new NotificationHelper.NotificationCallback() {
+                                @Override
+                                public void onComplete(int sentCount) {
+                                    Log.d(TAG, "Successfully sent deadline missed notification to " + sentCount + " users");
+                                    // Mark as sent to prevent duplicates
+                                    markDeadlineNotificationSent(eventId);
+                                }
+                                
+                                @Override
+                                public void onError(String error) {
+                                    Log.e(TAG, "Failed to send deadline missed notification: " + error);
+                                }
+                            });
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to load event for deadline notification", e);
+                });
+    }
+    
+    /**
+     * Marks the event as having sent the deadline missed notification.
+     */
+    private void markDeadlineNotificationSent(String eventId) {
+        db.collection("events").document(eventId)
+                .update("deadlineNotificationSent", true)
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "Marked event " + eventId + " as having sent deadline notification");
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to mark deadline notification as sent for event " + eventId, e);
+                });
     }
 }
 

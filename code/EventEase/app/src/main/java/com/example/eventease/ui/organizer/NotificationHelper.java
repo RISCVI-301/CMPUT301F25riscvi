@@ -251,6 +251,23 @@ public class NotificationHelper {
      */
     public void sendNotificationsToUsers(List<String> userIds, String title, String message, 
                                          String eventId, String eventTitle, NotificationCallback callback) {
+        sendNotificationsToUsers(userIds, title, message, eventId, eventTitle, true, callback);
+    }
+    
+    /**
+     * Sends notifications to a specific list of users with custom title and message.
+     * 
+     * @param userIds List of user IDs to notify
+     * @param title Custom notification title
+     * @param message Custom notification message
+     * @param eventId The event ID
+     * @param eventTitle The event title
+     * @param filterDeclined If true, filter out users who have declined
+     * @param callback Callback for completion/error
+     */
+    public void sendNotificationsToUsers(List<String> userIds, String title, String message, 
+                                         String eventId, String eventTitle, boolean filterDeclined,
+                                         NotificationCallback callback) {
         if (userIds == null || userIds.isEmpty()) {
             if (callback != null) {
                 callback.onComplete(0);
@@ -265,24 +282,174 @@ public class NotificationHelper {
             return;
         }
         
-        // Get current user (organizer)
-        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
-        if (currentUser == null) {
-            if (callback != null) {
-                callback.onError("User not authenticated");
+        if (filterDeclined) {
+            // Filter out users who have declined - they shouldn't receive notifications
+            filterOutDeclinedUsers(eventId, userIds, filteredUserIds -> {
+                if (filteredUserIds.isEmpty()) {
+                    Log.d(TAG, "All users have declined, no notifications to send");
+                    if (callback != null) {
+                        callback.onComplete(0);
+                    }
+                    return;
+                }
+                
+                // Get current user (organizer)
+                FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+                if (currentUser == null) {
+                    if (callback != null) {
+                        callback.onError("User not authenticated");
+                    }
+                    return;
+                }
+                String organizerId = currentUser.getUid();
+                
+                sendNotificationsToFilteredUsers(filteredUserIds, title, message, eventId, eventTitle, organizerId, callback);
+            });
+        } else {
+            // Don't filter - send to all (e.g., for selection notifications before anyone has declined)
+            FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+            if (currentUser == null) {
+                if (callback != null) {
+                    callback.onError("User not authenticated");
+                }
+                return;
             }
+            String organizerId = currentUser.getUid();
+            sendNotificationsToFilteredUsers(userIds, title, message, eventId, eventTitle, organizerId, callback);
+        }
+    }
+    
+    /**
+     * Filters out users who have declined invitations for this event.
+     */
+    private void filterOutDeclinedUsers(String eventId, List<String> userIds, 
+                                        java.util.function.Consumer<List<String>> callback) {
+        if (userIds == null || userIds.isEmpty()) {
+            callback.accept(new java.util.ArrayList<>());
             return;
         }
-        String organizerId = currentUser.getUid();
         
+        // Also check CancelledEntrants subcollection (includes declined users)
+        DocumentReference eventRef = db.collection("events").document(eventId);
+        eventRef.collection("CancelledEntrants").get()
+                .addOnSuccessListener(cancelledSnapshot -> {
+                    java.util.Set<String> declinedUserIds = new java.util.HashSet<>();
+                    
+                    // Add users from CancelledEntrants (these are declined or missed deadline)
+                    if (cancelledSnapshot != null) {
+                        for (com.google.firebase.firestore.DocumentSnapshot doc : cancelledSnapshot.getDocuments()) {
+                            declinedUserIds.add(doc.getId());
+                        }
+                    }
+                    
+                    // Also check invitations collection for declined status (for users who declined but not yet moved)
+                    db.collection("invitations")
+                            .whereEqualTo("eventId", eventId)
+                            .whereEqualTo("status", "DECLINED")
+                            .get()
+                            .addOnSuccessListener(invitationSnapshot -> {
+                                if (invitationSnapshot != null) {
+                                    for (com.google.firebase.firestore.DocumentSnapshot doc : invitationSnapshot.getDocuments()) {
+                                        String uid = doc.getString("uid");
+                                        if (uid != null) {
+                                            declinedUserIds.add(uid);
+                                        }
+                                    }
+                                }
+                                
+                                // Filter out declined users
+                                List<String> filtered = new java.util.ArrayList<>();
+                                for (String userId : userIds) {
+                                    if (!declinedUserIds.contains(userId)) {
+                                        filtered.add(userId);
+                                    }
+                                }
+                                
+                                Log.d(TAG, "Filtered out " + declinedUserIds.size() + " declined users from " + userIds.size() + " total");
+                                callback.accept(filtered);
+                            })
+                            .addOnFailureListener(e -> {
+                                Log.e(TAG, "Failed to check declined invitations, using cancelled entrants only", e);
+                                // Filter based on cancelled entrants only
+                                List<String> filtered = new java.util.ArrayList<>();
+                                for (String userId : userIds) {
+                                    if (!declinedUserIds.contains(userId)) {
+                                        filtered.add(userId);
+                                    }
+                                }
+                                callback.accept(filtered);
+                            });
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to check cancelled entrants, sending to all", e);
+                    // On error, send to all (better to send than miss)
+                    callback.accept(userIds);
+                });
+    }
+    
+    /**
+     * Sends notifications to filtered user list.
+     */
+    private void sendNotificationsToFilteredUsers(List<String> userIds, String title, String message,
+                                                 String eventId, String eventTitle, String organizerId,
+                                                 NotificationCallback callback) {
+        // Check for recent duplicate notification requests (within last 5 minutes)
+        long fiveMinutesAgo = System.currentTimeMillis() - (5 * 60 * 1000);
+        db.collection("notificationRequests")
+                .whereEqualTo("eventId", eventId)
+                .whereEqualTo("title", title)
+                .whereGreaterThan("createdAt", fiveMinutesAgo)
+                .limit(1)
+                .get()
+                .addOnSuccessListener(existingSnapshot -> {
+                    if (existingSnapshot != null && !existingSnapshot.isEmpty()) {
+                        Log.w(TAG, "Duplicate notification request found for event " + eventId + " with title '" + title + "', skipping");
+                        if (callback != null) {
+                            callback.onComplete(0);
+                        }
+                        return;
+                    }
+                    
+                    // No duplicate found, create notification request
+                    createNotificationRequest(userIds, title, message, eventId, eventTitle, organizerId, callback);
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to check for duplicate notification requests, creating anyway", e);
+                    // On error, create the request (better to send than miss)
+                    createNotificationRequest(userIds, title, message, eventId, eventTitle, organizerId, callback);
+                });
+    }
+    
+    /**
+     * Creates a notification request in Firestore.
+     */
+    private void createNotificationRequest(List<String> userIds, String title, String message,
+                                          String eventId, String eventTitle, String organizerId,
+                                          NotificationCallback callback) {
         // Create notification request in Firestore
         // Cloud Functions will pick this up and send FCM notifications
+        
+        // Determine groupType from title
+        String groupType = "general";
+        if (title != null) {
+            String titleLower = title.toLowerCase();
+            if (titleLower.contains("replacement")) {
+                groupType = "replacement";
+            } else if (titleLower.contains("selected") || titleLower.contains("chosen")) {
+                groupType = "selection";
+            } else if (titleLower.contains("deadline") || titleLower.contains("missed")) {
+                groupType = "deadline";
+            } else if (titleLower.contains("sorry") || titleLower.contains("not selected")) {
+                groupType = "sorry";
+            }
+        }
+        
         Map<String, Object> notificationRequest = new HashMap<>();
         notificationRequest.put("eventId", eventId);
         notificationRequest.put("eventTitle", eventTitle != null ? eventTitle : "Event");
         notificationRequest.put("organizerId", organizerId);
         notificationRequest.put("userIds", userIds);
-        notificationRequest.put("groupType", "replacement");
+        notificationRequest.put("groupType", groupType);
         notificationRequest.put("message", message);
         notificationRequest.put("title", title);
         notificationRequest.put("status", "PENDING");

@@ -31,9 +31,8 @@ google-services.json.bak
 .cache/
 
 
-NOTIFICATION_SETUP.md
-TEST_NOTIFICATIONS.md
-QUICK_TEST_GUIDE.md
-test_notifications.sh
-TESTING_GUIDE copy.md
-NOTIFICATION_BUTTONS_EXPLAINED.md
+
+firebase.json
+firestore.indexes.json
+firestore.rules
+functions/.gitignore

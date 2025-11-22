@@ -271,6 +271,10 @@ public class MyEventsFragment extends Fragment {
                         int admittedCount = allMyEvents.size();
                         
                         // Process waitlisted/selected events
+                        // Events should show in waitlisted until 48 hours before event start
+                        long currentTime = System.currentTimeMillis();
+                        long fortyEightHoursMs = 48L * 60 * 60 * 1000; // 48 hours in milliseconds
+                        
                         List<Event> waitlistedSelected = new ArrayList<>();
                         for (Event e : finalOpenEvents) {
                             try {
@@ -288,6 +292,18 @@ public class MyEventsFragment extends Fragment {
                                 // Show if in waitlist OR selected, AND NOT admitted
                                 // (admitted events are already added from getUpcomingEvents)
                                 if ((Boolean.TRUE.equals(joined) || Boolean.TRUE.equals(inSelected)) && !Boolean.TRUE.equals(admitted)) {
+                                    // Check if event is more than 48 hours away
+                                    // If event start is less than 48 hours away, don't show in waitlisted
+                                    long eventStartMs = e.getStartsAtEpochMs();
+                                    if (eventStartMs > 0) {
+                                        long timeUntilEvent = eventStartMs - currentTime;
+                                        if (timeUntilEvent <= fortyEightHoursMs) {
+                                            // Event is 48 hours or less away, don't show in waitlisted
+                                            android.util.Log.d("MyEventsFragment", "Event " + e.getTitle() + " is " + (timeUntilEvent / (60 * 60 * 1000)) + " hours away, hiding from waitlisted");
+                                            continue;
+                                        }
+                                    }
+                                    
                                     waitlistedSelected.add(e);
                                     eventIds.add(e.getId());
                                 }

@@ -96,6 +96,16 @@ public class EventSelectionHelper {
                 return;
             }
             
+            // Skip if event start date has already passed
+            Long startsAtEpochMs = eventDoc.getLong("startsAtEpochMs");
+            if (startsAtEpochMs != null && startsAtEpochMs > 0 && currentTime >= startsAtEpochMs) {
+                Log.d(TAG, "Event " + eventId + " start date has already passed, skipping selection processing");
+                if (callback != null) {
+                    callback.onComplete(0);
+                }
+                return;
+            }
+            
             if (Boolean.TRUE.equals(selectionProcessed)) {
                 Log.d(TAG, "Selection already processed for event " + eventId);
                 
@@ -178,7 +188,45 @@ public class EventSelectionHelper {
                         selectedUserIds.add(doc.getId());
                     }
                     
-                    Log.d(TAG, "Selected user IDs: " + selectedUserIds);
+                    Log.d(TAG, "Selected " + selectedUserIds.size() + " user IDs: " + selectedUserIds);
+                    Log.d(TAG, "Total waitlisted: " + availableCount + ", Sample size: " + sampleSize + ", Selected: " + selectedUserIds.size());
+                    
+                    // CRITICAL FIX: Verify we're not selecting more than sampleSize
+                    // If somehow more were selected, truncate BOTH lists to match sampleSize
+                    // This ensures we don't move more entrants to SelectedEntrants than sampleSize
+                    if (selectedUserIds.size() > sampleSize) {
+                        Log.e(TAG, "ERROR: Selected more users than sample size! Selected: " + selectedUserIds.size() + ", Sample size: " + sampleSize);
+                        selectedUserIds = selectedUserIds.subList(0, sampleSize);
+                        selectedDocs = selectedDocs.subList(0, sampleSize); // FIX: Also truncate selectedDocs
+                        Log.d(TAG, "Truncated to sample size: " + selectedUserIds.size() + " users");
+                    }
+                    
+                    // Additional safety check: ensure selectedDocs never exceeds sampleSize
+                    if (selectedDocs.size() > sampleSize) {
+                        Log.e(TAG, "ERROR: selectedDocs size (" + selectedDocs.size() + ") exceeds sampleSize (" + sampleSize + "), truncating");
+                        selectedDocs = selectedDocs.subList(0, sampleSize);
+                        // Also ensure selectedUserIds matches
+                        if (selectedUserIds.size() > sampleSize) {
+                            selectedUserIds = selectedUserIds.subList(0, sampleSize);
+                        }
+                    }
+                    
+                    // Final validation: ensure both lists are the same size
+                    if (selectedDocs.size() != selectedUserIds.size()) {
+                        Log.e(TAG, "ERROR: Mismatch between selectedDocs (" + selectedDocs.size() + ") and selectedUserIds (" + selectedUserIds.size() + ")");
+                        int minSize = Math.min(selectedDocs.size(), selectedUserIds.size());
+                        selectedDocs = selectedDocs.subList(0, minSize);
+                        selectedUserIds = selectedUserIds.subList(0, minSize);
+                    }
+                    
+                    // Final check: ensure we never exceed sampleSize
+                    if (selectedDocs.size() > sampleSize) {
+                        Log.e(TAG, "CRITICAL: Final check failed - selectedDocs size (" + selectedDocs.size() + ") still exceeds sampleSize (" + sampleSize + ")");
+                        selectedDocs = selectedDocs.subList(0, sampleSize);
+                        selectedUserIds = selectedUserIds.subList(0, Math.min(selectedUserIds.size(), sampleSize));
+                    }
+                    
+                    Log.d(TAG, "Final selection count: " + selectedDocs.size() + " entrants (sampleSize: " + sampleSize + ")");
                     
                     moveToSelectedAndSendInvitations(eventRef, eventId, selectedDocs, selectedUserIds, 
                                                      eventTitle, deadlineEpochMs, callback);
@@ -193,11 +241,36 @@ public class EventSelectionHelper {
     
     /**
      * Randomly selects a specified number of documents from a list.
+     * Guarantees that the returned list size never exceeds the requested count.
      */
     private List<DocumentSnapshot> randomlySelect(List<DocumentSnapshot> allDocs, int count) {
+        if (allDocs == null || allDocs.isEmpty() || count <= 0) {
+            return new ArrayList<>();
+        }
+        
+        if (count >= allDocs.size()) {
+            Log.w(TAG, "Requested count (" + count + ") >= available docs (" + allDocs.size() + "), returning all");
+            return new ArrayList<>(allDocs);
+        }
+        
         List<DocumentSnapshot> shuffled = new ArrayList<>(allDocs);
-        Collections.shuffle(shuffled, new Random());
-        return shuffled.subList(0, count);
+        Collections.shuffle(shuffled, new Random(System.currentTimeMillis()));
+        
+        // Ensure we only take exactly 'count' items (never more)
+        int actualCount = Math.min(count, shuffled.size());
+        List<DocumentSnapshot> selected = shuffled.subList(0, actualCount);
+        Log.d(TAG, "Randomly selected " + selected.size() + " out of " + allDocs.size() + " documents (requested: " + count + ")");
+        
+        // Return a new list to avoid issues with subList
+        List<DocumentSnapshot> result = new ArrayList<>(selected);
+        
+        // Final safety check: ensure we never return more than requested
+        if (result.size() > count) {
+            Log.e(TAG, "CRITICAL ERROR: randomlySelect returned " + result.size() + " items when " + count + " was requested!");
+            result = new ArrayList<>(result.subList(0, count));
+        }
+        
+        return result;
     }
     
     /**
@@ -316,6 +389,152 @@ public class EventSelectionHelper {
     }
     
     /**
+     * Checks if selection notification was already sent and sends it if not.
+     */
+    private void checkAndSendSelectionNotification(String eventId, String eventTitle, List<String> userIds,
+                                                   Long deadlineEpochMs, InvitationHelper.InvitationCallback callback) {
+        // Check if selection notification already sent
+        DocumentReference eventRef = db.collection("events").document(eventId);
+        eventRef.get().addOnSuccessListener(eventDoc -> {
+            if (eventDoc == null || !eventDoc.exists()) {
+                Log.e(TAG, "Event not found for selection notification check");
+                if (callback != null) {
+                    callback.onComplete(userIds.size());
+                }
+                return;
+            }
+            
+            // Skip if event start date has already passed
+            long currentTime = System.currentTimeMillis();
+            Long startsAtEpochMs = eventDoc.getLong("startsAtEpochMs");
+            if (startsAtEpochMs != null && startsAtEpochMs > 0 && currentTime >= startsAtEpochMs) {
+                Log.d(TAG, "Event " + eventId + " start date has already passed, skipping selection notification");
+                if (callback != null) {
+                    callback.onComplete(userIds.size());
+                }
+                return;
+            }
+            
+            Boolean selectionNotificationSent = eventDoc.getBoolean("selectionNotificationSent");
+            if (Boolean.TRUE.equals(selectionNotificationSent)) {
+                Log.d(TAG, "Selection notification already sent for event " + eventId + ", skipping");
+                if (callback != null) {
+                    callback.onComplete(userIds.size());
+                }
+                return;
+            }
+            
+            // Use a transaction to atomically check and set the flag
+            // This prevents race conditions where multiple processes try to send notifications
+            final long finalCurrentTime = currentTime;
+            final Long finalStartsAtEpochMs = startsAtEpochMs;
+            db.runTransaction(transaction -> {
+                // Re-read the document in the transaction
+                DocumentSnapshot snapshot = transaction.get(eventRef);
+                if (!snapshot.exists()) {
+                    throw new RuntimeException("Event not found");
+                }
+                
+                // Check if notification already sent
+                Boolean alreadySent = snapshot.getBoolean("selectionNotificationSent");
+                if (Boolean.TRUE.equals(alreadySent)) {
+                    throw new RuntimeException("Notification already sent");
+                }
+                
+                // Check if event start date has passed (use values from outer scope)
+                if (finalStartsAtEpochMs != null && finalStartsAtEpochMs > 0 && finalCurrentTime >= finalStartsAtEpochMs) {
+                    throw new RuntimeException("Event start date has passed");
+                }
+                
+                // Atomically set the flag
+                transaction.update(eventRef, "selectionNotificationSent", true);
+                return null;
+            }).addOnSuccessListener(aVoid -> {
+                Log.d(TAG, "Atomically marked selection notification as sent for event " + eventId);
+                // Now send the notification
+                sendSelectionNotification(eventId, eventTitle, userIds, deadlineEpochMs, eventRef, callback);
+            })
+            .addOnFailureListener(e -> {
+                String errorMsg = e.getMessage();
+                if (errorMsg != null && (errorMsg.contains("already sent") || errorMsg.contains("start date has passed"))) {
+                    Log.d(TAG, "Selection notification cannot be sent: " + errorMsg);
+                } else {
+                    Log.e(TAG, "Transaction failed for selection notification", e);
+                }
+                // Don't send notification if transaction failed
+                if (callback != null) {
+                    callback.onComplete(userIds.size());
+                }
+            });
+        }).addOnFailureListener(e -> {
+            Log.e(TAG, "Failed to check selection notification status", e);
+            // On error, don't send notification to avoid duplicates for past events
+            if (callback != null) {
+                callback.onComplete(userIds.size());
+            }
+        });
+    }
+    
+    /**
+     * Sends selection notification to selected entrants.
+     */
+    private void sendSelectionNotification(String eventId, String eventTitle, List<String> userIds,
+                                          Long deadlineEpochMs, DocumentReference eventRef,
+                                          InvitationHelper.InvitationCallback callback) {
+        NotificationHelper notificationHelper = new NotificationHelper();
+        
+        // Format deadline nicely
+        String deadlineText = "N/A";
+        if (deadlineEpochMs != null && deadlineEpochMs > 0) {
+            java.text.SimpleDateFormat dateFormat = new java.text.SimpleDateFormat("MMM d, yyyy 'at' h:mm a", java.util.Locale.getDefault());
+            deadlineText = dateFormat.format(new java.util.Date(deadlineEpochMs));
+        }
+        
+        String notificationTitle = "You've been selected! 🎉";
+        String notificationMessage = "Congratulations! You've been selected for " + 
+            (eventTitle != null ? eventTitle : "this event") + 
+            ". Please check your invitations to accept or decline. " +
+            "Deadline to respond: " + deadlineText;
+        
+        // Don't filter declined users for selection notification (they haven't declined yet)
+        notificationHelper.sendNotificationsToUsers(userIds, notificationTitle, notificationMessage,
+                eventId, eventTitle, false, // filterDeclined = false
+                new NotificationHelper.NotificationCallback() {
+                    @Override
+                    public void onComplete(int sentCount) {
+                        Log.d(TAG, "✓ Sent push notifications to " + sentCount + " users");
+                        // Flag already set before sending, no need to set again
+                        if (callback != null) {
+                            callback.onComplete(userIds.size());
+                        }
+                    }
+                    
+                    @Override
+                    public void onError(String error) {
+                        Log.e(TAG, "Failed to send push notifications: " + error);
+                        // Flag already set before sending, no need to set again
+                        // Still report success since invitations were created
+                        if (callback != null) {
+                            callback.onComplete(userIds.size());
+                        }
+                    }
+                });
+    }
+    
+    /**
+     * Marks the event as having sent the selection notification.
+     */
+    private void markSelectionNotificationSent(DocumentReference eventRef) {
+        eventRef.update("selectionNotificationSent", true)
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "Marked event as having sent selection notification");
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to mark selection notification as sent", e);
+                });
+    }
+    
+    /**
      * Sends invitations to selected entrants and push notifications.
      */
     private void sendInvitationsToSelected(String eventId, String eventTitle, List<String> userIds,
@@ -382,36 +601,8 @@ public class EventSelectionHelper {
                     .addOnSuccessListener(aVoid -> {
                         Log.d(TAG, "✓ Created " + userIds.size() + " invitation documents");
                         
-                        // Send push notifications via NotificationHelper
-                        NotificationHelper notificationHelper = new NotificationHelper();
-                        String notificationMessage = "You've been selected! Please check your invitations. " +
-                            "Deadline to accept/decline: " + 
-                            (deadlineEpochMs != null ? new java.util.Date(deadlineEpochMs).toString() : "N/A");
-                        
-                        notificationHelper.sendNotificationsToUsers(userIds,
-                                "You've been selected! 🎉", 
-                                "Congratulations! You've been selected for " + (eventTitle != null ? eventTitle : "this event") + 
-                                ". Please check your invitations. Deadline: " + 
-                                (deadlineEpochMs != null ? new java.util.Date(deadlineEpochMs).toString() : "N/A"),
-                                eventId, eventTitle,
-                                new NotificationHelper.NotificationCallback() {
-                                    @Override
-                                    public void onComplete(int sentCount) {
-                                        Log.d(TAG, "✓ Sent push notifications to " + sentCount + " users");
-                                        if (callback != null) {
-                                            callback.onComplete(userIds.size());
-                                        }
-                                    }
-                                    
-                                    @Override
-                                    public void onError(String error) {
-                                        Log.e(TAG, "Failed to send push notifications: " + error);
-                                        // Still report success since invitations were created
-                                        if (callback != null) {
-                                            callback.onComplete(userIds.size());
-                                        }
-                                    }
-                                });
+                        // Check if selection notification already sent to prevent duplicates
+                        checkAndSendSelectionNotification(eventId, eventTitle, userIds, deadlineEpochMs, callback);
                     })
                     .addOnFailureListener(e -> {
                         Log.e(TAG, "Failed to create invitations", e);
