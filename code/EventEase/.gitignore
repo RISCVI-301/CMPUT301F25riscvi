@@ -36,3 +36,8 @@ firebase.json
 firestore.indexes.json
 firestore.rules
 functions/.gitignore
+
+# Local organization folders (not needed remotely)
+config/
+logs/
+compiled/
