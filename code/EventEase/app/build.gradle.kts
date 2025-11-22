@@ -44,8 +44,24 @@ dependencies {
     implementation(libs.navigation.fragment)
     implementation("com.google.android.material:material:1.12.0")
     implementation(libs.navigation.ui)
+
     implementation(libs.firebase.firestore)
     implementation(libs.glide)
+
+
+    // Firebase BOM - must be declared before other Firebase dependencies
+    implementation(platform("com.google.firebase:firebase-bom:34.4.0"))
+    // Firebase dependencies (versions managed by BOM)
+    implementation("com.google.firebase:firebase-analytics")
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-firestore")
+    implementation("com.google.firebase:firebase-storage")
+    implementation("com.google.firebase:firebase-messaging")
+    implementation("com.google.android.gms:play-services-location:21.1.0")
+    implementation("com.google.android.gms:play-services-maps:18.2.0")
+    implementation("com.google.zxing:core:3.5.3")
+
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
