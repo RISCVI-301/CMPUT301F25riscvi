@@ -56,7 +56,7 @@ import java.util.UUID;
 
 /**
  * Activity for an organizer to create a new event.
- *
+ * 
  * <p>This class provides a comprehensive form for organizers to input event details including:
  * <ul>
  *   <li>Event title, description, location, and guidelines</li>
@@ -69,7 +69,7 @@ import java.util.UUID;
  *   <li>QR code generation options</li>
  *   <li>Geolocation tracking options</li>
  * </ul>
- *
+ * 
  * <p>The activity performs validation on user input before saving the event. The creation process involves:
  * <ol>
  *   <li>Uploading the poster image to Firebase Storage (if provided)</li>
@@ -77,14 +77,15 @@ import java.util.UUID;
  *   <li>Creating a new document in the 'events' collection in Firestore</li>
  *   <li>Initializing subcollections for waitlist, admitted entrants, etc.</li>
  * </ol>
- *
+ * 
  * <p>After successful creation, the organizer is returned to the event list view.
  */
 public class OrganizerCreateEventActivity extends AppCompatActivity {
     private static final String TAG = "CreateEvent";
     // --- UI Elements ---
     private ImageButton btnBack, btnPickPoster;
-    private EditText etTitle, etDescription, etGuidelines, etLocation, etCapacity;
+    private EditText etTitle, etDescription, etGuidelines, etLocation, etCapacity, etSampleSize;
+    private TextView tvSampleSize;
     private Button btnStart, btnEnd, btnDeadline, btnEventStart, btnSave;
     private Switch swGeo, swQr;
     private RadioGroup rgEntrants;
@@ -126,6 +127,8 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         etGuidelines = findViewById(R.id.etGuidelines);
         etLocation = findViewById(R.id.etLocation);
         etCapacity = findViewById(R.id.etCapacity);
+        etSampleSize = findViewById(R.id.etSampleSize);
+        tvSampleSize = findViewById(R.id.tvSampleSize);
         btnStart = findViewById(R.id.btnStart);
         btnEnd = findViewById(R.id.btnEnd);
         btnDeadline = findViewById(R.id.btnDeadline);
@@ -146,6 +149,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
             boolean specific = (checkedId == R.id.rbSpecific);
             etCapacity.setEnabled(specific);
             etCapacity.setVisibility(specific ? View.VISIBLE : View.GONE);
+            // Sample size is always visible, no need to control its visibility here
             if (!specific) {
                 etCapacity.setText("");
             } else {
@@ -405,7 +409,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         int chosenCapacity = -1;
         if (rbSpecific.isChecked()) {
             String capStr = safe(etCapacity.getText());
-            if (capStr.isEmpty()) { etCapacity.setError("Enter capacity"); etCapacity.requestFocus(); return; }
+            if (capStr.isEmpty()) { etCapacity.setError("Enter waiting list capacity"); etCapacity.requestFocus(); return; }
             try {
                 int v = Integer.parseInt(capStr);
                 if (v < 1 || v > 500) { etCapacity.setError("1–500 only"); etCapacity.requestFocus(); return; }
@@ -413,6 +417,34 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
             } catch (NumberFormatException e) {
                 etCapacity.setError("Enter a number"); etCapacity.requestFocus(); return;
             }
+        }
+        
+        // Sample size is always required, regardless of waitlist capacity setting
+        int chosenSampleSize = 0;
+        String sampleStr = safe(etSampleSize.getText());
+        if (sampleStr.isEmpty()) { 
+            etSampleSize.setError("Enter sample size"); 
+            etSampleSize.requestFocus(); 
+            return; 
+        }
+        try {
+            int v = Integer.parseInt(sampleStr);
+            if (v < 1) { 
+                etSampleSize.setError("Must be at least 1"); 
+                etSampleSize.requestFocus(); 
+                return; 
+            }
+            // If waitlist capacity is specific, sample size cannot exceed it
+            if (chosenCapacity > 0 && v > chosenCapacity) { 
+                etSampleSize.setError("Sample size cannot exceed waiting list capacity"); 
+                etSampleSize.requestFocus(); 
+                return; 
+            }
+            chosenSampleSize = v;
+        } catch (NumberFormatException e) {
+            etSampleSize.setError("Enter a number"); 
+            etSampleSize.requestFocus(); 
+            return;
         }
 
         if (organizerId == null || organizerId.trim().isEmpty()) {
@@ -423,7 +455,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
 
         btnSave.setEnabled(false);
         btnSave.setText("Saving…");
-        doUploadAndSave(title, chosenCapacity);
+        doUploadAndSave(title, chosenCapacity, chosenSampleSize);
     }
     /**
      * Uploads the selected event poster to Firebase Storage and then calls
@@ -431,8 +463,9 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
      *
      * @param title          The validated title of the event.
      * @param chosenCapacity The validated capacity of the event (-1 for unlimited).
+     * @param chosenSampleSize The validated sample size (number of initial invitations).
      */
-    private void doUploadAndSave(String title, int chosenCapacity) {
+    private void doUploadAndSave(String title, int chosenCapacity, int chosenSampleSize) {
         final String id = UUID.randomUUID().toString();
         final StorageReference ref = FirebaseStorage.getInstance()
                 .getReference("posters/" + id + ".jpg");
@@ -446,7 +479,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                     if (!task.isSuccessful()) throw task.getException();
                     return ref.getDownloadUrl();
                 })
-                .addOnSuccessListener(download -> writeEventDoc(id, title, chosenCapacity, download.toString()))
+                .addOnSuccessListener(download -> writeEventDoc(id, title, chosenCapacity, chosenSampleSize, download.toString()))
                 .addOnFailureListener(e -> {
                     Log.e(TAG, "Poster upload failed", e);
                     toast("Upload failed: " + e.getMessage());
@@ -460,9 +493,10 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
      * @param id             The unique ID generated for this event.
      * @param title          The title of the event.
      * @param chosenCapacity The maximum number of attendees (-1 for no limit).
+     * @param chosenSampleSize The number of initial invitations to send.
      * @param posterUrl      The public URL of the uploaded poster in Firebase Storage.
      */
-    private void writeEventDoc(String id, String title, int chosenCapacity, String posterUrl) {
+    private void writeEventDoc(String id, String title, int chosenCapacity, int chosenSampleSize, String posterUrl) {
         if (organizerId == null || organizerId.trim().isEmpty()) {
             toast("Organizer profile not configured.");
             btnSave.setEnabled(true);
@@ -488,6 +522,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         doc.put("eventStart", eventStartEpochMs);
         doc.put("eventStartEpochMs", eventStartEpochMs); // Also save with consistent naming
         doc.put("capacity", chosenCapacity);
+        doc.put("sampleSize", chosenSampleSize);
         doc.put("geolocation", useGeo);
         doc.put("qrEnabled", generateQr);
         doc.put("posterUrl", posterUrl);

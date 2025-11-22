@@ -1,22 +1,30 @@
 package com.example.eventease.ui.entrant.profile;
 
+import android.Manifest;
 import android.app.Dialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.ColorDrawable;
+import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.TextView;
+import android.widget.Toast;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.widget.AppCompatButton;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.navigation.Navigation;
 import androidx.cardview.widget.CardView;
@@ -32,6 +40,7 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.google.firebase.firestore.QuerySnapshot;
 import com.example.eventease.R;
+import com.example.eventease.notifications.FCMTokenManager;
 import com.example.eventease.util.ToastUtil;
 import com.example.eventease.ui.organizer.OrganizerMyEventActivity;
 import java.util.ArrayList;
@@ -47,15 +56,40 @@ import android.renderscript.ScriptIntrinsicBlur;
  * Shows profile details and provides navigation to edit profile and logout.
  */
 public class AccountFragment extends Fragment {
+    private static final String TAG = "AccountFragment";
     private TextView fullNameText;
     private ShapeableImageView profileImage;
     private FirebaseFirestore db;
     private FirebaseAuth mAuth;
     private CardView organizerSwitchCard;
     private String organizerIdForSwitch;
+    private ActivityResultLauncher<String> notificationPermissionLauncher;
+    private TextView notificationStatusText;
 
     public AccountFragment() { }
 
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        
+        // Initialize notification permission launcher
+        notificationPermissionLauncher = registerForActivityResult(
+                new ActivityResultContracts.RequestPermission(),
+                isGranted -> {
+                    if (isGranted) {
+                        Log.d(TAG, "Notification permission granted from account page");
+                        ToastUtil.showShort(requireContext(), "Notification permission granted!");
+                        // Initialize FCM after permission is granted
+                        FCMTokenManager.getInstance().initialize();
+                        updateNotificationStatus();
+                    } else {
+                        Log.w(TAG, "Notification permission denied from account page");
+                        ToastUtil.showShort(requireContext(), "Notification permission denied. You can enable it later in Settings.");
+                        updateNotificationStatus();
+                    }
+                });
+    }
+    
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
@@ -85,10 +119,14 @@ public class AccountFragment extends Fragment {
             });
         }
 
-        // Set up click listeners
-        root.findViewById(R.id.notificationsCard).setOnClickListener(v -> {
-            // Handle notifications click
-        });
+        // Set up notification card click listener
+        CardView notificationsCard = root.findViewById(R.id.notificationsCard);
+        if (notificationsCard != null) {
+            notificationsCard.setOnClickListener(v -> handleNotificationPermissionClick());
+        }
+        
+        // Find notification status text (we'll add it to layout or use existing TextView)
+        // For now, we'll show status in a toast and update the card appearance
 
         root.findViewById(R.id.logoutButton).setOnClickListener(v -> logout());
 
@@ -100,7 +138,64 @@ public class AccountFragment extends Fragment {
         // Load user data with real-time updates
         loadUserData();
         
+        // Update notification status on view creation
+        updateNotificationStatus();
+        
         return root;
+    }
+    
+    /**
+     * Handles notification permission click from account page.
+     * Checks current permission status and requests if needed.
+     */
+    private void handleNotificationPermissionClick() {
+        if (getContext() == null) return;
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            // Android 13+ requires runtime permission
+            if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.POST_NOTIFICATIONS) 
+                    == PackageManager.PERMISSION_GRANTED) {
+                // Permission already granted
+                ToastUtil.showShort(getContext(), "Notification permission is already enabled ✓");
+                updateNotificationStatus();
+            } else {
+                // Request permission
+                Log.d(TAG, "Requesting notification permission from account page");
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS);
+            }
+        } else {
+            // Android 12 and below - permission granted via manifest
+            ToastUtil.showShort(getContext(), "Notifications are enabled (Android 12 and below)");
+        }
+    }
+    
+    /**
+     * Updates the notification status display in the account page.
+     */
+    private void updateNotificationStatus() {
+        if (getView() == null || getContext() == null) return;
+        
+        CardView notificationsCard = getView().findViewById(R.id.notificationsCard);
+        if (notificationsCard == null) return;
+        
+        boolean hasPermission = false;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            hasPermission = ContextCompat.checkSelfPermission(getContext(), Manifest.permission.POST_NOTIFICATIONS) 
+                    == PackageManager.PERMISSION_GRANTED;
+        } else {
+            // Android 12 and below - permission granted via manifest
+            hasPermission = true;
+        }
+        
+        // Update card appearance based on permission status
+        // You can change background color or add an icon to show status
+        if (hasPermission) {
+            // Permission granted - could show green tint or checkmark
+            notificationsCard.setAlpha(1.0f);
+        } else {
+            // Permission denied - could show grayed out or warning icon
+            notificationsCard.setAlpha(0.7f);
+        }
     }
     
     private void loadUserData() {

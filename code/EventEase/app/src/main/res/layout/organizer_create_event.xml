@@ -380,11 +380,11 @@
                     android:textSize="16sp"/>
             </LinearLayout>
 
-            <!-- Entrants -->
+            <!-- Waiting List Capacity -->
             <TextView
                 android:layout_marginTop="16dp"
                 android:layout_marginBottom="8dp"
-                android:text="Number of Entrants"
+                android:text="Waiting List Capacity"
                 android:textStyle="bold"
                 android:textSize="20sp"
                 android:textColor="@color/ee_text_light"
@@ -420,15 +420,39 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:layout_marginBottom="16dp"
+                android:layout_marginBottom="8dp"
                 android:background="@drawable/ee_card_bg"
                 android:enabled="false"
-                android:hint="Enter capacity"
+                android:hint="Enter waiting list capacity"
                 android:inputType="number"
                 android:padding="18dp"
                 android:textColor="@color/ee_text_light"
                 android:textColorHint="#80FFFFFF"
                 android:visibility="gone"/>
+
+            <TextView
+                android:id="@+id/tvSampleSize"
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="8dp"
+                android:text="Sample Size for Initial Invitation"
+                android:textStyle="bold"
+                android:textSize="20sp"
+                android:textColor="@color/ee_text_light"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"/>
+
+            <EditText
+                android:id="@+id/etSampleSize"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="16dp"
+                android:background="@drawable/ee_card_bg"
+                android:hint="Enter sample size (number of initial invitations)"
+                android:inputType="number"
+                android:padding="18dp"
+                android:textColor="@color/ee_text_light"
+                android:textColorHint="#80FFFFFF"/>
 
         </LinearLayout>
     </ScrollView>
