@@ -38,18 +38,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity
-            android:name=".admin.image.ui.AdminImageManagementActivity"
-            android:exported="false" />
-        <activity
-            android:name=".admin.event.ui.AdminEventManagementActivity"
-            android:exported="false" />
-        <activity
-            android:name=".admin.event.ui.EventDetailActivity"
-            android:exported="false" />
-        <activity
-            android:name=".admin.AdminMainActivity"
-            android:exported="false" />
 
         <meta-data
             android:name="preloaded_fonts"
@@ -67,8 +55,6 @@
                 android:name="androidx.core.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
-
-
 
         <activity
             android:name=".ui.organizer.OrganizerMyEventActivity"
@@ -95,16 +81,6 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
-
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.fileprovider"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths" />
-        </provider>
 
         <service
             android:name="com.example.eventease.notifications.EventNotificationService"
