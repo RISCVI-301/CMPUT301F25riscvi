@@ -89,7 +89,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:padding="16dp">
+            android:padding="16dp"
+            android:gravity="center_vertical">
 
             <TextView
                 android:layout_width="0dp"
@@ -100,12 +101,12 @@
                 android:textColor="#FFFFFF"
                 android:fontFamily="@font/entrant_fredoka_one"/>
 
-            <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:src="@drawable/entrant_ic_arrow_forward"
-                android:layout_gravity="center_vertical"
-                app:tint="#FFFFFF"/>
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/notificationToggle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:checked="true"/>
         </LinearLayout>
     </androidx.cardview.widget.CardView>
 

@@ -38,22 +38,15 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity
-            android:name=".admin.image.ui.AdminImageManagementActivity"
-            android:exported="false" />
-        <activity
-            android:name=".admin.event.ui.AdminEventManagementActivity"
-            android:exported="false" />
-        <activity
-            android:name=".admin.event.ui.EventDetailActivity"
-            android:exported="false" />
-        <activity
-            android:name=".admin.AdminMainActivity"
-            android:exported="false" />
 
         <meta-data
             android:name="preloaded_fonts"
             android:resource="@array/preloaded_fonts" />
+
+        <!-- Google Maps API Key -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="@string/google_maps_api_key" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
@@ -67,8 +60,6 @@
                 android:name="androidx.core.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
-
-
 
         <activity
             android:name=".ui.organizer.OrganizerMyEventActivity"
@@ -85,16 +76,9 @@
         <activity
             android:name=".ui.organizer.OrganizerViewEntrantsActivity"
             android:exported="false" />
-
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.fileprovider"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths" />
-        </provider>
+        <activity
+            android:name=".ui.organizer.OrganizerEntrantLocationsActivity"
+            android:exported="false" />
 
         <service
             android:name="com.example.eventease.notifications.EventNotificationService"

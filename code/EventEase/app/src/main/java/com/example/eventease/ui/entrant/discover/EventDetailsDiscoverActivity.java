@@ -278,6 +278,9 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
         } else {
             observeWaitlistCollection();
         }
+        
+        // Update button state when event data changes
+        updateWaitlistButtonState();
 
         if (event.getRegistrationStart() > 0 && event.getRegistrationEnd() > 0) {
             SimpleDateFormat regDateFormat = new SimpleDateFormat("MMM d, yyyy • h:mm a", Locale.getDefault());
@@ -292,7 +295,12 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
             }
             
             dateView.setText(dateText);
-        } else if (event.getStartsAtEpochMs() > 0) {
+        }
+        
+        // Update button state after event is loaded
+        checkWaitlistStatus();
+        
+        if (event.getStartsAtEpochMs() > 0) {
             String dateText = DATE_FORMAT.format(new Date(event.getStartsAtEpochMs()));
             
             // Add deadline if available
@@ -410,6 +418,12 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
         if (waitlistCountView != null) {
             waitlistCountView.setText(String.valueOf(Math.max(0, count)));
         }
+        // Update button state when waitlist count changes (affects capacity check)
+        if (currentEvent != null) {
+            // Update the event's waitlist count for canJoinWaitlist() check
+            currentEvent.waitlistCount = (int) count;
+            updateWaitlistButtonState();
+        }
     }
 
     private void observeWaitlistCollection() {
@@ -461,22 +475,46 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
      * Handle the join waitlist button click
      */
     private void handleJoinWaitlist() {
+        android.util.Log.d("EventDetailsDiscover", "handleJoinWaitlist called, isUserInWaitlist=" + isUserInWaitlist);
+        
         if (isUserInWaitlist) {
-            Toast.makeText(this, "You are already in the waitlist", Toast.LENGTH_SHORT).show();
+            // User wants to opt out
+            handleOptOut();
             return;
         }
 
         if (authManager == null || waitlistRepo == null || TextUtils.isEmpty(eventId)) {
+            android.util.Log.e("EventDetailsDiscover", "Cannot join: authManager=" + authManager + ", waitlistRepo=" + waitlistRepo + ", eventId=" + eventId);
             Toast.makeText(this, "Unable to join waitlist. Please try again.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Check if user can join
+        if (!canJoinWaitlist()) {
+            android.util.Log.d("EventDetailsDiscover", "Cannot join waitlist - validation failed");
+            if (currentEvent != null) {
+                long currentTime = System.currentTimeMillis();
+                if (currentEvent.getRegistrationStart() > 0 && currentTime < currentEvent.getRegistrationStart()) {
+                    Toast.makeText(this, "Registration period has not started yet", Toast.LENGTH_LONG).show();
+                } else if (currentEvent.getRegistrationEnd() > 0 && currentTime > currentEvent.getRegistrationEnd()) {
+                    Toast.makeText(this, "Registration period has ended", Toast.LENGTH_LONG).show();
+                } else {
+                    Toast.makeText(this, "Waitlist is full. Capacity reached.", Toast.LENGTH_LONG).show();
+                }
+            } else {
+                Toast.makeText(this, "Cannot join waitlist at this time", Toast.LENGTH_SHORT).show();
+            }
             return;
         }
 
         // Disable button to prevent multiple clicks
         waitlistButton.setEnabled(false);
+        android.util.Log.d("EventDetailsDiscover", "Calling waitlistRepo.join for eventId=" + eventId + ", uid=" + authManager.getUid());
 
         String uid = authManager.getUid();
         waitlistRepo.join(eventId, uid)
                 .addOnSuccessListener(aVoid -> {
+                    android.util.Log.d("EventDetailsDiscover", "Successfully joined waitlist");
                     isUserInWaitlist = true;
                     updateWaitlistButtonState();
                     Toast.makeText(this, "Successfully joined the waitlist!", Toast.LENGTH_SHORT).show();
@@ -485,10 +523,40 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
                     JoinWaitlistDialogFragment.show(getSupportFragmentManager());
                 })
                 .addOnFailureListener(e -> {
+                    android.util.Log.e("EventDetailsDiscover", "Failed to join waitlist", e);
                     waitlistButton.setEnabled(true);
                     String errorMessage = e.getMessage();
                     if (TextUtils.isEmpty(errorMessage)) {
                         errorMessage = "Failed to join waitlist. Please try again.";
+                    }
+                    Toast.makeText(this, errorMessage, Toast.LENGTH_LONG).show();
+                });
+    }
+    
+    /**
+     * Handle opt out from waitlist
+     */
+    private void handleOptOut() {
+        if (authManager == null || waitlistRepo == null || TextUtils.isEmpty(eventId)) {
+            Toast.makeText(this, "Unable to leave waitlist. Please try again.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Disable button to prevent multiple clicks
+        waitlistButton.setEnabled(false);
+
+        String uid = authManager.getUid();
+        waitlistRepo.leave(eventId, uid)
+                .addOnSuccessListener(aVoid -> {
+                    isUserInWaitlist = false;
+                    updateWaitlistButtonState();
+                    Toast.makeText(this, "Successfully left the waitlist", Toast.LENGTH_SHORT).show();
+                })
+                .addOnFailureListener(e -> {
+                    waitlistButton.setEnabled(true);
+                    String errorMessage = e.getMessage();
+                    if (TextUtils.isEmpty(errorMessage)) {
+                        errorMessage = "Failed to leave waitlist. Please try again.";
                     }
                     Toast.makeText(this, errorMessage, Toast.LENGTH_LONG).show();
                 });
@@ -503,11 +571,89 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
         }
 
         if (isUserInWaitlist) {
-            waitlistButton.setText("Already in Waitlist");
-            waitlistButton.setEnabled(false);
-        } else {
-            waitlistButton.setText("Join Waitlist");
+            waitlistButton.setText("Opt Out");
             waitlistButton.setEnabled(true);
+        } else {
+            // Check if capacity is full
+            boolean isCapacityFull = isCapacityFull();
+            if (isCapacityFull) {
+                waitlistButton.setText("Capacity Full");
+                waitlistButton.setEnabled(false);
+            } else {
+                // Check if registration period has ended or other restrictions
+                boolean canJoin = canJoinWaitlist();
+                waitlistButton.setText("Join Waitlist");
+                waitlistButton.setEnabled(canJoin);
+            }
         }
+    }
+    
+    /**
+     * Check if the waitlist capacity is full
+     */
+    private boolean isCapacityFull() {
+        if (currentEvent == null) {
+            return false;
+        }
+        
+        int capacity = currentEvent.getCapacity();
+        if (capacity <= 0) {
+            return false; // No capacity limit
+        }
+        
+        int waitlistCount = currentEvent.getWaitlistCount();
+        return waitlistCount >= capacity;
+    }
+    
+    /**
+     * Check if user can join the waitlist (registration period active and capacity not reached)
+     */
+    private boolean canJoinWaitlist() {
+        if (currentEvent == null) {
+            android.util.Log.d("EventDetailsDiscover", "canJoinWaitlist: currentEvent is null");
+            return false;
+        }
+        
+        long currentTime = System.currentTimeMillis();
+        
+        // Check registration period
+        if (currentEvent.getRegistrationStart() > 0 && currentEvent.getRegistrationEnd() > 0) {
+            if (currentTime < currentEvent.getRegistrationStart()) {
+                android.util.Log.d("EventDetailsDiscover", "canJoinWaitlist: Registration hasn't started. Start: " + 
+                    new java.util.Date(currentEvent.getRegistrationStart()) + ", Current: " + new java.util.Date(currentTime));
+                return false; // Registration period hasn't started
+            }
+            if (currentTime > currentEvent.getRegistrationEnd()) {
+                android.util.Log.d("EventDetailsDiscover", "canJoinWaitlist: Registration has ended. End: " + 
+                    new java.util.Date(currentEvent.getRegistrationEnd()) + ", Current: " + new java.util.Date(currentTime));
+                return false; // Registration period has ended
+            }
+        } else if (currentEvent.getRegistrationStart() > 0) {
+            // Only start time is set
+            if (currentTime < currentEvent.getRegistrationStart()) {
+                android.util.Log.d("EventDetailsDiscover", "canJoinWaitlist: Registration hasn't started (start only)");
+                return false;
+            }
+        } else if (currentEvent.getRegistrationEnd() > 0) {
+            // Only end time is set
+            if (currentTime > currentEvent.getRegistrationEnd()) {
+                android.util.Log.d("EventDetailsDiscover", "canJoinWaitlist: Registration has ended (end only)");
+                return false;
+            }
+        }
+        
+        // Check capacity
+        int capacity = currentEvent.getCapacity();
+        if (capacity > 0) {
+            int waitlistCount = currentEvent.getWaitlistCount();
+            android.util.Log.d("EventDetailsDiscover", "canJoinWaitlist: Capacity check - capacity=" + capacity + ", waitlistCount=" + waitlistCount);
+            if (waitlistCount >= capacity) {
+                android.util.Log.d("EventDetailsDiscover", "canJoinWaitlist: Capacity reached");
+                return false; // Capacity reached
+            }
+        }
+        
+        android.util.Log.d("EventDetailsDiscover", "canJoinWaitlist: All checks passed, can join");
+        return true;
     }
 }

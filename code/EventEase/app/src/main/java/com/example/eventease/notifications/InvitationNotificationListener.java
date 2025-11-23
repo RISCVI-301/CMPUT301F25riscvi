@@ -26,8 +26,7 @@ import javax.annotation.Nullable;
 
 public class InvitationNotificationListener {
     private static final String TAG = "InvitationNotificationListener";
-    private static final String CHANNEL_ID = "event_invitations";
-    private static final String CHANNEL_NAME = "Event Invitations";
+    private static final String CHANNEL_ID = NotificationChannelManager.CHANNEL_ID;
     
     private ListenerRegistration registration;
     private final FirebaseFirestore db;
@@ -150,18 +149,8 @@ public class InvitationNotificationListener {
     }
     
     private void createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel channel = new NotificationChannel(
-                    CHANNEL_ID,
-                    CHANNEL_NAME,
-                    NotificationManager.IMPORTANCE_HIGH
-            );
-            channel.setDescription("Notifications for event invitations");
-            NotificationManager notificationManager = context.getSystemService(NotificationManager.class);
-            if (notificationManager != null) {
-                notificationManager.createNotificationChannel(channel);
-            }
-        }
+        // Use centralized channel manager
+        NotificationChannelManager.createNotificationChannel(context);
     }
 }
 
