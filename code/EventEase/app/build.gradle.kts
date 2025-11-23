@@ -1,13 +1,18 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     alias(libs.plugins.android.application)
     id("com.google.gms.google-services")
 }
 
 // Load API key from local.properties
-val localProperties = java.util.Properties()
 val localPropertiesFile = rootProject.file("local.properties")
+val localProperties = Properties()
 if (localPropertiesFile.exists()) {
-    localProperties.load(java.io.FileInputStream(localPropertiesFile))
+    FileInputStream(localPropertiesFile).use { stream ->
+        localProperties.load(stream)
+    }
 }
 val googleMapsApiKey = localProperties.getProperty("google.maps.api.key") ?: ""
 
