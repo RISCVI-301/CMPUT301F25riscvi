@@ -29,6 +29,8 @@ public class Event {
     public String location;
     /** Maximum capacity of the event. */
     public int capacity;
+    /** Sample size - number of invitations to send initially from waitlist. */
+    public int sampleSize;
     /** Current number of people on waitlist (deprecated - use waitlist.size()). */
     public int waitlistCount;
     /** List of user IDs on the waitlist. */
@@ -83,6 +85,7 @@ public class Event {
         m.put("registrationEnd", registrationEnd);
         m.put("location", location);
         m.put("capacity", capacity);
+        m.put("sampleSize", sampleSize);
         m.put("waitlistCount", waitlistCount);
         m.put("waitlist", waitlist != null ? waitlist : new ArrayList<>());
         m.put("admitted", admitted != null ? admitted : new ArrayList<>());
@@ -125,6 +128,9 @@ public class Event {
         
         Object cap = m.get("capacity");
         e.capacity = cap != null ? ((Number) cap).intValue() : 0;
+        
+        Object sampleSize = m.get("sampleSize");
+        e.sampleSize = sampleSize != null ? ((Number) sampleSize).intValue() : 0;
         
         Object wc = m.get("waitlistCount");
         e.waitlistCount = wc != null ? ((Number) wc).intValue() : 0;
@@ -280,6 +286,20 @@ public class Event {
      * @param capacity the event capacity to set
      */
     public void setCapacity(int capacity) { this.capacity = capacity; }
+
+    /**
+     * Gets the sample size (number of initial invitations to send).
+     *
+     * @return the sample size
+     */
+    public int getSampleSize() { return sampleSize; }
+
+    /**
+     * Sets the sample size (number of initial invitations to send).
+     *
+     * @param sampleSize the sample size to set
+     */
+    public void setSampleSize(int sampleSize) { this.sampleSize = sampleSize; }
 
     /**
      * Gets the waitlist count (deprecated - use getWaitlist().size() instead).

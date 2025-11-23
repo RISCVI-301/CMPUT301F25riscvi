@@ -94,7 +94,8 @@ public class ReplacementHelper {
         // Get event details for deadline calculation
         db.collection("events").document(eventId).get()
                 .addOnSuccessListener(eventDoc -> {
-                    Long eventDeadline = eventDoc != null ? eventDoc.getLong("eventDeadline") : null;
+                    // Use correct Firestore field names
+                    Long eventDeadline = eventDoc != null ? eventDoc.getLong("deadlineEpochMs") : null;
                     Long eventStart = eventDoc != null ? eventDoc.getLong("eventStart") : null;
                     
                     // Calculate deadline for replacement invitations
@@ -147,15 +148,26 @@ public class ReplacementHelper {
                                         batch.delete(eventRef.collection("WaitlistedEntrants").document(userId));
                                         
                                         // Create invitation for replacement
+                                        // Use same field names as InvitationHelper for consistency
+                                        String invitationId = UUID.randomUUID().toString();
                                         Map<String, Object> invitation = new HashMap<>();
+                                        invitation.put("id", invitationId);
                                         invitation.put("eventId", eventId);
-                                        invitation.put("userId", userId);
+                                        invitation.put("uid", userId); // Use 'uid' to match InvitationHelper
+                                        invitation.put("entrantId", userId); // Add for compatibility
                                         invitation.put("status", "PENDING");
-                                        invitation.put("createdAt", System.currentTimeMillis());
+                                        invitation.put("issuedAt", System.currentTimeMillis()); // Use 'issuedAt' to match InvitationHelper
                                         invitation.put("expiresAt", deadlineToAccept);
                                         invitation.put("isReplacement", true);
                                         
-                                        batch.set(db.collection("invitations").document(UUID.randomUUID().toString()), invitation);
+                                        // Get organizer ID for consistency
+                                        com.google.firebase.auth.FirebaseAuth auth = com.google.firebase.auth.FirebaseAuth.getInstance();
+                                        com.google.firebase.auth.FirebaseUser currentUser = auth.getCurrentUser();
+                                        if (currentUser != null) {
+                                            invitation.put("organizerId", currentUser.getUid());
+                                        }
+                                        
+                                        batch.set(db.collection("invitations").document(invitationId), invitation);
                                     }
                                 }
 
@@ -198,27 +210,26 @@ public class ReplacementHelper {
                 eventTitle, deadlineStr
         );
 
-        WriteBatch batch = db.batch();
-        for (String userId : userIds) {
-            Map<String, Object> notification = new HashMap<>();
-            notification.put("userId", userId);
-            notification.put("eventId", eventId);
-            notification.put("title", "Replacement Invitation");
-            notification.put("message", message);
-            notification.put("type", "REPLACEMENT_INVITATION");
-            notification.put("createdAt", System.currentTimeMillis());
-            notification.put("read", false);
-            
-            batch.set(db.collection("notifications").document(), notification);
-        }
-
-        batch.commit()
-                .addOnSuccessListener(v -> {
-                    Log.d(TAG, "Sent " + userIds.size() + " replacement notifications");
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Failed to send replacement notifications", e);
-                });
+        // Use NotificationHelper for push notifications (works when app is closed)
+        NotificationHelper notificationHelper = new NotificationHelper();
+        notificationHelper.sendNotificationsToUsers(
+                userIds,
+                "Replacement Invitation",
+                message,
+                eventId,
+                eventTitle,
+                new NotificationHelper.NotificationCallback() {
+                    @Override
+                    public void onComplete(int sentCount) {
+                        Log.d(TAG, "Successfully sent " + sentCount + " replacement push notifications");
+                    }
+                    
+                    @Override
+                    public void onError(String error) {
+                        Log.e(TAG, "Failed to send replacement notifications: " + error);
+                    }
+                }
+        );
     }
 }
 

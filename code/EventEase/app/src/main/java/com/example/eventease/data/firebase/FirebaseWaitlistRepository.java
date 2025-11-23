@@ -60,31 +60,76 @@ public class FirebaseWaitlistRepository implements WaitlistRepository {
                 return Tasks.forException(new Exception("User is already admitted to this event"));
             }
 
-            DocumentReference waitlistDoc = eventRef.collection("WaitlistedEntrants").document(uid);
-            return waitlistDoc.get().continueWithTask(waitlistTask -> {
-                if (waitlistTask.isSuccessful() && waitlistTask.getResult() != null && waitlistTask.getResult().exists()) {
-                    Log.d(TAG, "User " + uid + " already has a waitlist entry for event " + eventId);
-                    membership.add(key(eventId, uid));
-                    return Tasks.forResult(null);
+            // Check registration period
+            Long registrationStart = eventDoc.getLong("registrationStart");
+            Long registrationEnd = eventDoc.getLong("registrationEnd");
+            long currentTime = System.currentTimeMillis();
+            
+            if (registrationStart != null && registrationStart > 0 && currentTime < registrationStart) {
+                Log.d(TAG, "Registration period has not started yet for event " + eventId);
+                return Tasks.forException(new Exception("Registration period has not started yet"));
+            }
+            
+            if (registrationEnd != null && registrationEnd > 0 && currentTime > registrationEnd) {
+                Log.d(TAG, "Registration period has ended for event " + eventId);
+                return Tasks.forException(new Exception("Registration period has ended"));
+            }
+
+            // Check capacity
+            Long capacityLong = eventDoc.getLong("capacity");
+            int capacity = capacityLong != null ? capacityLong.intValue() : 0;
+            if (capacity > 0) {
+                Long waitlistCountLong = eventDoc.getLong("waitlistCount");
+                int currentWaitlistCount = waitlistCountLong != null ? waitlistCountLong.intValue() : 0;
+                
+                // Also check actual count in subcollection as fallback
+                if (currentWaitlistCount == 0) {
+                    return eventRef.collection("WaitlistedEntrants").get().continueWithTask(countTask -> {
+                        int actualCount = countTask.isSuccessful() && countTask.getResult() != null ? 
+                            countTask.getResult().size() : 0;
+                        
+                        if (actualCount >= capacity) {
+                            Log.d(TAG, "Waitlist capacity reached for event " + eventId + " (capacity: " + capacity + ", current: " + actualCount + ")");
+                            return Tasks.forException(new Exception("Waitlist is full. Capacity reached."));
+                        }
+                        
+                        return proceedWithJoin(eventRef, eventId, uid);
+                    });
+                } else if (currentWaitlistCount >= capacity) {
+                    Log.d(TAG, "Waitlist capacity reached for event " + eventId + " (capacity: " + capacity + ", current: " + currentWaitlistCount + ")");
+                    return Tasks.forException(new Exception("Waitlist is full. Capacity reached."));
                 }
+            }
 
-                return db.collection("users").document(uid).get().continueWithTask(userTask -> {
-                    DocumentSnapshot userDoc = userTask.isSuccessful() ? userTask.getResult() : null;
-                    Map<String, Object> payload = buildWaitlistEntry(uid, userDoc);
+            return proceedWithJoin(eventRef, eventId, uid);
+        });
+    }
+    
+    private Task<Void> proceedWithJoin(DocumentReference eventRef, String eventId, String uid) {
+        DocumentReference waitlistDoc = eventRef.collection("WaitlistedEntrants").document(uid);
+        return waitlistDoc.get().continueWithTask(waitlistTask -> {
+            if (waitlistTask.isSuccessful() && waitlistTask.getResult() != null && waitlistTask.getResult().exists()) {
+                Log.d(TAG, "User " + uid + " already has a waitlist entry for event " + eventId);
+                membership.add(key(eventId, uid));
+                return Tasks.forResult(null);
+            }
 
-                    WriteBatch batch = db.batch();
-                    batch.set(waitlistDoc, payload, SetOptions.merge());
-                    batch.update(eventRef, "waitlistCount", FieldValue.increment(1));
+            return db.collection("users").document(uid).get().continueWithTask(userTask -> {
+                DocumentSnapshot userDoc = userTask.isSuccessful() ? userTask.getResult() : null;
+                Map<String, Object> payload = buildWaitlistEntry(uid, userDoc);
 
-                    return batch.commit()
-                            .addOnSuccessListener(aVoid -> {
-                                Log.d(TAG, "SUCCESS: User " + uid + " added to waitlist subcollection for event " + eventId);
-                                membership.add(key(eventId, uid));
-                                eventRepo.incrementWaitlist(eventId);
-                            })
-                            .addOnFailureListener(e -> Log.e(TAG, "FAILED to add user " + uid + " to waitlist for event " + eventId, e))
-                            .continueWith(t -> null);
-                });
+                WriteBatch batch = db.batch();
+                batch.set(waitlistDoc, payload, SetOptions.merge());
+                batch.update(eventRef, "waitlistCount", FieldValue.increment(1));
+
+                return batch.commit()
+                        .addOnSuccessListener(aVoid -> {
+                            Log.d(TAG, "SUCCESS: User " + uid + " added to waitlist subcollection for event " + eventId);
+                            membership.add(key(eventId, uid));
+                            eventRepo.incrementWaitlist(eventId);
+                        })
+                        .addOnFailureListener(e -> Log.e(TAG, "FAILED to add user " + uid + " to waitlist for event " + eventId, e))
+                        .continueWith(t -> null);
             });
         });
     }
@@ -118,6 +163,26 @@ public class FirebaseWaitlistRepository implements WaitlistRepository {
         DocumentReference eventRef = db.collection("events").document(eventId);
         DocumentReference waitlistDoc = eventRef.collection("WaitlistedEntrants").document(uid);
 
+        // Get event details for notification
+        return eventRef.get().continueWithTask(eventTask -> {
+            String eventTitle = null;
+            Long capacity = null;
+            Long waitlistCount = null;
+            
+            if (eventTask.isSuccessful() && eventTask.getResult() != null && eventTask.getResult().exists()) {
+                DocumentSnapshot eventDoc = eventTask.getResult();
+                eventTitle = eventDoc.getString("title");
+                capacity = eventDoc.getLong("capacity");
+                waitlistCount = eventDoc.getLong("waitlistCount");
+            }
+            
+            return proceedWithLeave(eventRef, waitlistDoc, eventId, uid, eventTitle, capacity, waitlistCount);
+        });
+    }
+    
+    private Task<Void> proceedWithLeave(DocumentReference eventRef, DocumentReference waitlistDoc, 
+                                       String eventId, String uid, String eventTitle, 
+                                       Long capacity, Long waitlistCount) {
         WriteBatch batch = db.batch();
         batch.delete(waitlistDoc);
         batch.update(eventRef, "waitlistCount", FieldValue.increment(-1));
@@ -127,9 +192,69 @@ public class FirebaseWaitlistRepository implements WaitlistRepository {
                     Log.d(TAG, "SUCCESS: User " + uid + " removed from waitlist for event " + eventId);
                     membership.remove(key(eventId, uid));
                     eventRepo.decrementWaitlist(eventId);
+                    
+                    // Send notification to other waitlisted users if capacity was full
+                    if (eventTitle != null && capacity != null && capacity > 0 && 
+                        waitlistCount != null && waitlistCount >= capacity) {
+                        // Capacity was full, now there's a spot available - notify others
+                        sendWaitlistSpotAvailableNotification(eventId, eventTitle, uid);
+                    }
                 })
                 .addOnFailureListener(e -> Log.e(TAG, "FAILED to remove user " + uid + " from waitlist for event " + eventId, e))
                 .continueWith(task -> null);
+    }
+    
+    /**
+     * Sends notification to waitlisted users when a spot becomes available.
+     */
+    private void sendWaitlistSpotAvailableNotification(String eventId, String eventTitle, String leavingUserId) {
+        Log.d(TAG, "Sending waitlist spot available notification for event " + eventId);
+        
+        DocumentReference eventRef = db.collection("events").document(eventId);
+        
+        eventRef.collection("WaitlistedEntrants").get()
+                .addOnSuccessListener(snapshot -> {
+                    if (snapshot == null || snapshot.isEmpty()) {
+                        return;
+                    }
+                    
+                    List<String> userIds = new java.util.ArrayList<>();
+                    for (com.google.firebase.firestore.DocumentSnapshot doc : snapshot.getDocuments()) {
+                        String userId = doc.getId();
+                        // Don't notify the user who just left
+                        if (!userId.equals(leavingUserId)) {
+                            userIds.add(userId);
+                        }
+                    }
+                    
+                    if (userIds.isEmpty()) {
+                        return;
+                    }
+                    
+                    String notificationTitle = "Waitlist Update: " + eventTitle;
+                    String notificationMessage = "A spot has become available on the waitlist for " + 
+                        eventTitle + ". Check the event details if you're interested!";
+                    
+                    com.example.eventease.ui.organizer.NotificationHelper notificationHelper = 
+                        new com.example.eventease.ui.organizer.NotificationHelper();
+                    
+                    notificationHelper.sendNotificationsToUsers(userIds, notificationTitle, notificationMessage,
+                            eventId, eventTitle,
+                            new com.example.eventease.ui.organizer.NotificationHelper.NotificationCallback() {
+                                @Override
+                                public void onComplete(int sentCount) {
+                                    Log.d(TAG, "Sent waitlist spot available notification to " + sentCount + " users");
+                                }
+                                
+                                @Override
+                                public void onError(String error) {
+                                    Log.e(TAG, "Failed to send waitlist spot available notification: " + error);
+                                }
+                            });
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to load waitlisted entrants for notification", e);
+                });
     }
 
     private Map<String, Object> buildWaitlistEntry(String uid, DocumentSnapshot userDoc) {

@@ -6,7 +6,9 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.location.LocationManager;
+import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -19,10 +21,12 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.navigation.fragment.NavHostFragment;
 
 import com.example.eventease.R;
+import com.example.eventease.notifications.FCMTokenManager;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
 import com.google.firebase.auth.FirebaseAuth;
@@ -53,7 +57,9 @@ public class LocationPermissionFragment extends Fragment {
     private FirebaseAuth auth;
 
     private ActivityResultLauncher<String[]> locationPermissionLauncher;
+    private ActivityResultLauncher<String> notificationPermissionLauncher;
     private String selectedPermissionType;
+    private static final String TAG = "LocationPermissionFragment";
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -74,8 +80,26 @@ public class LocationPermissionFragment extends Fragment {
                         // Permission denied
                         savePermissionPreference(PERMISSION_DENIED);
                         Toast.makeText(requireContext(), "Location permission denied", Toast.LENGTH_SHORT).show();
-                        navigateToDiscover();
+                        // Still request notification permission even if location was denied
+                        requestNotificationPermission();
                     }
+                });
+        
+        // Initialize notification permission launcher
+        notificationPermissionLauncher = registerForActivityResult(
+                new ActivityResultContracts.RequestPermission(),
+                isGranted -> {
+                    if (isGranted) {
+                        Log.d(TAG, "Notification permission granted on first sign-in");
+                        // Initialize FCM after permission is granted
+                        FCMTokenManager.getInstance().initialize();
+                    } else {
+                        Log.w(TAG, "Notification permission denied on first sign-in");
+                        // Still initialize FCM - may work on older Android versions
+                        FCMTokenManager.getInstance().initialize();
+                    }
+                    // Navigate to discover after notification permission is handled
+                    navigateToDiscover();
                 });
     }
 
@@ -129,13 +153,18 @@ public class LocationPermissionFragment extends Fragment {
             
             db.collection("users").document(uid)
                     .update(updates)
-                    .addOnSuccessListener(aVoid -> navigateToDiscover())
+                    .addOnSuccessListener(aVoid -> {
+                        // Still request notification permission even if location was denied
+                        requestNotificationPermission();
+                    })
                     .addOnFailureListener(e -> {
                         Toast.makeText(requireContext(), "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                        navigateToDiscover();
+                        // Still request notification permission even if location save failed
+                        requestNotificationPermission();
                     });
         } else {
-            navigateToDiscover();
+            // Still request notification permission
+            requestNotificationPermission();
         }
     }
 
@@ -232,13 +261,40 @@ public class LocationPermissionFragment extends Fragment {
                 .addOnSuccessListener(aVoid -> {
                     setLoading(false);
                     Toast.makeText(requireContext(), "Location saved successfully!", Toast.LENGTH_SHORT).show();
-                    navigateToDiscover();
+                    // Request notification permission after location is saved
+                    requestNotificationPermission();
                 })
                 .addOnFailureListener(e -> {
                     setLoading(false);
                     Toast.makeText(requireContext(), "Failed to save location: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                    navigateToDiscover();
+                    // Still request notification permission even if location save failed
+                    requestNotificationPermission();
                 });
+    }
+    
+    /**
+     * Requests notification permission for Android 13+ (API 33+).
+     * Called after location permission is handled.
+     */
+    private void requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            // Android 13+ requires runtime permission
+            if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.POST_NOTIFICATIONS) 
+                    != PackageManager.PERMISSION_GRANTED) {
+                Log.d(TAG, "Requesting notification permission on first sign-in");
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS);
+            } else {
+                Log.d(TAG, "Notification permission already granted");
+                // Initialize FCM and navigate
+                FCMTokenManager.getInstance().initialize();
+                navigateToDiscover();
+            }
+        } else {
+            // Android 12 and below - permission granted via manifest
+            Log.d(TAG, "Android version < 13, notification permission granted via manifest");
+            FCMTokenManager.getInstance().initialize();
+            navigateToDiscover();
+        }
     }
 
     private void savePermissionPreference(String permissionType) {

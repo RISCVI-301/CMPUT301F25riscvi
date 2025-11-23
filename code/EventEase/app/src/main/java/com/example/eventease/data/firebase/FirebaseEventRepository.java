@@ -85,7 +85,7 @@ public class FirebaseEventRepository implements EventRepository {
                         }
                     }
                     
-                    // Filter open events
+                    // Filter open events (and ensure they're not deleted)
                     List<Event> result = new ArrayList<>();
                     for (Event e : events.values()) {
                         if (e.getStartAt() == null || e.getStartAt().after(now)) {
@@ -197,11 +197,27 @@ public class FirebaseEventRepository implements EventRepository {
                         return;
                     }
 
-                    int count = snap != null ? snap.size() : 0;
-                    waitlistCounts.put(eventId, count);
+                    // Use DocumentChange for more accurate real-time updates
+                    if (snap != null && !snap.getDocumentChanges().isEmpty()) {
+                        // Process changes to update count incrementally
+                        int currentCount = waitlistCounts.getOrDefault(eventId, 0);
+                        for (com.google.firebase.firestore.DocumentChange change : snap.getDocumentChanges()) {
+                            if (change.getType() == com.google.firebase.firestore.DocumentChange.Type.ADDED) {
+                                currentCount++;
+                            } else if (change.getType() == com.google.firebase.firestore.DocumentChange.Type.REMOVED) {
+                                currentCount = Math.max(0, currentCount - 1);
+                            }
+                        }
+                        waitlistCounts.put(eventId, currentCount);
+                    } else {
+                        // Fallback to size if no changes (initial load)
+                        int count = snap != null ? snap.size() : 0;
+                        waitlistCounts.put(eventId, count);
+                    }
 
+                    int finalCount = waitlistCounts.get(eventId);
                     db.collection("events").document(eventId)
-                            .update("waitlistCount", count)
+                            .update("waitlistCount", finalCount)
                             .addOnFailureListener(e -> Log.e(TAG, "Failed to sync waitlistCount field", e));
 
                     notifyCount(eventId);

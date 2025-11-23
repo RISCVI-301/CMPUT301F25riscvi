@@ -30,6 +30,7 @@ import com.google.firebase.storage.StorageReference;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 
 public class OrganizerWaitlistActivity extends AppCompatActivity {
@@ -99,6 +100,12 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
             }
         });
         deleteEventButton.setOnClickListener(v -> showDeleteEventConfirmation());
+
+        // Set up notification button for Waitlisted Entrants
+        ImageView mailIcon = findViewById(R.id.mail_icon);
+        if (mailIcon != null) {
+            mailIcon.setOnClickListener(v -> showSendNotificationsToWaitlistedConfirmation());
+        }
 
         signInAndLoadData();
     }
@@ -245,7 +252,7 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
         
         new MaterialAlertDialogBuilder(this)
                 .setTitle("Delete Event")
-                .setMessage("Are you sure you want to delete \"" + eventTitle + "\"? This action cannot be undone. All event data including waitlists, entrants, and invitations will be permanently deleted.")
+                .setMessage("Are you sure you want to delete \"" + eventTitle + "\"? This action cannot be undone. All event data including waitlists, entrants, and invitations will be permanently deleted from the database.")
                 .setPositiveButton("Delete", (dialog, which) -> deleteEvent())
                 .setNegativeButton("Cancel", null)
                 .show();
@@ -295,13 +302,14 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
             deleteEventButton.setEnabled(true);
         });
     }
-
+    
     private void deleteEventSubcollections(DocumentReference eventRef, Runnable onComplete) {
         String[] subcollections = {
             "WaitlistedEntrants",
             "SelectedEntrants",
             "NonSelectedEntrants",
-            "CancelledEntrants"
+            "CancelledEntrants",
+            "AdmittedEntrants"
         };
 
         List<com.google.android.gms.tasks.Task<QuerySnapshot>> getTasks = new ArrayList<>();
@@ -412,6 +420,63 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
                     onComplete.run();
                 });
     }
+
+    private void showSendNotificationsToWaitlistedConfirmation() {
+        if (currentEventId == null || currentEventId.isEmpty()) {
+            Toast.makeText(this, "Event ID not found", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (entrantNamesList.isEmpty()) {
+            Toast.makeText(this, "No waitlisted entrants to send notifications to", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        int count = entrantNamesList.size();
+        String message = "Send notifications to " + count + " waitlisted entrant" + (count > 1 ? "s" : "") + "? They will receive push notifications even when the app is closed.";
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Send Notifications")
+                .setMessage(message)
+                .setPositiveButton("Send", (dialog, which) -> sendNotificationsToWaitlisted())
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void sendNotificationsToWaitlisted() {
+        if (currentEventId == null || currentEventId.isEmpty()) {
+            Toast.makeText(this, "Event ID not found", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        String eventTitle = eventNameTextView != null ? eventNameTextView.getText().toString() : "Event";
+        if (eventTitle == null || eventTitle.isEmpty()) {
+            eventTitle = "Event";
+        }
+
+        Toast.makeText(this, "Sending notifications...", Toast.LENGTH_SHORT).show();
+
+        NotificationHelper notificationHelper = new NotificationHelper();
+        // Use default message from NotificationHelper
+        notificationHelper.sendNotificationsToWaitlisted(currentEventId, eventTitle, null, new NotificationHelper.NotificationCallback() {
+            @Override
+            public void onComplete(int sentCount) {
+                Toast.makeText(OrganizerWaitlistActivity.this,
+                        "Successfully sent notifications to " + sentCount + " waitlisted entrant" + (sentCount > 1 ? "s" : ""),
+                        Toast.LENGTH_LONG).show();
+                Log.d(TAG, "Sent notifications to " + sentCount + " waitlisted entrants");
+            }
+
+            @Override
+            public void onError(String error) {
+                Toast.makeText(OrganizerWaitlistActivity.this,
+                        "Failed to send notifications: " + error,
+                        Toast.LENGTH_LONG).show();
+                Log.e(TAG, "Failed to send notifications: " + error);
+            }
+        });
+    }
+
 }
 
 
