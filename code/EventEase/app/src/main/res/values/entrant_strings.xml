@@ -37,7 +37,7 @@
     <string name="event_details_guidelines_title">Guidelines</string>
     <string name="event_details_guidelines_body">Please review the event guidelines. Thank you for your interest!</string>
     <string name="delete_profile">Delete Profile</string>
-    <!-- Google Maps API Key - Replace with your actual API key from Google Cloud Console -->
-    <string name="google_maps_api_key">AIzaSyDS1w-gpvRX6e_dAlT0zpp-yaoyYtW8Xuo</string>
+    <!-- Google Maps API Key - Generated at build time from local.properties -->
+    <!-- Do not add the actual key here - it will be generated from local.properties -->
 </resources>
 

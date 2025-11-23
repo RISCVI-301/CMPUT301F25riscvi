@@ -3,6 +3,14 @@ plugins {
     id("com.google.gms.google-services")
 }
 
+// Load API key from local.properties
+val localProperties = java.util.Properties()
+val localPropertiesFile = rootProject.file("local.properties")
+if (localPropertiesFile.exists()) {
+    localProperties.load(java.io.FileInputStream(localPropertiesFile))
+}
+val googleMapsApiKey = localProperties.getProperty("google.maps.api.key") ?: ""
+
 android {
     namespace = "com.example.eventease"
     compileSdk = 36
@@ -18,6 +26,9 @@ android {
         
         renderscriptTargetApi = 26
         renderscriptSupportModeEnabled = true
+        
+        // Add Google Maps API key as a resource value (loaded from local.properties)
+        resValue("string", "google_maps_api_key", googleMapsApiKey)
     }
 
     buildTypes {
