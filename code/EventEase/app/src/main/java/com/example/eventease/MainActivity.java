@@ -54,25 +54,19 @@ public class MainActivity extends AppCompatActivity {
     private android.widget.TextView navLabelMyEvents;
     private android.widget.TextView navLabelDiscover;
     private android.widget.TextView navLabelAccount;
-<<<<<<< HEAD
 
     private InvitationNotificationListener invitationListener;
     private ActivityResultLauncher<String> notificationPermissionLauncher;
     private static boolean listenersInitialized = false;
-=======
->>>>>>> 590d2f49ef5cab38a8e18b47d77b0f1848ce5c79
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-<<<<<<< HEAD
 
         //FireBase
         FirebaseApp.initializeApp(this);
         Log.d("FirebaseTest", "FirebaseApp initialized: " + (FirebaseApp.getApps(this).size() > 0));
 
-=======
->>>>>>> 590d2f49ef5cab38a8e18b47d77b0f1848ce5c79
         setContentView(R.layout.entrant_activity_mainfragments);
 
         // Initialize notification permission launcher
@@ -412,8 +406,3 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 }
-<<<<<<< HEAD
-
-
-=======
->>>>>>> 590d2f49ef5cab38a8e18b47d77b0f1848ce5c79

@@ -43,6 +43,11 @@
             android:name="preloaded_fonts"
             android:resource="@array/preloaded_fonts" />
 
+        <!-- Google Maps API Key -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="@string/google_maps_api_key" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -70,6 +75,9 @@
         <activity android:name=".ui.organizer.OrganizerWaitlistActivity" />
         <activity
             android:name=".ui.organizer.OrganizerViewEntrantsActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.organizer.OrganizerEntrantLocationsActivity"
             android:exported="false" />
 
         <service

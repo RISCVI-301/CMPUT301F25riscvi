@@ -107,6 +107,22 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
             mailIcon.setOnClickListener(v -> showSendNotificationsToWaitlistedConfirmation());
         }
 
+        // Set up location button to view entrant locations on map
+        ImageView locationIcon = findViewById(R.id.location_icon);
+        if (locationIcon != null) {
+            locationIcon.setClickable(true);
+            locationIcon.setFocusable(true);
+            locationIcon.setOnClickListener(v -> {
+                if (currentEventId == null || currentEventId.isEmpty()) {
+                    Toast.makeText(this, "Missing event ID", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                android.content.Intent mapIntent = new android.content.Intent(this, OrganizerEntrantLocationsActivity.class);
+                mapIntent.putExtra("eventId", currentEventId);
+                startActivity(mapIntent);
+            });
+        }
+
         signInAndLoadData();
     }
 
