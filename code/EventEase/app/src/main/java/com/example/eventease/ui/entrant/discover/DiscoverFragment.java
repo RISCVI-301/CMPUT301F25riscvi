@@ -208,34 +208,9 @@ public class DiscoverFragment extends Fragment {
         RadioButton radioCustom = dialog.findViewById(R.id.radioCustomDate);
         TextView chooseDateValue = dialog.findViewById(R.id.textChooseDateValue);
         View chooseDateRow = dialog.findViewById(R.id.chooseDateRow);
-        RadioGroup dateGroup = dialog.findViewById(R.id.dateRadioGroup);
 
         restoreDateSelection(radioAnyDate, radioToday, radioTomorrow, radioCustom, chooseDateValue);
-
-        if (dateGroup != null) {
-            dateGroup.setOnCheckedChangeListener((group, checkedId) -> {
-                if (checkedId == R.id.radioAnyDate) {
-                    activeDateFilter = DateFilterOption.ANY_DATE;
-                } else if (checkedId == R.id.radioToday) {
-                    activeDateFilter = DateFilterOption.TODAY;
-                } else if (checkedId == R.id.radioTomorrow) {
-                    activeDateFilter = DateFilterOption.TOMORROW;
-                } else if (checkedId == R.id.radioCustomDate) {
-                    activeDateFilter = DateFilterOption.CUSTOM;
-                    if (customDateFilterStartMs <= 0) {
-                        openDatePicker(chooseDateValue, radioCustom);
-                    }
-                }
-            });
-        }
-
-        View.OnClickListener chooseDateClick = v -> openDatePicker(chooseDateValue, radioCustom);
-        if (chooseDateRow != null) {
-            chooseDateRow.setOnClickListener(chooseDateClick);
-        }
-        if (radioCustom != null) {
-            radioCustom.setOnClickListener(chooseDateClick);
-        }
+        setDateSelectionHandlers(radioAnyDate, radioToday, radioTomorrow, radioCustom, chooseDateRow, chooseDateValue);
 
         CheckBox cbOutdoor = dialog.findViewById(R.id.cbOutdoor);
         CheckBox cbIndoor = dialog.findViewById(R.id.cbIndoor);
@@ -269,6 +244,7 @@ public class DiscoverFragment extends Fragment {
     private void restoreDateSelection(@Nullable RadioButton any, @Nullable RadioButton today,
                                       @Nullable RadioButton tomorrow, @Nullable RadioButton custom,
                                       @Nullable TextView chooseDateValue) {
+        clearDateChecks(any, today, tomorrow, custom);
         if (any == null || today == null || tomorrow == null || custom == null) return;
 
         switch (activeDateFilter) {
@@ -317,6 +293,49 @@ public class DiscoverFragment extends Fragment {
             chooseDateValue.setText(filterDateFormat.format(new Date(customDateFilterStartMs)));
         } else {
             chooseDateValue.setText("No date selected");
+        }
+    }
+
+    private void setDateSelectionHandlers(@Nullable RadioButton any, @Nullable RadioButton today,
+                                          @Nullable RadioButton tomorrow, @Nullable RadioButton custom,
+                                          @Nullable View chooseDateRow, @Nullable TextView chooseDateValue) {
+        View.OnClickListener anyHandler = v -> setDateChoice(DateFilterOption.ANY_DATE, any, today, tomorrow, custom, chooseDateValue, false);
+        View.OnClickListener todayHandler = v -> setDateChoice(DateFilterOption.TODAY, today, any, tomorrow, custom, chooseDateValue, false);
+        View.OnClickListener tomorrowHandler = v -> setDateChoice(DateFilterOption.TOMORROW, tomorrow, any, today, custom, chooseDateValue, false);
+        View.OnClickListener customHandler = v -> setDateChoice(DateFilterOption.CUSTOM, custom, any, today, tomorrow, chooseDateValue, true);
+
+        if (any != null) any.setOnClickListener(anyHandler);
+        if (today != null) today.setOnClickListener(todayHandler);
+        if (tomorrow != null) tomorrow.setOnClickListener(tomorrowHandler);
+        if (custom != null) custom.setOnClickListener(customHandler);
+        if (chooseDateRow != null) chooseDateRow.setOnClickListener(customHandler);
+    }
+
+    private void setDateChoice(DateFilterOption option, @Nullable RadioButton target,
+                               @Nullable RadioButton other1, @Nullable RadioButton other2, @Nullable RadioButton other3,
+                               @Nullable TextView chooseDateValue, boolean launchPickerIfNeeded) {
+        clearDateChecks(target, other1, other2, other3);
+        if (target != null) {
+            target.setChecked(true);
+        }
+        activeDateFilter = option;
+        if (option == DateFilterOption.CUSTOM) {
+            if (customDateFilterStartMs <= 0 || launchPickerIfNeeded) {
+                openDatePicker(chooseDateValue, target);
+            } else {
+                updateChooseDateLabel(chooseDateValue);
+            }
+        } else {
+            updateChooseDateLabel(chooseDateValue);
+        }
+    }
+
+    private void clearDateChecks(@Nullable RadioButton... radios) {
+        if (radios == null) return;
+        for (RadioButton rb : radios) {
+            if (rb != null) {
+                rb.setChecked(false);
+            }
         }
     }
 
@@ -456,8 +475,7 @@ public class DiscoverFragment extends Fragment {
 
         List<Event> filtered = new ArrayList<>();
         for (Event event : allEvents) {
-            // Interest selections are stored for later use once events carry categories.
-            if (passesDateFilter(event)) {
+            if (passesDateFilter(event) && passesInterestFilter(event)) {
                 filtered.add(event);
             }
         }
@@ -495,29 +513,53 @@ public class DiscoverFragment extends Fragment {
         }
     }
 
+    private boolean passesInterestFilter(@NonNull Event event) {
+        if (selectedInterests.isEmpty()) {
+            return true;
+        }
+        List<String> interests = event.getInterests();
+        if (interests == null || interests.isEmpty()) {
+            return false;
+        }
+        for (String tag : interests) {
+            if (tag != null && selectedInterests.contains(tag)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private boolean passesDateFilter(@NonNull Event event) {
         if (activeDateFilter == DateFilterOption.ANY_DATE) {
             return true;
         }
 
-        long startsAt = event.getStartsAtEpochMs();
-        if (startsAt <= 0) {
+        long registrationDate = getRegistrationDateForFilter(event);
+        if (registrationDate <= 0) {
             // Unknown start dates only pass when no filter is applied.
             return false;
         }
 
         switch (activeDateFilter) {
             case TODAY:
-                return isSameDay(startsAt, startOfDay(System.currentTimeMillis()));
+                return isSameDay(registrationDate, startOfDay(System.currentTimeMillis()));
             case TOMORROW:
                 long tomorrowStart = startOfDay(System.currentTimeMillis()) + 24L * 60L * 60L * 1000L;
-                return isSameDay(startsAt, tomorrowStart);
+                return isSameDay(registrationDate, tomorrowStart);
             case CUSTOM:
                 if (customDateFilterStartMs <= 0) return true;
-                return isSameDay(startsAt, customDateFilterStartMs);
+                return isSameDay(registrationDate, customDateFilterStartMs);
             default:
                 return true;
         }
+    }
+
+    private long getRegistrationDateForFilter(@NonNull Event event) {
+        if (event.registrationStart > 0) {
+            return event.registrationStart;
+        }
+        // Fallback to event start if registration start is missing.
+        return event.getStartsAtEpochMs();
     }
 
     private boolean isSameDay(long timestampMs, long dayStartMs) {

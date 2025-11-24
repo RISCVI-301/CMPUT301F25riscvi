@@ -49,6 +49,8 @@ public class Event {
     public long createdAtEpochMs;
     /** QR code payload string (e.g., "event:<id>"). */
     @Nullable public String qrPayload;
+    /** Interests/tags for filtering (e.g., Outdoor, Music). */
+    @Nullable public List<String> interests;
 
     public Event() { /* for Firestore */ }
 
@@ -93,6 +95,7 @@ public class Event {
         m.put("organizerId", organizerId);
         m.put("createdAtEpochMs", createdAtEpochMs);
         m.put("qrPayload", qrPayload);
+        m.put("interests", interests != null ? interests : new ArrayList<>());
         return m;
     }
     
@@ -179,6 +182,15 @@ public class Event {
         
         e.qrPayload = (String) m.get("qrPayload");
         
+        Object interestsObj = m.get("interests");
+        if (interestsObj instanceof List) {
+            @SuppressWarnings("unchecked")
+            List<String> interestList = (List<String>) interestsObj;
+            e.interests = interestList != null ? new ArrayList<>(interestList) : new ArrayList<>();
+        } else {
+            e.interests = new ArrayList<>();
+        }
+        
         return e;
     }
 
@@ -223,6 +235,11 @@ public class Event {
      * @param startsAtEpochMs the start time in milliseconds
      */
     public void setStartsAtEpochMs(long startsAtEpochMs) { this.startsAtEpochMs = startsAtEpochMs; }
+
+    /** Optional getter for interests. */
+    public List<String> getInterests() { return interests; }
+
+    public void setInterests(List<String> interests) { this.interests = interests; }
 
     /**
      * Gets the event deadline in milliseconds since epoch (UTC).
