@@ -118,6 +118,9 @@ public class AutomaticEntrantSelectionService extends JobService {
     private static boolean isInitialLoad = true;
     private static long listenerSetupTime = 0;
     private static final long INITIAL_LOAD_SKIP_DURATION_MS = 10 * 1000; // Skip processing for 10 seconds after listener setup
+    private static final long PERIODIC_CHECK_INTERVAL_MS = 60 * 1000; // Check every 60 seconds for events that need processing
+    private static android.os.Handler periodicCheckHandler;
+    private static java.lang.Runnable periodicCheckRunnable;
     
     /**
      * Sets up a Firestore listener to automatically select entrants when event registration periods end.
@@ -129,6 +132,12 @@ public class AutomaticEntrantSelectionService extends JobService {
      *   <li>Sends invitations to selected entrants</li>
      *   <li>Sends push notifications</li>
      * </ol>
+     * 
+     * <p>This method sets up both:
+     * <ul>
+     *   <li>A real-time listener for immediate processing when events change</li>
+     *   <li>A periodic check to catch events that need processing but weren't caught by the listener</li>
+     * </ul>
      */
     public static void setupAutomaticSelectionListener() {
         // Remove existing listener if any to prevent duplicates
@@ -136,6 +145,11 @@ public class AutomaticEntrantSelectionService extends JobService {
             Log.d(TAG, "Removing existing automatic selection listener to prevent duplicates");
             selectionListenerRegistration.remove();
             selectionListenerRegistration = null;
+        }
+        
+        // Stop existing periodic check if any
+        if (periodicCheckHandler != null && periodicCheckRunnable != null) {
+            periodicCheckHandler.removeCallbacks(periodicCheckRunnable);
         }
         
         FirebaseFirestore db = FirebaseFirestore.getInstance();
@@ -147,6 +161,22 @@ public class AutomaticEntrantSelectionService extends JobService {
         // Record when listener is set up to skip processing for a short period
         listenerSetupTime = System.currentTimeMillis();
         isInitialLoad = true; // Reset flag when setting up new listener
+        
+        // Set up periodic check to catch events that need processing
+        periodicCheckHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+        periodicCheckRunnable = new java.lang.Runnable() {
+            @Override
+            public void run() {
+                Log.d(TAG, "Running periodic check for events that need selection processing");
+                checkAndProcessPendingEvents(selectionHelper);
+                // Schedule next check
+                if (periodicCheckHandler != null && periodicCheckRunnable != null) {
+                    periodicCheckHandler.postDelayed(periodicCheckRunnable, PERIODIC_CHECK_INTERVAL_MS);
+                }
+            }
+        };
+        // Start periodic check immediately and then every interval
+        periodicCheckHandler.post(periodicCheckRunnable);
         
         // Listen to events where registrationEnd is in the past and selectionProcessed is false
         // Only process document changes to avoid processing all events on every snapshot
@@ -270,16 +300,118 @@ public class AutomaticEntrantSelectionService extends JobService {
     }
     
     /**
+     * Periodically checks for events that need selection processing.
+     * This catches events whose registration period ended but weren't caught by the real-time listener.
+     */
+    private static void checkAndProcessPendingEvents(EventSelectionHelper selectionHelper) {
+        FirebaseFirestore db = FirebaseFirestore.getInstance();
+        long currentTime = System.currentTimeMillis();
+        
+        // Query for events that:
+        // 1. Have a registrationEnd time
+        // 2. Haven't been processed yet (selectionProcessed = false)
+        // 3. Registration period has ended (currentTime >= registrationEnd)
+        // 4. Event hasn't started yet (currentTime < startsAtEpochMs)
+        Query query = db.collection("events")
+                .whereGreaterThan("registrationEnd", 0L)
+                .whereEqualTo("selectionProcessed", false);
+        
+        query.get()
+                .addOnSuccessListener(snapshot -> {
+                    if (snapshot == null || snapshot.isEmpty()) {
+                        Log.d(TAG, "Periodic check: No events found that need selection processing");
+                        return;
+                    }
+                    
+                    List<DocumentSnapshot> events = snapshot.getDocuments();
+                    Log.d(TAG, "Periodic check: Found " + events.size() + " events to check for selection");
+                    
+                    int processedCount = 0;
+                    
+                    for (DocumentSnapshot eventDoc : events) {
+                        Long registrationEnd = eventDoc.getLong("registrationEnd");
+                        Boolean selectionProcessed = eventDoc.getBoolean("selectionProcessed");
+                        Boolean selectionNotificationSent = eventDoc.getBoolean("selectionNotificationSent");
+                        String eventId = eventDoc.getId();
+                        
+                        // Skip if already processed
+                        if (Boolean.TRUE.equals(selectionProcessed)) {
+                            continue;
+                        }
+                        
+                        // Skip if selection notification already sent
+                        if (Boolean.TRUE.equals(selectionNotificationSent)) {
+                            continue;
+                        }
+                        
+                        // Skip if already processing this event
+                        if (processingEventIds.contains(eventId)) {
+                            continue;
+                        }
+                        
+                        // Skip if event start date has already passed
+                        Long startsAtEpochMs = eventDoc.getLong("startsAtEpochMs");
+                        if (startsAtEpochMs != null && startsAtEpochMs > 0 && currentTime >= startsAtEpochMs) {
+                            continue;
+                        }
+                        
+                        // Check if registration period has ended
+                        if (registrationEnd != null && registrationEnd > 0 && currentTime >= registrationEnd) {
+                            // Mark as processing to prevent duplicate processing
+                            processingEventIds.add(eventId);
+                            Log.d(TAG, "Periodic check: Processing entrant selection for event: " + eventId + 
+                                " (registration ended at " + new java.util.Date(registrationEnd) + ")");
+                            
+                            selectionHelper.checkAndProcessEventSelection(eventId, new EventSelectionHelper.SelectionCallback() {
+                                @Override
+                                public void onComplete(int selectedCount) {
+                                    // Remove from processing set
+                                    processingEventIds.remove(eventId);
+                                    if (selectedCount > 0) {
+                                        Log.d(TAG, "Periodic check: Successfully selected " + selectedCount + " entrants for event " + eventId);
+                                    }
+                                }
+                                
+                                @Override
+                                public void onError(String error) {
+                                    // Remove from processing set even on error
+                                    processingEventIds.remove(eventId);
+                                    Log.e(TAG, "Periodic check: Error selecting entrants for event " + eventId + ": " + error);
+                                }
+                            });
+                            
+                            processedCount++;
+                        }
+                    }
+                    
+                    if (processedCount > 0) {
+                        Log.d(TAG, "Periodic check: Processed " + processedCount + " events for automatic entrant selection");
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Periodic check: Failed to query events for automatic selection", e);
+                });
+    }
+    
+    /**
      * Stops the automatic selection listener.
      */
     public static void stopAutomaticSelectionListener() {
         if (selectionListenerRegistration != null) {
             selectionListenerRegistration.remove();
             selectionListenerRegistration = null;
-            processingEventIds.clear();
-            isInitialLoad = true;
-            Log.d(TAG, "Stopped automatic entrant selection listener");
         }
+        
+        // Stop periodic check
+        if (periodicCheckHandler != null && periodicCheckRunnable != null) {
+            periodicCheckHandler.removeCallbacks(periodicCheckRunnable);
+            periodicCheckHandler = null;
+            periodicCheckRunnable = null;
+        }
+        
+        processingEventIds.clear();
+        isInitialLoad = true;
+        Log.d(TAG, "Stopped automatic entrant selection listener and periodic check");
     }
 }
 

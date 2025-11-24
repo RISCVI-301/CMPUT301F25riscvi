@@ -141,15 +141,28 @@ public class MyEventsFragment extends Fragment {
         inviteReg = invitationRepo.listenActive(auth.getUid(), new InvitationListener() {
             @Override
             public void onChanged(List<Invitation> activeInvites) {
+                android.util.Log.d("MyEventsFragment", "Invitation listener callback: " + (activeInvites != null ? activeInvites.size() : 0) + " invitations");
                 invitedEventIds.clear();
                 eventIdToInvitationId.clear();
                 if (activeInvites != null) {
                     for (Invitation inv : activeInvites) {
-                        invitedEventIds.add(inv.getEventId());
-                        eventIdToInvitationId.put(inv.getEventId(), inv.getId());
+                        // Only show teal dot for PENDING invitations
+                        if (inv.getStatus() == com.example.eventease.model.Invitation.Status.PENDING) {
+                            invitedEventIds.add(inv.getEventId());
+                            eventIdToInvitationId.put(inv.getEventId(), inv.getId());
+                            android.util.Log.d("MyEventsFragment", "Added invitation for event: " + inv.getEventId() + " (invitationId: " + inv.getId() + ")");
+                        }
                     }
                 }
+                android.util.Log.d("MyEventsFragment", "Setting invitedEventIds: " + invitedEventIds.size() + " events");
                 adapter.setInvitedEventIds(invitedEventIds);
+                
+                // Reload events list when invitations change (e.g., after accepting/declining)
+                // This ensures admitted events are removed from waitlisted section
+                if (eventRepo != null && waitlistRepo != null && admittedRepo != null) {
+                    android.util.Log.d("MyEventsFragment", "Reloading events list due to invitation change");
+                    loadMyEvents();
+                }
             }
         });
     }
@@ -195,14 +208,26 @@ public class MyEventsFragment extends Fragment {
             return;
         }
 
+        android.util.Log.d("MyEventsFragment", "Loading events for user: " + uid);
+        android.util.Log.d("MyEventsFragment", "eventRepo: " + eventRepo + ", waitlistRepo: " + waitlistRepo + ", admittedRepo: " + admittedRepo);
+
         // Load admitted upcoming events first
         Task<List<Event>> admittedEventsTask = admittedRepo.getUpcomingEvents(uid);
+        admittedEventsTask.addOnFailureListener(e -> {
+            android.util.Log.e("MyEventsFragment", "Failed to load admitted upcoming events", e);
+        });
         
         // Load previous events (deadline passed)
         Task<List<Event>> previousEventsTask = admittedRepo.getPreviousEvents(uid);
+        previousEventsTask.addOnFailureListener(e -> {
+            android.util.Log.e("MyEventsFragment", "Failed to load previous events", e);
+        });
         
         // Load open events for waitlisted/selected filtering
         Task<List<Event>> openEventsTask = eventRepo.getOpenEvents(new Date());
+        openEventsTask.addOnFailureListener(e -> {
+            android.util.Log.e("MyEventsFragment", "Failed to load open events", e);
+        });
         
         // Combine all tasks
         Tasks.whenAllComplete(admittedEventsTask, previousEventsTask, openEventsTask)
@@ -259,72 +284,249 @@ public class MyEventsFragment extends Fragment {
                         List<Event> allMyEvents = new ArrayList<>();
                         Set<String> eventIds = new HashSet<>();
                         
-                        // Add admitted upcoming events first
+                        // Track admitted event IDs to exclude them from waitlisted section
+                        // This fragment is ONLY for waitlisted/selected events, NOT admitted events
+                        // Admitted events should appear in UpcomingEventsFragment instead
+                        Set<String> admittedEventIds = new HashSet<>();
                         for (Event event : finalAdmittedEvents) {
-                            if (event != null && event.getId() != null && !eventIds.contains(event.getId())) {
-                                allMyEvents.add(event);
-                                eventIds.add(event.getId());
-                                android.util.Log.d("MyEventsFragment", "Added admitted upcoming event: " + event.getTitle() + " (id: " + event.getId() + ")");
+                            if (event != null && event.getId() != null) {
+                                admittedEventIds.add(event.getId());
+                                android.util.Log.d("MyEventsFragment", "User is admitted to event: " + event.getTitle() + " (id: " + event.getId() + "), will EXCLUDE from waitlisted section");
                             }
                         }
                         
-                        int admittedCount = allMyEvents.size();
+                        android.util.Log.d("MyEventsFragment", "MyEventsFragment (Waitlisted Events) will exclude " + admittedEventIds.size() + " admitted events");
                         
-                        // Process waitlisted/selected events
-                        // Events should show in waitlisted until 48 hours before event start
+                        // Process waitlisted/selected events ONLY
+                        // Waitlisted events area shows:
+                        // 1. Events where user has PENDING invitation (from invitations collection) - with teal dot
+                        // 2. Events where user is in WaitlistedEntrants subcollection
+                        // BUT NEVER shows events where user is already admitted
                         long currentTime = System.currentTimeMillis();
-                        long fortyEightHoursMs = 48L * 60 * 60 * 1000; // 48 hours in milliseconds
                         
                         List<Event> waitlistedSelected = new ArrayList<>();
+                        
+                        // Get events with PENDING invitations (these should show with teal dot)
+                        Set<String> eventsWithPendingInvitations = new HashSet<>();
+                        if (invitedEventIds != null) {
+                            eventsWithPendingInvitations.addAll(invitedEventIds);
+                        }
+                        
                         for (Event e : finalOpenEvents) {
                             try {
-                                // Skip if already added as admitted event
-                                if (eventIds.contains(e.getId())) {
+                                // Skip events without valid IDs
+                                if (e == null || e.getId() == null || e.getId().isEmpty()) {
+                                    android.util.Log.w("MyEventsFragment", "Skipping event with null/empty ID");
                                     continue;
                                 }
                                 
-                                Boolean joined = Tasks.await(waitlistRepo.isJoined(e.getId(), uid));
-                                Boolean inSelected = Tasks.await(isInSelectedEntrants(e.getId(), uid));
-                                Boolean admitted = Tasks.await(admittedRepo.isAdmitted(e.getId(), uid));
+                                String eventId = e.getId();
                                 
-                                android.util.Log.d("MyEventsFragment", "Event " + e.getTitle() + " - Joined: " + joined + ", Selected: " + inSelected + ", Admitted: " + admitted);
+                                // Skip if user is admitted to this event
+                                // This fragment should ONLY show waitlisted/selected events, NOT admitted events
+                                if (admittedEventIds.contains(eventId)) {
+                                    android.util.Log.d("MyEventsFragment", "Event " + e.getTitle() + " (id: " + eventId + ") - User is admitted, skipping from waitlisted section");
+                                    continue;
+                                }
                                 
-                                // Show if in waitlist OR selected, AND NOT admitted
-                                // (admitted events are already added from getUpcomingEvents)
-                                if ((Boolean.TRUE.equals(joined) || Boolean.TRUE.equals(inSelected)) && !Boolean.TRUE.equals(admitted)) {
-                                    // Check if event is more than 48 hours away
-                                    // If event start is less than 48 hours away, don't show in waitlisted
-                                    long eventStartMs = e.getStartsAtEpochMs();
-                                    if (eventStartMs > 0) {
-                                        long timeUntilEvent = eventStartMs - currentTime;
-                                        if (timeUntilEvent <= fortyEightHoursMs) {
-                                            // Event is 48 hours or less away, don't show in waitlisted
-                                            android.util.Log.d("MyEventsFragment", "Event " + e.getTitle() + " is " + (timeUntilEvent / (60 * 60 * 1000)) + " hours away, hiding from waitlisted");
+                                // CRITICAL: Check admitted status FIRST before any other checks
+                                // This is the source of truth - if user is in AdmittedEntrants, they should NOT be in waitlisted
+                                // Use Source.SERVER to bypass cache and get fresh data
+                                Boolean admitted = null;
+                                try {
+                                    com.google.firebase.firestore.FirebaseFirestore db = com.google.firebase.firestore.FirebaseFirestore.getInstance();
+                                    com.google.android.gms.tasks.Task<com.google.firebase.firestore.DocumentSnapshot> admittedCheck = db.collection("events")
+                                            .document(eventId)
+                                            .collection("AdmittedEntrants")
+                                            .document(uid)
+                                            .get(com.google.firebase.firestore.Source.SERVER);
+                                    
+                                    com.google.firebase.firestore.DocumentSnapshot admittedDoc = Tasks.await(admittedCheck);
+                                    admitted = admittedDoc != null && admittedDoc.exists();
+                                    android.util.Log.d("MyEventsFragment", "Event " + e.getTitle() + " (id: " + eventId + ") - Admitted check result (SERVER): " + admitted + " for uid: " + uid);
+                                } catch (Exception ex) {
+                                    android.util.Log.e("MyEventsFragment", "Error checking admitted status for event " + eventId + ", uid: " + uid, ex);
+                                    admitted = false;
+                                }
+                                
+                                // If user is admitted, skip entirely (don't show in waitlisted, regardless of other statuses)
+                                if (admitted != null && admitted == true) {
+                                    android.util.Log.d("MyEventsFragment", "Event " + e.getTitle() + " (id: " + eventId + ") - User is ADMITTED, skipping from waitlisted section");
+                                    continue;
+                                }
+                                
+                                // Only check other statuses if user is NOT admitted
+                                Boolean joined = null;
+                                Boolean hasPendingInvitation = false;
+                                
+                                // Verify invitation actually exists and is PENDING before using cached set
+                                // This prevents stale data from invitation listener causing events to show incorrectly
+                                if (eventsWithPendingInvitations.contains(eventId)) {
+                                    // Double-check that invitation actually exists and is PENDING
+                                    // This is important because the invitation listener might have stale data
+                                    // (e.g., invitation was deleted when user accepted, but listener hasn't updated yet)
+                                    // Use same query pattern as elsewhere: query by uid and status, filter by eventId in memory to avoid index requirements
+                                    try {
+                                        com.google.firebase.firestore.FirebaseFirestore db = com.google.firebase.firestore.FirebaseFirestore.getInstance();
+                                        // Use Source.SERVER to bypass cache and get fresh data from server
+                                        // This ensures we don't see stale invitations that were deleted after acceptance
+                                        com.google.android.gms.tasks.Task<com.google.firebase.firestore.QuerySnapshot> invitationCheck = db.collection("invitations")
+                                                .whereEqualTo("uid", uid)
+                                                .whereEqualTo("status", "PENDING")
+                                                .get(com.google.firebase.firestore.Source.SERVER);
+                                        
+                                        com.google.firebase.firestore.QuerySnapshot invitationSnapshot = Tasks.await(invitationCheck);
+                                        if (invitationSnapshot != null && !invitationSnapshot.isEmpty()) {
+                                            // Filter by eventId in memory
+                                            com.google.firebase.firestore.QueryDocumentSnapshot matchingInv = null;
+                                            for (com.google.firebase.firestore.QueryDocumentSnapshot doc : invitationSnapshot) {
+                                                String invEventId = doc.getString("eventId");
+                                                if (eventId.equals(invEventId)) {
+                                                    matchingInv = doc;
+                                                    break;
+                                                }
+                                            }
+                                            
+                                            if (matchingInv != null) {
+                                                // Verify invitation hasn't expired
+                                                Long expiresAtMs = matchingInv.getLong("expiresAt");
+                                                if (expiresAtMs != null && expiresAtMs > 0) {
+                                                    long expiresAt = expiresAtMs;
+                                                    if (expiresAt > currentTime) {
+                                                        hasPendingInvitation = true;
+                                                        android.util.Log.d("MyEventsFragment", "Verified PENDING invitation exists for event " + eventId);
+                                                    } else {
+                                                        android.util.Log.d("MyEventsFragment", "Invitation for event " + eventId + " has expired, ignoring");
+                                                    }
+                                                } else {
+                                                    hasPendingInvitation = true;
+                                                    android.util.Log.d("MyEventsFragment", "Verified PENDING invitation exists for event " + eventId + " (no expiration)");
+                                                }
+                                            } else {
+                                                android.util.Log.d("MyEventsFragment", "Cached invitation set has event " + eventId + " but no PENDING invitation found in Firestore (likely deleted after acceptance)");
+                                            }
+                                        } else {
+                                            android.util.Log.d("MyEventsFragment", "Cached invitation set has event " + eventId + " but no PENDING invitations found in Firestore (likely deleted after acceptance)");
+                                        }
+                                    } catch (Exception ex) {
+                                        android.util.Log.e("MyEventsFragment", "Error verifying invitation for event " + eventId, ex);
+                                        // If verification fails, don't trust the cached set - assume no invitation
+                                        hasPendingInvitation = false;
+                                    }
+                                }
+                                
+                                try {
+                                    joined = Tasks.await(waitlistRepo.isJoined(eventId, uid));
+                                } catch (Exception ex) {
+                                    android.util.Log.e("MyEventsFragment", "Error checking waitlist status for event " + eventId, ex);
+                                    joined = false;
+                                }
+                                
+                                android.util.Log.d("MyEventsFragment", "Event " + e.getTitle() + " (id: " + eventId + ") - Joined: " + joined + ", HasPendingInvitation: " + hasPendingInvitation + ", Admitted: " + admitted);
+                                
+                                // Show if:
+                                // 1. User has PENDING invitation (verified to exist in Firestore), OR
+                                // 2. User is in WaitlistedEntrants subcollection
+                                // (Admitted check already done above - if admitted, we would have continued)
+                                if (hasPendingInvitation || Boolean.TRUE.equals(joined)) {
+                                    // Double-check admitted status one more time before adding (defensive check)
+                                    // This prevents race conditions where status might have changed
+                                    // Use Source.SERVER to bypass cache
+                                    try {
+                                        com.google.firebase.firestore.FirebaseFirestore db = com.google.firebase.firestore.FirebaseFirestore.getInstance();
+                                        com.google.android.gms.tasks.Task<com.google.firebase.firestore.DocumentSnapshot> finalAdmittedCheck = db.collection("events")
+                                                .document(eventId)
+                                                .collection("AdmittedEntrants")
+                                                .document(uid)
+                                                .get(com.google.firebase.firestore.Source.SERVER);
+                                        
+                                        com.google.firebase.firestore.DocumentSnapshot finalAdmittedDoc = Tasks.await(finalAdmittedCheck);
+                                        Boolean isFinalAdmitted = finalAdmittedDoc != null && finalAdmittedDoc.exists();
+                                        if (isFinalAdmitted != null && isFinalAdmitted == true) {
+                                            android.util.Log.d("MyEventsFragment", "Event " + e.getTitle() + " (id: " + eventId + ") - Final admitted check (SERVER): TRUE, skipping from waitlisted");
                                             continue;
                                         }
+                                    } catch (Exception ex) {
+                                        android.util.Log.e("MyEventsFragment", "Error in final admitted check for event " + eventId, ex);
+                                        // Continue with adding if check fails (better to show than hide)
                                     }
                                     
+                                    android.util.Log.d("MyEventsFragment", "Adding event " + e.getTitle() + " (id: " + eventId + ") to waitlisted section");
                                     waitlistedSelected.add(e);
-                                    eventIds.add(e.getId());
+                                    eventIds.add(eventId);
+                                } else {
+                                    android.util.Log.d("MyEventsFragment", "Event " + e.getTitle() + " (id: " + eventId + ") - Not in waitlist and no pending invitation, skipping");
                                 }
                             } catch (Exception ex) {
-                                android.util.Log.e("MyEventsFragment", "Error checking waitlist for event " + e.getId(), ex);
+                                android.util.Log.e("MyEventsFragment", "Error checking waitlist for event " + (e != null && e.getId() != null ? e.getId() : "null"), ex);
                             }
                         }
                         
-                        // Add waitlisted/selected events
+                        // Add waitlisted/selected events ONLY (admitted events should NOT be here)
                         allMyEvents.addAll(waitlistedSelected);
                         
-                        // Add previous events at the end (they have deadline passed)
-                        for (Event event : finalPreviousEvents) {
-                            if (event != null && event.getId() != null && !eventIds.contains(event.getId())) {
-                                allMyEvents.add(event);
-                                eventIds.add(event.getId());
-                                android.util.Log.d("MyEventsFragment", "Added previous event: " + event.getTitle() + " (id: " + event.getId() + ")");
+                        // FINAL SAFETY CHECK: Remove any admitted events that might have slipped through
+                        // This is a defensive check to ensure NO admitted events appear in this fragment
+                        // This fragment is ONLY for waitlisted/selected events
+                        android.util.Log.d("MyEventsFragment", "Final safety check: Checking " + allMyEvents.size() + " waitlisted events, will remove any that are admitted");
+                        
+                        List<Event> eventsToRemove = new ArrayList<>();
+                        int checkedCount = 0;
+                        for (Event event : allMyEvents) {
+                            if (event != null && event.getId() != null) {
+                                String eventId = event.getId();
+                                
+                                // Skip if we already know it's admitted
+                                if (admittedEventIds.contains(eventId)) {
+                                    android.util.Log.w("MyEventsFragment", "*** FOUND ADMITTED EVENT IN WAITLISTED LIST ***");
+                                    android.util.Log.w("MyEventsFragment", "Event: " + event.getTitle() + " (id: " + eventId + ")");
+                                    android.util.Log.w("MyEventsFragment", "User: " + uid);
+                                    android.util.Log.w("MyEventsFragment", "Removing from waitlisted section (should appear in UpcomingEventsFragment instead)");
+                                    eventsToRemove.add(event);
+                                    continue;
+                                }
+                                
+                                // For all other events, verify user is NOT admitted
+                                // Use Source.SERVER to bypass cache
+                                checkedCount++;
+                                try {
+                                    com.google.firebase.firestore.FirebaseFirestore db = com.google.firebase.firestore.FirebaseFirestore.getInstance();
+                                    com.google.android.gms.tasks.Task<com.google.firebase.firestore.DocumentSnapshot> finalCheck = db.collection("events")
+                                            .document(eventId)
+                                            .collection("AdmittedEntrants")
+                                            .document(uid)
+                                            .get(com.google.firebase.firestore.Source.SERVER);
+                                    
+                                    com.google.firebase.firestore.DocumentSnapshot finalDoc = Tasks.await(finalCheck);
+                                    Boolean isAdmitted = finalDoc != null && finalDoc.exists();
+                                    android.util.Log.d("MyEventsFragment", "Final check for event " + event.getTitle() + " (id: " + eventId + "): admitted=" + isAdmitted + " (SERVER)");
+                                    if (isAdmitted != null && isAdmitted == true) {
+                                        android.util.Log.w("MyEventsFragment", "*** FOUND ADMITTED EVENT IN WAITLISTED SECTION ***");
+                                        android.util.Log.w("MyEventsFragment", "Event: " + event.getTitle() + " (id: " + eventId + ")");
+                                        android.util.Log.w("MyEventsFragment", "User: " + uid);
+                                        android.util.Log.w("MyEventsFragment", "Removing from waitlisted section (should appear in UpcomingEventsFragment instead)");
+                                        eventsToRemove.add(event);
+                                    }
+                                } catch (Exception ex) {
+                                    android.util.Log.e("MyEventsFragment", "Error in final admitted check for event " + eventId + ", uid: " + uid, ex);
+                                    android.util.Log.e("MyEventsFragment", "Exception details: " + ex.getMessage());
+                                    if (ex.getCause() != null) {
+                                        android.util.Log.e("MyEventsFragment", "Cause: " + ex.getCause().getMessage());
+                                    }
+                                }
                             }
                         }
                         
-                        android.util.Log.d("MyEventsFragment", "Total events for user: " + allMyEvents.size() + " (upcoming admitted: " + admittedCount + ", waitlisted/selected: " + waitlistedSelected.size() + ", previous: " + finalPreviousEvents.size() + ")");
+                        android.util.Log.d("MyEventsFragment", "Final safety check: Checked " + checkedCount + " events, found " + eventsToRemove.size() + " admitted events to remove");
+                        
+                        // Remove admitted events from waitlisted section
+                        // They should appear in UpcomingEventsFragment instead
+                        if (!eventsToRemove.isEmpty()) {
+                            android.util.Log.w("MyEventsFragment", "Removing " + eventsToRemove.size() + " admitted events from waitlisted section");
+                            allMyEvents.removeAll(eventsToRemove);
+                        }
+                        
+                        android.util.Log.d("MyEventsFragment", "Total waitlisted/selected events for user: " + allMyEvents.size() + " (excluded " + admittedEventIds.size() + " admitted events)");
                         
                         if (!isAdded()) return;
                         
@@ -356,6 +558,7 @@ public class MyEventsFragment extends Fragment {
                     return task.isSuccessful() && task.getResult() != null && task.getResult().exists();
                 });
     }
+    
 
     private int dp(int dps) {
         Resources r = getResources();

@@ -85,7 +85,7 @@ public class FirebaseEventRepository implements EventRepository {
                         }
                     }
                     
-                    // Filter open events (and ensure they're not deleted)
+                    // Filter open events
                     List<Event> result = new ArrayList<>();
                     for (Event e : events.values()) {
                         if (e.getStartAt() == null || e.getStartAt().after(now)) {

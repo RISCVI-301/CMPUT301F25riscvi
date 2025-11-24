@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/dialogBlurBackground"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/entrant_dialog_blur_background"
+    android:clickable="true"
+    android:focusable="true">
+
+<androidx.cardview.widget.CardView
+    android:id="@+id/dialogCardView"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="32dp"
+    android:layout_gravity="center"
+    app:cardCornerRadius="20dp"
+    app:cardElevation="24dp"
+    android:backgroundTint="#FFFFFF">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Title Section -->
+        <TextView
+            android:id="@+id/tvDialogTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Notification Preferences"
+            android:textSize="36sp"
+            android:textStyle="bold"
+            android:textColor="#223C65"
+            android:padding="28dp"
+            android:paddingBottom="20dp"
+            android:fontFamily="@font/entrant_fredoka_one"
+            android:background="#FFFFFF"
+            android:shadowColor="#80000000"
+            android:shadowDx="0"
+            android:shadowDy="4"
+            android:shadowRadius="8"/>
+
+        <!-- Divider 1 (under title) -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="2dp"
+            android:background="#223C65"/>
+
+        <!-- Content Section -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="28dp"
+            android:paddingTop="24dp"
+            android:paddingBottom="24dp">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Choose which notifications you want to receive:"
+                android:textSize="18sp"
+                android:textColor="#223C65"
+                android:fontFamily="@font/entrant_fredoka_one"
+                android:layout_marginBottom="24dp"/>
+
+            <!-- Invited Notifications Option -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:padding="16dp"
+                android:layout_marginBottom="16dp"
+                android:background="@drawable/entrant_dialog_option_background">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Invited Notifications"
+                        android:textSize="20sp"
+                        android:textStyle="bold"
+                        android:textColor="#223C65"
+                        android:fontFamily="@font/entrant_fredoka_one"
+                        android:layout_marginBottom="4dp"/>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Receive notifications when you're chosen from the waiting list"
+                        android:textSize="14sp"
+                        android:textColor="#446EAF"
+                        android:fontFamily="@font/entrant_fredoka_one"/>
+                </LinearLayout>
+
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/switchInvited"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:checked="true"/>
+            </LinearLayout>
+
+            <!-- Not Invited Notifications Option -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:padding="16dp"
+                android:layout_marginBottom="16dp"
+                android:background="@drawable/entrant_dialog_option_background">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Not Invited Notifications"
+                        android:textSize="20sp"
+                        android:textStyle="bold"
+                        android:textColor="#223C65"
+                        android:fontFamily="@font/entrant_fredoka_one"
+                        android:layout_marginBottom="4dp"/>
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Receive notifications when you're not chosen from the waiting list"
+                        android:textSize="14sp"
+                        android:textColor="#446EAF"
+                        android:fontFamily="@font/entrant_fredoka_one"/>
+                </LinearLayout>
+
+                <com.google.android.material.switchmaterial.SwitchMaterial
+                    android:id="@+id/switchNotInvited"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="16dp"
+                    android:checked="true"/>
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- Divider 2 (above button) -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="2dp"
+            android:background="#223C65"/>
+
+        <!-- Save Button -->
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/btnDialogSave"
+            android:layout_width="match_parent"
+            android:layout_height="64dp"
+            android:text="Save Preferences"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:textColor="#FFFFFF"
+            android:background="@drawable/entrant_button_guidelines_ok"
+            android:layout_margin="28dp"
+            android:layout_marginTop="20dp"
+            android:fontFamily="@font/entrant_fredoka_one"
+            android:elevation="8dp"
+            style="@style/Widget.AppCompat.Button.Borderless"/>
+
+    </LinearLayout>
+
+</androidx.cardview.widget.CardView>
+
+</FrameLayout>
+

@@ -241,15 +241,12 @@ public class FirebaseInvitationRepository implements InvitationRepository {
     public Task<Void> accept(String invitationId, String eventId, String uid) {
         Log.d(TAG, "Accept called with invitationId: " + invitationId + ", eventId: " + eventId + ", uid: " + uid);
         
-        Map<String, Object> updates = new HashMap<>();
-        updates.put("status", "ACCEPTED");
-        updates.put("acceptedAt", System.currentTimeMillis());
-        
-        return db.collection("invitations").document(invitationId).update(updates)
-                .continueWithTask(updateTask -> {
-                    if (!updateTask.isSuccessful()) {
-                        Log.e(TAG, "Failed to update invitation status", updateTask.getException());
-                        return Tasks.forException(updateTask.getException());
+        // Delete invitation document and notificationRequests entry
+        return deleteInvitationAndNotificationRequests(invitationId, eventId, uid)
+                .continueWithTask(deleteTask -> {
+                    if (!deleteTask.isSuccessful()) {
+                        Log.e(TAG, "Failed to delete invitation and notification requests", deleteTask.getException());
+                        return Tasks.forException(deleteTask.getException());
                     }
                     
                     Invitation inv = byId.get(invitationId);
@@ -289,33 +286,89 @@ public class FirebaseInvitationRepository implements InvitationRepository {
             DocumentSnapshot userDoc = userTask.isSuccessful() ? userTask.getResult() : null;
             Map<String, Object> cancelledData = buildCancelledEntry(uid, userDoc);
             
-            Map<String, Object> invitationUpdates = new HashMap<>();
-            invitationUpdates.put("status", "DECLINED");
-            invitationUpdates.put("declinedAt", System.currentTimeMillis());
-            
-            WriteBatch batch = db.batch();
-            batch.update(db.collection("invitations").document(invitationId), invitationUpdates);
-            batch.set(cancelledDoc, cancelledData, SetOptions.merge());
-            batch.delete(waitlistDoc);
-            batch.delete(selectedDoc);
-            
-            return batch.commit()
-                    .continueWith(commitTask -> {
-                        if (commitTask.isSuccessful()) {
-                            Log.d(TAG, "SUCCESS: Invitation declined, user moved to CancelledEntrants");
-                            Invitation inv = byId.get(invitationId);
-                            if (inv != null) {
-                                inv.setStatus(Status.DECLINED);
-                            }
-                            notifyUid(uid);
-                            
-                            // NOTE: Automatic replacement is disabled - organizer must manually replace via button
-                        } else {
-                            Log.e(TAG, "FAILED to decline invitation and move to cancelled", commitTask.getException());
+            // Delete invitation document and notificationRequests entry
+            return deleteInvitationAndNotificationRequests(invitationId, eventId, uid)
+                    .continueWithTask(deleteTask -> {
+                        if (!deleteTask.isSuccessful()) {
+                            Log.e(TAG, "Failed to delete invitation and notification requests", deleteTask.getException());
+                            return Tasks.forException(deleteTask.getException());
                         }
-                        return null;
+                        
+                        WriteBatch batch = db.batch();
+                        batch.set(cancelledDoc, cancelledData, SetOptions.merge());
+                        batch.delete(waitlistDoc);
+                        batch.delete(selectedDoc);
+                        
+                        return batch.commit()
+                                .continueWith(commitTask -> {
+                                    if (commitTask.isSuccessful()) {
+                                        Log.d(TAG, "SUCCESS: Invitation declined, user moved to CancelledEntrants");
+                                        Invitation inv = byId.get(invitationId);
+                                        if (inv != null) {
+                                            inv.setStatus(Status.DECLINED);
+                                        }
+                                        notifyUid(uid);
+                                        
+                                        // NOTE: Automatic replacement is disabled - organizer must manually replace via button
+                                    } else {
+                                        Log.e(TAG, "FAILED to decline invitation and move to cancelled", commitTask.getException());
+                                    }
+                                    return null;
+                                });
                     });
         });
+    }
+    
+    /**
+     * Deletes the invitation document and any related notificationRequests entries.
+     */
+    private Task<Void> deleteInvitationAndNotificationRequests(String invitationId, String eventId, String uid) {
+        // Delete invitation document
+        Task<Void> deleteInvitationTask = db.collection("invitations").document(invitationId).delete();
+        
+        // Delete notificationRequests entries for this eventId and userId
+        Task<QuerySnapshot> findNotificationRequestsTask = db.collection("notificationRequests")
+                .whereEqualTo("eventId", eventId)
+                .whereArrayContains("userIds", uid)
+                .get();
+        
+        return Tasks.whenAllComplete(deleteInvitationTask, findNotificationRequestsTask)
+                .continueWithTask(allTasks -> {
+                    // Delete invitation is done
+                    if (!deleteInvitationTask.isSuccessful()) {
+                        Log.e(TAG, "Failed to delete invitation document", deleteInvitationTask.getException());
+                    } else {
+                        Log.d(TAG, "Successfully deleted invitation document: " + invitationId);
+                    }
+                    
+                    // Delete notificationRequests
+                    if (findNotificationRequestsTask.isSuccessful() && findNotificationRequestsTask.getResult() != null) {
+                        QuerySnapshot snapshot = findNotificationRequestsTask.getResult();
+                        WriteBatch batch = db.batch();
+                        int deleteCount = 0;
+                        for (DocumentSnapshot doc : snapshot.getDocuments()) {
+                            batch.delete(doc.getReference());
+                            deleteCount++;
+                        }
+                        if (deleteCount > 0) {
+                            Log.d(TAG, "Deleting " + deleteCount + " notificationRequests entries for eventId: " + eventId + ", uid: " + uid);
+                            return batch.commit().continueWith(commitTask -> {
+                                if (commitTask.isSuccessful()) {
+                                    Log.d(TAG, "Successfully deleted notificationRequests entries");
+                                } else {
+                                    Log.e(TAG, "Failed to delete notificationRequests entries", commitTask.getException());
+                                }
+                                return null;
+                            });
+                        } else {
+                            Log.d(TAG, "No notificationRequests entries found to delete");
+                        }
+                    } else {
+                        Log.w(TAG, "Failed to query notificationRequests or no results found");
+                    }
+                    
+                    return Tasks.forResult(null);
+                });
     }
     
     private Map<String, Object> buildCancelledEntry(String uid, DocumentSnapshot userDoc) {

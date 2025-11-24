@@ -61,6 +61,7 @@ public class EventDetailActivity extends AppCompatActivity {
     private Button btnRegister;
     private Button btnDecline;
     private Button btnGuidelines;
+    private Button btnLeaveWaitlist;
     private ImageButton btnBack;
     private ImageButton btnShare;
     private ImageView ivEventImage;
@@ -81,12 +82,18 @@ public class EventDetailActivity extends AppCompatActivity {
     private int eventWaitlistCount;
     private boolean hasInvitation;
     private String invitationId;
+    private boolean isUserInWaitlist = false;
+    private boolean isUserAdmitted = false;
+    private boolean isUserInSelectedEntrants = false;
+    private boolean isPreviousEvent = false;
     
     private InvitationRepository invitationRepo;
     private WaitlistRepository waitlistRepo;
     private AuthManager authManager;
     private com.example.eventease.data.EventRepository eventRepo;
+    private com.example.eventease.data.AdmittedRepository admittedRepo;
     private com.example.eventease.data.ListenerRegistration waitlistCountReg;
+    private com.example.eventease.data.ListenerRegistration invitationReg;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -105,12 +112,14 @@ public class EventDetailActivity extends AppCompatActivity {
         eventWaitlistCount = getIntent().getIntExtra("eventWaitlistCount", 0);
         hasInvitation = getIntent().getBooleanExtra("hasInvitation", false);
         invitationId = getIntent().getStringExtra("invitationId");
+        isPreviousEvent = getIntent().getBooleanExtra("isPreviousEvent", false);
         
         // Initialize repositories
         invitationRepo = App.graph().invitations;
         waitlistRepo = App.graph().waitlists;
         authManager = App.graph().auth;
         eventRepo = App.graph().events;
+        admittedRepo = App.graph().admitted;
 
         // Initialize views
         tvEventName = findViewById(R.id.tvEventName);
@@ -119,6 +128,7 @@ public class EventDetailActivity extends AppCompatActivity {
         btnRegister = findViewById(R.id.btnRegister);
         btnDecline = findViewById(R.id.btnDecline);
         btnGuidelines = findViewById(R.id.btnGuidelines);
+        btnLeaveWaitlist = findViewById(R.id.btnLeaveWaitlist);
         btnBack = findViewById(R.id.btnBack);
         btnShare = findViewById(R.id.btnShare);
         ivEventImage = findViewById(R.id.ivEventImage);
@@ -152,20 +162,58 @@ public class EventDetailActivity extends AppCompatActivity {
             // TODO: Update invitation status to DECLINED
         });
 
-        // Show/hide buttons based on invitation status
-        if (hasInvitation) {
-            btnRegister.setVisibility(View.VISIBLE);
-            btnDecline.setVisibility(View.VISIBLE);
-        } else {
+        // Set up leave waitlist button
+        btnLeaveWaitlist.setOnClickListener(v -> {
+            handleLeaveWaitlist();
+        });
+
+        // Initially hide leave waitlist button - will be shown if user is on waitlist
+        btnLeaveWaitlist.setVisibility(View.GONE);
+        android.view.View leaveWaitlistCard = findViewById(R.id.leaveWaitlistCard);
+        if (leaveWaitlistCard != null) {
+            leaveWaitlistCard.setVisibility(View.GONE);
+        }
+
+        // If this is a previous event, hide all buttons, waitlist count, and skip status checks
+        if (isPreviousEvent) {
             btnRegister.setVisibility(View.GONE);
             btnDecline.setVisibility(View.GONE);
+            btnLeaveWaitlist.setVisibility(View.GONE);
+            if (leaveWaitlistCard != null) {
+                leaveWaitlistCard.setVisibility(View.GONE);
+            }
+            // Hide waitlist count section for previous events
+            android.view.View waitlistCountCard = findViewById(R.id.waitlistCountCard);
+            if (waitlistCountCard != null) {
+                waitlistCountCard.setVisibility(View.GONE);
+            }
+            android.util.Log.d("EventDetailActivity", "Previous event - hiding all buttons and waitlist count");
+        } else {
+            // Show/hide buttons based on invitation status
+            if (hasInvitation) {
+                btnRegister.setVisibility(View.VISIBLE);
+                btnRegister.setText("Accept");
+                btnDecline.setVisibility(View.VISIBLE);
+            } else {
+                btnRegister.setVisibility(View.GONE);
+                btnDecline.setVisibility(View.GONE);
+            }
+
+            // Listen to waitlist count updates from Firebase
+            setupWaitlistCountListener();
+            
+            // Check if user is on waitlist and if user is admitted
+            checkWaitlistStatus();
+            checkAdmittedStatus();
+            // Check if user is in SelectedEntrants (means they were invited)
+            checkSelectedEntrantsStatus();
+            // Also check for invitations dynamically (in case hasInvitation from intent is incorrect)
+            // This will do an immediate check and set up a listener for real-time updates
+            checkInvitationStatus();
         }
 
         // Load event data (placeholder for now)
         loadEventData();
-        
-        // Listen to waitlist count updates from Firebase
-        setupWaitlistCountListener();
 
         // Wire bottom nav navigation to MainActivity destinations
         if (navButtonDiscover != null) {
@@ -190,8 +238,10 @@ public class EventDetailActivity extends AppCompatActivity {
             tvOverview.setText("No description available for this event.");
         }
         
-        // Waitlist count will be updated by the listener
-        tvWaitlistCount.setText("Loading...");
+        // Waitlist count will be updated by the listener (only for non-previous events)
+        if (!isPreviousEvent && tvWaitlistCount != null) {
+            tvWaitlistCount.setText("Loading...");
+        }
         
         // Load event image using Glide
         if (eventPosterUrl != null && !eventPosterUrl.isEmpty()) {
@@ -463,13 +513,21 @@ public class EventDetailActivity extends AppCompatActivity {
      * Accept the invitation and move user to upcoming events
      */
     private void acceptInvitation() {
+        String uid = authManager.getUid();
+        
+        // If invitationId is not set but user is in SelectedEntrants, try to find the invitation
+        if ((invitationId == null || invitationId.isEmpty()) && isUserInSelectedEntrants) {
+            android.util.Log.d("EventDetailActivity", "Invitation ID not set but user is in SelectedEntrants, finding invitation...");
+            findInvitationForSelectedEntrant(uid, true); // true = accept after finding
+            return;
+        }
+        
         if (invitationId == null || invitationId.isEmpty()) {
-            android.util.Log.e("EventDetailActivity", "Invitation ID is null or empty");
+            android.util.Log.e("EventDetailActivity", "Invitation ID is null or empty and user not in SelectedEntrants");
             Toast.makeText(this, "Invitation not found", Toast.LENGTH_SHORT).show();
             return;
         }
         
-        String uid = authManager.getUid();
         android.util.Log.d("EventDetailActivity", "Accepting invitation: " + invitationId + " for event: " + eventId + " by user: " + uid);
         
         // Show loading state
@@ -485,6 +543,12 @@ public class EventDetailActivity extends AppCompatActivity {
                     // Hide the buttons since invitation is now accepted
                     btnRegister.setVisibility(View.GONE);
                     btnDecline.setVisibility(View.GONE);
+                    // Update status - user is now admitted, not in waitlist anymore
+                    hasInvitation = false;
+                    isUserInWaitlist = false;
+                    isUserAdmitted = true;
+                    isUserInSelectedEntrants = false; // No longer in SelectedEntrants after accepting
+                    updateLeaveWaitlistButtonVisibility();
                     // Finish the activity to return to previous screen
                     finish();
                 })
@@ -514,13 +578,21 @@ public class EventDetailActivity extends AppCompatActivity {
      * Decline the invitation (keeps user in waitlist for future rerolls)
      */
     private void declineInvitation() {
+        String uid = authManager.getUid();
+        
+        // If invitationId is not set but user is in SelectedEntrants, try to find the invitation
+        if ((invitationId == null || invitationId.isEmpty()) && isUserInSelectedEntrants) {
+            android.util.Log.d("EventDetailActivity", "Invitation ID not set but user is in SelectedEntrants, finding invitation...");
+            findInvitationForSelectedEntrant(uid, false); // false = decline after finding
+            return;
+        }
+        
         if (invitationId == null || invitationId.isEmpty()) {
-            android.util.Log.e("EventDetailActivity", "Invitation ID is null or empty");
+            android.util.Log.e("EventDetailActivity", "Invitation ID is null or empty and user not in SelectedEntrants");
             Toast.makeText(this, "Invitation not found", Toast.LENGTH_SHORT).show();
             return;
         }
         
-        String uid = authManager.getUid();
         android.util.Log.d("EventDetailActivity", "Declining invitation: " + invitationId + " for event: " + eventId + " by user: " + uid);
         
         // Show loading state
@@ -536,6 +608,9 @@ public class EventDetailActivity extends AppCompatActivity {
                     // Hide the buttons since invitation is now declined
                     btnRegister.setVisibility(View.GONE);
                     btnDecline.setVisibility(View.GONE);
+                    hasInvitation = false;
+                    // User remains in SelectedEntrants but invitation is declined
+                    updateButtonVisibility();
                     // Finish the activity to return to previous screen
                     finish();
                 })
@@ -548,6 +623,452 @@ public class EventDetailActivity extends AppCompatActivity {
                     btnDecline.setText("Decline");
                 });
     }
+    
+    /**
+     * Finds the invitation for a user who is in SelectedEntrants.
+     * This is used when the user is in SelectedEntrants but invitationId is not set yet.
+     * 
+     * @param uid The user ID
+     * @param acceptAfterFinding If true, accept the invitation after finding it; if false, decline it
+     */
+    private void findInvitationForSelectedEntrant(String uid, boolean acceptAfterFinding) {
+        if (invitationRepo == null || eventId == null || eventId.isEmpty()) {
+            Toast.makeText(this, "Unable to process invitation", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        // Show loading state
+        btnRegister.setEnabled(false);
+        btnDecline.setEnabled(false);
+        if (acceptAfterFinding) {
+            btnRegister.setText("Processing...");
+        } else {
+            btnDecline.setText("Processing...");
+        }
+        
+        // Query for the invitation
+        // Use same pattern as elsewhere: query by uid and status, filter by eventId in memory to avoid index requirements
+        com.google.firebase.firestore.FirebaseFirestore db = com.google.firebase.firestore.FirebaseFirestore.getInstance();
+        db.collection("invitations")
+                .whereEqualTo("uid", uid)
+                .whereEqualTo("status", "PENDING")
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    if (querySnapshot != null && !querySnapshot.isEmpty()) {
+                        // Filter by eventId in memory
+                        com.google.firebase.firestore.QueryDocumentSnapshot foundDoc = null;
+                        for (com.google.firebase.firestore.QueryDocumentSnapshot doc : querySnapshot) {
+                            String docEventId = doc.getString("eventId");
+                            if (eventId.equals(docEventId)) {
+                                foundDoc = doc;
+                                break;
+                            }
+                        }
+                        
+                        if (foundDoc != null) {
+                            String foundInvitationId = foundDoc.getString("id");
+                            if (foundInvitationId == null || foundInvitationId.isEmpty()) {
+                                foundInvitationId = foundDoc.getId();
+                            }
+                            
+                            invitationId = foundInvitationId;
+                            android.util.Log.d("EventDetailActivity", "Found invitation ID: " + invitationId + " for user in SelectedEntrants");
+                            
+                            // Now accept or decline
+                            if (acceptAfterFinding) {
+                                acceptInvitation();
+                            } else {
+                                declineInvitation();
+                            }
+                        } else {
+                            // No invitation found for this event - this shouldn't happen if user is in SelectedEntrants
+                            android.util.Log.e("EventDetailActivity", "User is in SelectedEntrants but no PENDING invitation found for event " + eventId);
+                            Toast.makeText(this, "Invitation not found. Please contact the organizer.", Toast.LENGTH_LONG).show();
+                            // Restore buttons
+                            btnRegister.setEnabled(true);
+                            btnDecline.setEnabled(true);
+                            if (acceptAfterFinding) {
+                                btnRegister.setText("Accept");
+                            } else {
+                                btnDecline.setText("Decline");
+                            }
+                        }
+                    } else {
+                        // No invitation found - this shouldn't happen if user is in SelectedEntrants
+                        android.util.Log.e("EventDetailActivity", "User is in SelectedEntrants but no PENDING invitation found");
+                        Toast.makeText(this, "Invitation not found. Please contact the organizer.", Toast.LENGTH_LONG).show();
+                        // Restore buttons
+                        btnRegister.setEnabled(true);
+                        btnDecline.setEnabled(true);
+                        if (acceptAfterFinding) {
+                            btnRegister.setText("Accept");
+                        } else {
+                            btnDecline.setText("Decline");
+                        }
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    android.util.Log.e("EventDetailActivity", "Failed to find invitation for SelectedEntrant", e);
+                    Toast.makeText(this, "Failed to find invitation: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    // Restore buttons
+                    btnRegister.setEnabled(true);
+                    btnDecline.setEnabled(true);
+                    if (acceptAfterFinding) {
+                        btnRegister.setText("Accept");
+                    } else {
+                        btnDecline.setText("Decline");
+                    }
+                });
+    }
+
+    /**
+     * Check if the current user has a pending invitation for this event
+     */
+    private void checkInvitationStatus() {
+        if (authManager == null || invitationRepo == null || eventId == null || eventId.isEmpty()) {
+            return;
+        }
+
+        String uid = authManager.getUid();
+        if (uid == null || uid.isEmpty()) {
+            return;
+        }
+
+        // First, do an immediate check for invitations to catch any that were just created
+        // This ensures buttons show up immediately even if the listener hasn't fired yet
+        checkInvitationStatusImmediate(uid);
+
+        // Then set up the listener for real-time updates
+        invitationReg = invitationRepo.listenActive(uid, new com.example.eventease.data.InvitationListener() {
+            @Override
+            public void onChanged(java.util.List<com.example.eventease.model.Invitation> activeInvites) {
+                updateInvitationButtons(activeInvites);
+            }
+        });
+    }
+    
+    /**
+     * Immediately checks for invitations without waiting for listener updates.
+     * This is useful when the activity is first opened or when we want to force a refresh.
+     * Uses the same query pattern as the listener (uid + status) to avoid index requirements,
+     * then filters by eventId in memory.
+     */
+    private void checkInvitationStatusImmediate(String uid) {
+        if (invitationRepo == null || eventId == null || eventId.isEmpty()) {
+            return;
+        }
+        
+        // Query invitations directly from Firestore for immediate check
+        // Use same query pattern as listener (uid + status) to avoid index requirements
+        com.google.firebase.firestore.FirebaseFirestore db = com.google.firebase.firestore.FirebaseFirestore.getInstance();
+        db.collection("invitations")
+                .whereEqualTo("uid", uid)
+                .whereEqualTo("status", "PENDING")
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    boolean hasActiveInvite = false;
+                    String activeInvitationId = null;
+                    
+                    if (querySnapshot != null && !querySnapshot.isEmpty()) {
+                        java.util.Date now = new java.util.Date();
+                        for (com.google.firebase.firestore.QueryDocumentSnapshot doc : querySnapshot) {
+                            try {
+                                // Filter by eventId in memory (same as listener does)
+                                String invEventId = doc.getString("eventId");
+                                if (!eventId.equals(invEventId)) {
+                                    continue; // Not for this event
+                                }
+                                
+                                // Check expiration
+                                Long expiresAtMs = doc.getLong("expiresAt");
+                                if (expiresAtMs != null && expiresAtMs > 0) {
+                                    java.util.Date expiresAt = new java.util.Date(expiresAtMs);
+                                    if (expiresAt.before(now)) {
+                                        // Invitation expired, skip it
+                                        continue;
+                                    }
+                                }
+                                
+                                hasActiveInvite = true;
+                                activeInvitationId = doc.getString("id");
+                                if (activeInvitationId == null || activeInvitationId.isEmpty()) {
+                                    activeInvitationId = doc.getId();
+                                }
+                                android.util.Log.d("EventDetailActivity", "Immediate check: Found PENDING invitation for event: " + eventId + ", invitationId: " + activeInvitationId);
+                                break;
+                            } catch (Exception e) {
+                                android.util.Log.e("EventDetailActivity", "Error parsing invitation document", e);
+                            }
+                        }
+                    }
+                    
+                    if (hasActiveInvite) {
+                        hasInvitation = true;
+                        invitationId = activeInvitationId;
+                        updateButtonVisibility();
+                    } else {
+                        // Also update buttons if no invitation found (to hide them if invitation was declined/expired)
+                        hasInvitation = false;
+                        invitationId = null;
+                        updateButtonVisibility();
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    android.util.Log.e("EventDetailActivity", "Failed to check invitation status immediately", e);
+                });
+    }
+    
+    /**
+     * Updates invitation buttons based on the list of active invitations.
+     */
+    private void updateInvitationButtons(java.util.List<com.example.eventease.model.Invitation> activeInvites) {
+        boolean hasActiveInvite = false;
+        String activeInvitationId = null;
+        
+        if (activeInvites != null) {
+            for (com.example.eventease.model.Invitation inv : activeInvites) {
+                // Check if this invitation is for the current event and is PENDING
+                if (eventId.equals(inv.getEventId()) && 
+                    inv.getStatus() == com.example.eventease.model.Invitation.Status.PENDING) {
+                    hasActiveInvite = true;
+                    activeInvitationId = inv.getId();
+                    android.util.Log.d("EventDetailActivity", "Found PENDING invitation for event: " + eventId + ", invitationId: " + activeInvitationId);
+                    break;
+                }
+            }
+        }
+        
+        android.util.Log.d("EventDetailActivity", "updateInvitationButtons: hasActiveInvite=" + hasActiveInvite + " for eventId=" + eventId);
+        
+        // Update hasInvitation and invitationId
+        hasInvitation = hasActiveInvite;
+        if (hasActiveInvite && activeInvitationId != null) {
+            invitationId = activeInvitationId;
+        }
+        
+        updateButtonVisibility();
+    }
+    
+    /**
+     * Updates button visibility based on current invitation status.
+     * Shows accept/decline buttons if:
+     * 1. User has a PENDING invitation, OR
+     * 2. User is in SelectedEntrants (which means they were invited)
+     * 
+     * For previous events, all buttons are hidden.
+     */
+    private void updateButtonVisibility() {
+        // If this is a previous event, hide all buttons
+        if (isPreviousEvent) {
+            btnRegister.setVisibility(View.GONE);
+            btnDecline.setVisibility(View.GONE);
+            btnLeaveWaitlist.setVisibility(View.GONE);
+            android.view.View leaveWaitlistCard = findViewById(R.id.leaveWaitlistCard);
+            if (leaveWaitlistCard != null) {
+                leaveWaitlistCard.setVisibility(View.GONE);
+            }
+            android.util.Log.d("EventDetailActivity", "Previous event - hiding all buttons");
+            return;
+        }
+        
+        // Show accept/decline buttons if user has invitation OR is in SelectedEntrants
+        // Being in SelectedEntrants means they were invited, even if invitation check hasn't completed yet
+        boolean shouldShowInviteButtons = hasInvitation || isUserInSelectedEntrants;
+        
+        // Update button visibility
+        if (shouldShowInviteButtons) {
+            btnRegister.setVisibility(View.VISIBLE);
+            btnRegister.setText("Accept");
+            btnDecline.setVisibility(View.VISIBLE);
+            android.util.Log.d("EventDetailActivity", "Showing accept/decline buttons - hasInvitation: " + hasInvitation + ", isUserInSelectedEntrants: " + isUserInSelectedEntrants);
+        } else {
+            btnRegister.setVisibility(View.GONE);
+            btnDecline.setVisibility(View.GONE);
+            android.util.Log.d("EventDetailActivity", "Hiding accept/decline buttons - hasInvitation: " + hasInvitation + ", isUserInSelectedEntrants: " + isUserInSelectedEntrants);
+        }
+        
+        // Also update leave waitlist button visibility
+        updateLeaveWaitlistButtonVisibility();
+    }
+
+    /**
+     * Check if the current user is on the waitlist for this event
+     */
+    private void checkWaitlistStatus() {
+        if (authManager == null || waitlistRepo == null || eventId == null || eventId.isEmpty()) {
+            return;
+        }
+
+        String uid = authManager.getUid();
+        if (uid == null || uid.isEmpty()) {
+            return;
+        }
+
+        waitlistRepo.isJoined(eventId, uid)
+                .addOnSuccessListener(joined -> {
+                    isUserInWaitlist = joined != null && joined;
+                    updateLeaveWaitlistButtonVisibility();
+                })
+                .addOnFailureListener(e -> {
+                    android.util.Log.e("EventDetailActivity", "Failed to check waitlist status", e);
+                    isUserInWaitlist = false;
+                    updateLeaveWaitlistButtonVisibility();
+                });
+    }
+
+    /**
+     * Check if the current user is admitted to this event
+     */
+    private void checkAdmittedStatus() {
+        if (authManager == null || admittedRepo == null || eventId == null || eventId.isEmpty()) {
+            return;
+        }
+
+        String uid = authManager.getUid();
+        if (uid == null || uid.isEmpty()) {
+            return;
+        }
+
+        admittedRepo.isAdmitted(eventId, uid)
+                .addOnSuccessListener(admitted -> {
+                    isUserAdmitted = admitted != null && admitted;
+                    updateLeaveWaitlistButtonVisibility();
+                })
+                .addOnFailureListener(e -> {
+                    android.util.Log.e("EventDetailActivity", "Failed to check admitted status", e);
+                    isUserAdmitted = false;
+                    updateLeaveWaitlistButtonVisibility();
+                });
+    }
+
+    /**
+     * Check if the current user is in SelectedEntrants for this event.
+     * Being in SelectedEntrants means they were selected and should have an invitation.
+     */
+    private void checkSelectedEntrantsStatus() {
+        if (authManager == null || eventId == null || eventId.isEmpty()) {
+            return;
+        }
+
+        String uid = authManager.getUid();
+        if (uid == null || uid.isEmpty()) {
+            return;
+        }
+
+        com.google.firebase.firestore.FirebaseFirestore db = com.google.firebase.firestore.FirebaseFirestore.getInstance();
+        db.collection("events")
+                .document(eventId)
+                .collection("SelectedEntrants")
+                .document(uid)
+                .get()
+                .addOnSuccessListener(documentSnapshot -> {
+                    boolean inSelected = documentSnapshot != null && documentSnapshot.exists();
+                    isUserInSelectedEntrants = inSelected;
+                    android.util.Log.d("EventDetailActivity", "User " + uid + " in SelectedEntrants for event " + eventId + ": " + inSelected);
+                    
+                    // If user is in SelectedEntrants, ensure buttons are shown
+                    // Also try to find/create invitation if not found yet
+                    if (inSelected && !hasInvitation) {
+                        android.util.Log.d("EventDetailActivity", "User is in SelectedEntrants but no invitation found yet, checking again...");
+                        // Update buttons immediately (they should show based on SelectedEntrants status)
+                        updateButtonVisibility();
+                        // Also try to find the invitation (might be a timing issue)
+                        if (invitationRepo != null) {
+                            checkInvitationStatusImmediate(uid);
+                        }
+                    } else {
+                        updateButtonVisibility();
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    android.util.Log.e("EventDetailActivity", "Failed to check SelectedEntrants status", e);
+                    isUserInSelectedEntrants = false;
+                    updateButtonVisibility();
+                });
+    }
+
+    /**
+     * Update the visibility of the leave waitlist button based on waitlist status
+     */
+    private void updateLeaveWaitlistButtonVisibility() {
+        // Only show leave waitlist button if:
+        // 1. User is on waitlist
+        // 2. User doesn't have an invitation AND is not in SelectedEntrants
+        //    (if in SelectedEntrants, they were invited, so don't show leave waitlist)
+        // 3. User is NOT admitted (admitted users shouldn't see leave waitlist button)
+        boolean shouldShow = isUserInWaitlist && !hasInvitation && !isUserInSelectedEntrants && !isUserAdmitted;
+        
+        if (btnLeaveWaitlist != null) {
+            btnLeaveWaitlist.setVisibility(shouldShow ? View.VISIBLE : View.GONE);
+        }
+        
+        android.view.View leaveWaitlistCard = findViewById(R.id.leaveWaitlistCard);
+        if (leaveWaitlistCard != null) {
+            leaveWaitlistCard.setVisibility(shouldShow ? View.VISIBLE : View.GONE);
+        }
+    }
+
+    /**
+     * Handle leaving the waitlist
+     */
+    private void handleLeaveWaitlist() {
+        if (authManager == null || waitlistRepo == null || eventId == null || eventId.isEmpty()) {
+            Toast.makeText(this, "Unable to leave waitlist. Please try again.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        String uid = authManager.getUid();
+        if (uid == null || uid.isEmpty()) {
+            Toast.makeText(this, "Unable to leave waitlist. Please try again.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Disable button to prevent multiple clicks
+        btnLeaveWaitlist.setEnabled(false);
+        btnLeaveWaitlist.setText("Leaving...");
+
+        android.util.Log.d("EventDetailActivity", "Leaving waitlist for event: " + eventId + " by user: " + uid);
+
+        waitlistRepo.leave(eventId, uid)
+                .addOnSuccessListener(aVoid -> {
+                    android.util.Log.d("EventDetailActivity", "Successfully left waitlist");
+                    isUserInWaitlist = false;
+                    updateLeaveWaitlistButtonVisibility();
+                    Toast.makeText(this, "Successfully left the waitlist", Toast.LENGTH_SHORT).show();
+                    
+                    // Navigate back to waitlisted events list (My Events page)
+                    finish();
+                })
+                .addOnFailureListener(e -> {
+                    android.util.Log.e("EventDetailActivity", "Failed to leave waitlist", e);
+                    btnLeaveWaitlist.setEnabled(true);
+                    btnLeaveWaitlist.setText("Leave Waitlist");
+                    
+                    String errorMessage = "Failed to leave waitlist";
+                    if (e != null && e.getMessage() != null && !e.getMessage().isEmpty()) {
+                        errorMessage = e.getMessage();
+                    }
+                    Toast.makeText(this, errorMessage, Toast.LENGTH_LONG).show();
+                });
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Refresh status when activity resumes (e.g., user navigates back)
+        // This ensures buttons are shown if status changed while the activity was in background
+        if (authManager != null && eventId != null && !eventId.isEmpty()) {
+            String uid = authManager.getUid();
+            if (uid != null && !uid.isEmpty()) {
+                // Refresh SelectedEntrants status
+                checkSelectedEntrantsStatus();
+                // Refresh invitation status
+                if (invitationRepo != null) {
+                    checkInvitationStatusImmediate(uid);
+                }
+            }
+        }
+    }
 
     @Override
     protected void onDestroy() {
@@ -555,6 +1076,10 @@ public class EventDetailActivity extends AppCompatActivity {
         if (waitlistCountReg != null) {
             waitlistCountReg.remove();
             waitlistCountReg = null;
+        }
+        if (invitationReg != null) {
+            invitationReg.remove();
+            invitationReg = null;
         }
     }
 }

@@ -76,7 +76,7 @@
         android:layout_weight="1"/>
 
     <androidx.cardview.widget.CardView
-        android:id="@+id/notificationsCard"
+        android:id="@+id/notificationPreferencesCard"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginHorizontal="16dp"
@@ -85,29 +85,15 @@
         app:cardBackgroundColor="#536C8C"
         android:elevation="8dp">
 
-        <LinearLayout
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:padding="16dp"
-            android:gravity="center_vertical">
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Notifications"
-                android:textSize="24sp"
-                android:textColor="#FFFFFF"
-                android:fontFamily="@font/entrant_fredoka_one"/>
-
-            <com.google.android.material.switchmaterial.SwitchMaterial
-                android:id="@+id/notificationToggle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="16dp"
-                android:checked="true"/>
-        </LinearLayout>
+            android:text="Notification Preferences"
+            android:textSize="24sp"
+            android:textColor="#FFFFFF"
+            android:fontFamily="@font/entrant_fredoka_one"
+            android:gravity="center"
+            android:padding="16dp"/>
     </androidx.cardview.widget.CardView>
 
     <androidx.cardview.widget.CardView

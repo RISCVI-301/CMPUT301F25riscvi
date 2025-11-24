@@ -154,9 +154,8 @@ public class DiscoverFragment extends Fragment {
             return;
         }
 
-        List<Event> events = new ArrayList<>();
         long currentTime = System.currentTimeMillis();
-        
+        List<Event> events = new ArrayList<>();
         for (DocumentSnapshot doc : snapshots.getDocuments()) {
             android.util.Log.d("DiscoverFragment", "Doc id=" + doc.getId() + " data=" + doc.getData());
             Event event = Event.fromMap(doc.getData());
@@ -165,27 +164,11 @@ public class DiscoverFragment extends Fragment {
                 event.id = doc.getId();
             }
             
-            // Filter by registration period - only show events where current time is between registrationStart and registrationEnd
-            if (event.getRegistrationStart() > 0 && event.getRegistrationEnd() > 0) {
-                if (currentTime < event.getRegistrationStart() || currentTime > event.getRegistrationEnd()) {
-                    // Registration period hasn't started yet or has ended, skip this event
-                    android.util.Log.d("DiscoverFragment", "Skipping event " + event.id + " - registration period: " + 
-                        new java.util.Date(event.getRegistrationStart()) + " to " + new java.util.Date(event.getRegistrationEnd()) + 
-                        ", current time: " + new java.util.Date(currentTime));
-                    continue;
-                }
-            } else if (event.getRegistrationStart() > 0) {
-                // Only registrationStart is set, check if it has started
-                if (currentTime < event.getRegistrationStart()) {
-                    android.util.Log.d("DiscoverFragment", "Skipping event " + event.id + " - registration hasn't started yet");
-                    continue;
-                }
-            } else if (event.getRegistrationEnd() > 0) {
-                // Only registrationEnd is set, check if it hasn't ended
-                if (currentTime > event.getRegistrationEnd()) {
-                    android.util.Log.d("DiscoverFragment", "Skipping event " + event.id + " - registration has ended");
-                    continue;
-                }
+            // Filter out events where the start date has already passed
+            long eventStartTime = event.getStartsAtEpochMs();
+            if (eventStartTime > 0 && eventStartTime < currentTime) {
+                android.util.Log.d("DiscoverFragment", "Event " + event.getTitle() + " (id: " + event.getId() + ") has already started/passed, excluding from discover");
+                continue;
             }
             
             events.add(event);
@@ -203,7 +186,7 @@ public class DiscoverFragment extends Fragment {
             }
         });
         
-        android.util.Log.d("DiscoverFragment", "Parsed events=" + events.size());
+        android.util.Log.d("DiscoverFragment", "Parsed " + events.size() + " upcoming events (filtered out past events)");
         adapter.submit(events);
         showEmptyState(events.isEmpty());
     }

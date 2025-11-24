@@ -1,13 +1,9 @@
 package com.example.eventease.ui.entrant.profile;
 
-import android.Manifest;
 import android.app.Dialog;
-import android.app.NotificationChannel;
-import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.drawable.BitmapDrawable;
@@ -21,8 +17,6 @@ import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.TextView;
 import android.widget.Toast;
-import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.widget.AppCompatButton;
@@ -42,12 +36,12 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.google.firebase.firestore.QuerySnapshot;
 import com.example.eventease.R;
-import com.example.eventease.notifications.FCMTokenManager;
 import com.example.eventease.util.ToastUtil;
 import com.example.eventease.ui.organizer.OrganizerMyEventActivity;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import android.renderscript.Allocation;
 import android.renderscript.Element;
 import android.renderscript.RenderScript;
@@ -65,44 +59,12 @@ public class AccountFragment extends Fragment {
     private FirebaseAuth mAuth;
     private CardView organizerSwitchCard;
     private String organizerIdForSwitch;
-    private ActivityResultLauncher<String> notificationPermissionLauncher;
-    private TextView notificationStatusText;
-    private com.google.android.material.switchmaterial.SwitchMaterial notificationToggle;
 
     public AccountFragment() { }
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        
-        // Initialize notification permission launcher
-        notificationPermissionLauncher = registerForActivityResult(
-                new ActivityResultContracts.RequestPermission(),
-                isGranted -> {
-                    if (isGranted) {
-                        Log.d(TAG, "Notification permission granted from account page");
-                        // Enable device notifications
-                        enableDeviceNotifications();
-                        // Save preference
-                        FirebaseUser currentUser = mAuth.getCurrentUser();
-                        if (currentUser != null) {
-                            saveNotificationPreference(currentUser.getUid(), true);
-                        }
-                    } else {
-                        Log.w(TAG, "Notification permission denied from account page");
-                        // Revert toggle
-                        if (notificationToggle != null) {
-                            notificationToggle.setOnCheckedChangeListener(null);
-                            notificationToggle.setChecked(false);
-                            notificationToggle.setOnCheckedChangeListener((buttonView, isChecked) -> {
-                                handleNotificationToggle(isChecked);
-                            });
-                        }
-                        // Open settings to allow manual enable
-                        openNotificationSettings();
-                        updateNotificationStatus();
-                    }
-                });
     }
     
     @Nullable
@@ -134,29 +96,12 @@ public class AccountFragment extends Fragment {
             });
         }
 
-        // Set up notification toggle
-        notificationToggle = root.findViewById(R.id.notificationToggle);
-        if (notificationToggle != null) {
-            // Load saved preference
-            loadNotificationPreference();
-            
-            // Set up toggle listener
-            notificationToggle.setOnCheckedChangeListener((buttonView, isChecked) -> {
-                handleNotificationToggle(isChecked);
-            });
-        }
-        
-        // Set up notification card click listener (for requesting permission if needed)
-        CardView notificationsCard = root.findViewById(R.id.notificationsCard);
-        if (notificationsCard != null) {
-            notificationsCard.setOnClickListener(v -> {
-                // If toggle is off, turn it on (which will request permission if needed)
-                if (notificationToggle != null && !notificationToggle.isChecked()) {
-                    notificationToggle.setChecked(true);
-                } else {
-                    // If already on, just show status
-                    handleNotificationPermissionClick();
-                }
+
+        // Set up notification preferences card click listener
+        CardView notificationPreferencesCard = root.findViewById(R.id.notificationPreferencesCard);
+        if (notificationPreferencesCard != null) {
+            notificationPreferencesCard.setOnClickListener(v -> {
+                showNotificationPreferencesDialog();
             });
         }
 
@@ -170,261 +115,7 @@ public class AccountFragment extends Fragment {
         // Load user data with real-time updates
         loadUserData();
         
-        // Update notification status on view creation
-        updateNotificationStatus();
-        
         return root;
-    }
-    
-    /**
-     * Handles notification permission click from account page.
-     * Checks current permission status and requests if needed.
-     */
-    private void handleNotificationPermissionClick() {
-        if (getContext() == null) return;
-        
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            // Android 13+ requires runtime permission
-            if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.POST_NOTIFICATIONS) 
-                    == PackageManager.PERMISSION_GRANTED) {
-                // Permission already granted
-                ToastUtil.showShort(getContext(), "Notification permission is already enabled ✓");
-                updateNotificationStatus();
-            } else {
-                // Request permission
-                Log.d(TAG, "Requesting notification permission from account page");
-                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS);
-            }
-        } else {
-            // Android 12 and below - permission granted via manifest
-            ToastUtil.showShort(getContext(), "Notifications are enabled (Android 12 and below)");
-        }
-    }
-    
-    /**
-     * Loads the user's notification preference from Firestore.
-     */
-    private void loadNotificationPreference() {
-        FirebaseUser currentUser = mAuth.getCurrentUser();
-        if (currentUser == null || notificationToggle == null) {
-            return;
-        }
-        
-        db.collection("users").document(currentUser.getUid())
-                .get()
-                .addOnSuccessListener(documentSnapshot -> {
-                    if (documentSnapshot != null && documentSnapshot.exists()) {
-                        Boolean notificationsEnabled = documentSnapshot.getBoolean("notificationsEnabled");
-                        // Default to true if not set
-                        boolean enabled = notificationsEnabled != null ? notificationsEnabled : true;
-                        
-                        // Temporarily remove listener to avoid triggering on load
-                        notificationToggle.setOnCheckedChangeListener(null);
-                        notificationToggle.setChecked(enabled);
-                        notificationToggle.setOnCheckedChangeListener((buttonView, isChecked) -> {
-                            handleNotificationToggle(isChecked);
-                        });
-                        
-                        updateNotificationStatus();
-                    }
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Failed to load notification preference", e);
-                    // Default to enabled
-                    if (notificationToggle != null) {
-                        notificationToggle.setOnCheckedChangeListener(null);
-                        notificationToggle.setChecked(true);
-                        notificationToggle.setOnCheckedChangeListener((buttonView, isChecked) -> {
-                            handleNotificationToggle(isChecked);
-                        });
-                    }
-                });
-    }
-    
-    /**
-     * Handles notification toggle change.
-     * This actually controls device notification settings for the app.
-     */
-    private void handleNotificationToggle(boolean isEnabled) {
-        FirebaseUser currentUser = mAuth.getCurrentUser();
-        if (currentUser == null) {
-            if (notificationToggle != null) {
-                notificationToggle.setChecked(false);
-            }
-            ToastUtil.showShort(getContext(), "Please log in to change notification settings");
-            return;
-        }
-        
-        if (isEnabled) {
-            // If enabling, check and request permission if needed
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.POST_NOTIFICATIONS) 
-                        != PackageManager.PERMISSION_GRANTED) {
-                    // Request permission
-                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS);
-                    // Don't save preference yet - wait for permission result
-                    return;
-                }
-            }
-            
-            // Enable notifications at device level
-            enableDeviceNotifications();
-            
-            // Save preference to Firestore
-            saveNotificationPreference(currentUser.getUid(), true);
-        } else {
-            // Disable notifications at device level
-            disableDeviceNotifications();
-            
-            // Save preference to Firestore
-            saveNotificationPreference(currentUser.getUid(), false);
-        }
-    }
-    
-    /**
-     * Enables notifications at the device level by ensuring the notification channel is enabled.
-     */
-    private void enableDeviceNotifications() {
-        if (getContext() == null) return;
-        
-        // Use centralized channel manager to ensure channel exists and is properly configured
-        com.example.eventease.notifications.NotificationChannelManager.createNotificationChannel(getContext());
-        
-        NotificationManager notificationManager = 
-            (NotificationManager) getContext().getSystemService(Context.NOTIFICATION_SERVICE);
-        
-        if (notificationManager == null) return;
-        
-        // If notifications are disabled at app level, open settings
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            if (!notificationManager.areNotificationsEnabled()) {
-                openNotificationSettings();
-                return;
-            }
-        }
-        
-        // Check if channel is enabled
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            boolean channelEnabled = com.example.eventease.notifications.NotificationChannelManager.isChannelEnabled(getContext());
-            if (!channelEnabled) {
-                ToastUtil.showShort(getContext(), "Please enable 'Event Invitations' channel in device settings");
-                openNotificationSettings();
-                return;
-            }
-        }
-        
-        ToastUtil.showShort(getContext(), "Notifications enabled ✓");
-        FCMTokenManager.getInstance().initialize();
-    }
-    
-    /**
-     * Disables notifications at the device level.
-     * 
-     * IMPORTANT: We do NOT set the channel to IMPORTANCE_NONE here because:
-     * 1. Once set to NONE, Android prevents programmatic re-enabling
-     * 2. The user must manually enable it in device settings
-     * 3. This causes a poor user experience
-     * 
-     * Instead, we just save the preference and let the user control it via device settings.
-     * The app will respect the user's Firestore preference when sending notifications.
-     */
-    private void disableDeviceNotifications() {
-        if (getContext() == null) return;
-        
-        // Don't modify the channel - just save the preference
-        // The user can control notifications via device settings if they want
-        ToastUtil.showShort(getContext(), "Notifications preference saved. You can control notifications in device settings.");
-    }
-    
-    /**
-     * Opens device notification settings for this app.
-     */
-    private void openNotificationSettings() {
-        if (getContext() == null) return;
-        
-        Intent intent = new Intent();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            intent.setAction(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS);
-            intent.putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, getContext().getPackageName());
-        } else {
-            intent.setAction(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-            intent.setData(android.net.Uri.parse("package:" + getContext().getPackageName()));
-        }
-        
-        try {
-            startActivity(intent);
-            ToastUtil.showShort(getContext(), "Please enable notifications in device settings");
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to open notification settings", e);
-            ToastUtil.showShort(getContext(), "Could not open settings. Please enable notifications manually.");
-        }
-    }
-    
-    /**
-     * Saves notification preference to Firestore.
-     */
-    private void saveNotificationPreference(String uid, boolean enabled) {
-        db.collection("users").document(uid)
-                .update("notificationsEnabled", enabled)
-                .addOnSuccessListener(aVoid -> {
-                    Log.d(TAG, "Notification preference saved: " + enabled);
-                    updateNotificationStatus();
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Failed to save notification preference", e);
-                    ToastUtil.showShort(getContext(), "Failed to save preference. Please try again.");
-                    // Revert toggle
-                    if (notificationToggle != null) {
-                        notificationToggle.setOnCheckedChangeListener(null);
-                        notificationToggle.setChecked(!enabled);
-                        notificationToggle.setOnCheckedChangeListener((buttonView, isChecked) -> {
-                            handleNotificationToggle(isChecked);
-                        });
-                    }
-                });
-    }
-    
-    /**
-     * Updates the notification status display in the account page.
-     */
-    private void updateNotificationStatus() {
-        if (getView() == null || getContext() == null) return;
-        
-        CardView notificationsCard = getView().findViewById(R.id.notificationsCard);
-        if (notificationsCard == null) return;
-        
-        NotificationManager notificationManager = 
-            (NotificationManager) getContext().getSystemService(Context.NOTIFICATION_SERVICE);
-        
-        boolean notificationsEnabled = false;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            notificationsEnabled = notificationManager != null && notificationManager.areNotificationsEnabled();
-        } else {
-            notificationsEnabled = true; // Android 6 and below - always enabled
-        }
-        
-        // Check permission for Android 13+
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            notificationsEnabled = notificationsEnabled && 
-                ContextCompat.checkSelfPermission(getContext(), Manifest.permission.POST_NOTIFICATIONS) 
-                    == PackageManager.PERMISSION_GRANTED;
-        }
-        
-        // Update toggle to match device state
-        if (notificationToggle != null) {
-            notificationToggle.setOnCheckedChangeListener(null);
-            notificationToggle.setChecked(notificationsEnabled);
-            notificationToggle.setOnCheckedChangeListener((buttonView, isChecked) -> {
-                handleNotificationToggle(isChecked);
-            });
-        }
-        
-        // Update card appearance
-        if (notificationsEnabled) {
-            notificationsCard.setAlpha(1.0f);
-        } else {
-            notificationsCard.setAlpha(0.7f);
-        }
     }
     
     private void loadUserData() {
@@ -746,5 +437,146 @@ public class AccountFragment extends Fragment {
             ToastUtil.showLong(getContext(), "Navigation error: " + e.getMessage());
             e.printStackTrace();
         }
+    }
+
+    /**
+     * Shows the notification preferences dialog.
+     */
+    private void showNotificationPreferencesDialog() {
+        if (getContext() == null) {
+            return;
+        }
+
+        Dialog dialog = new Dialog(requireContext(), android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
+        dialog.setContentView(R.layout.entrant_dialog_notification_preferences);
+        dialog.setCanceledOnTouchOutside(true);
+
+        // Set window properties for full screen blur
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            WindowManager.LayoutParams layoutParams = dialog.getWindow().getAttributes();
+            layoutParams.dimAmount = 0f;
+            dialog.getWindow().setAttributes(layoutParams);
+            dialog.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+        }
+
+        // Capture screenshot and blur it for the background
+        Bitmap screenshot = captureScreenshot();
+        if (screenshot != null) {
+            Bitmap blurredBitmap = blurBitmap(screenshot, 25f);
+            if (blurredBitmap != null) {
+                android.view.View blurBackground = dialog.findViewById(R.id.dialogBlurBackground);
+                if (blurBackground != null) {
+                    blurBackground.setBackground(new BitmapDrawable(getResources(), blurredBitmap));
+                }
+            }
+        }
+
+        // Make the background clickable to dismiss
+        android.view.View blurBackground = dialog.findViewById(R.id.dialogBlurBackground);
+        if (blurBackground != null) {
+            blurBackground.setOnClickListener(v -> dialog.dismiss());
+        }
+
+        // Get switches
+        com.google.android.material.switchmaterial.SwitchMaterial switchInvited = dialog.findViewById(R.id.switchInvited);
+        com.google.android.material.switchmaterial.SwitchMaterial switchNotInvited = dialog.findViewById(R.id.switchNotInvited);
+        AppCompatButton btnSave = dialog.findViewById(R.id.btnDialogSave);
+
+        // Load current preferences
+        loadNotificationPreferences(switchInvited, switchNotInvited);
+
+        // Set up save button
+        if (btnSave != null) {
+            btnSave.setOnClickListener(v -> {
+                if (switchInvited != null && switchNotInvited != null) {
+                    boolean invitedEnabled = switchInvited.isChecked();
+                    boolean notInvitedEnabled = switchNotInvited.isChecked();
+                    saveNotificationPreferences(invitedEnabled, notInvitedEnabled);
+                    dialog.dismiss();
+                }
+            });
+        }
+
+        dialog.show();
+
+        // Apply animations after dialog is shown
+        androidx.cardview.widget.CardView card = dialog.findViewById(R.id.dialogCardView);
+        if (blurBackground != null && card != null) {
+            android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(getContext(), R.anim.entrant_dialog_fade_in);
+            android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(getContext(), R.anim.entrant_dialog_zoom_in);
+
+            blurBackground.startAnimation(fadeIn);
+            card.startAnimation(zoomIn);
+        }
+    }
+
+    /**
+     * Loads notification preferences from Firestore and updates the switches.
+     */
+    private void loadNotificationPreferences(com.google.android.material.switchmaterial.SwitchMaterial switchInvited,
+                                           com.google.android.material.switchmaterial.SwitchMaterial switchNotInvited) {
+        FirebaseUser currentUser = mAuth.getCurrentUser();
+        if (currentUser == null || switchInvited == null || switchNotInvited == null) {
+            return;
+        }
+
+        db.collection("users").document(currentUser.getUid())
+                .get()
+                .addOnSuccessListener(documentSnapshot -> {
+                    if (documentSnapshot != null && documentSnapshot.exists()) {
+                        // Default to true if not set (receive all notifications)
+                        Boolean invitedEnabled = documentSnapshot.getBoolean("notificationPreferenceInvited");
+                        Boolean notInvitedEnabled = documentSnapshot.getBoolean("notificationPreferenceNotInvited");
+
+                        boolean invited = invitedEnabled != null ? invitedEnabled : true;
+                        boolean notInvited = notInvitedEnabled != null ? notInvitedEnabled : true;
+
+                        switchInvited.setChecked(invited);
+                        switchNotInvited.setChecked(notInvited);
+                    } else {
+                        // Default to both enabled
+                        switchInvited.setChecked(true);
+                        switchNotInvited.setChecked(true);
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to load notification preferences", e);
+                    // Default to both enabled on error
+                    if (switchInvited != null) {
+                        switchInvited.setChecked(true);
+                    }
+                    if (switchNotInvited != null) {
+                        switchNotInvited.setChecked(true);
+                    }
+                });
+    }
+
+    /**
+     * Saves notification preferences to Firestore.
+     */
+    private void saveNotificationPreferences(boolean invitedEnabled, boolean notInvitedEnabled) {
+        FirebaseUser currentUser = mAuth.getCurrentUser();
+        if (currentUser == null) {
+            ToastUtil.showShort(getContext(), "Please log in to save preferences");
+            return;
+        }
+
+        Map<String, Object> updates = new java.util.HashMap<>();
+        updates.put("notificationPreferenceInvited", invitedEnabled);
+        updates.put("notificationPreferenceNotInvited", notInvitedEnabled);
+
+        db.collection("users").document(currentUser.getUid())
+                .update(updates)
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "Notification preferences saved: invited=" + invitedEnabled + ", notInvited=" + notInvitedEnabled);
+                    ToastUtil.showShort(getContext(), "Notification preferences saved");
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to save notification preferences", e);
+                    ToastUtil.showShort(getContext(), "Failed to save preferences. Please try again.");
+                });
     }
 }

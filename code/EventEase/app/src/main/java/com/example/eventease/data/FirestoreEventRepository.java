@@ -37,15 +37,22 @@ public class FirestoreEventRepository implements EventRepository {
 
                     QuerySnapshot snapshot = task.getResult();
                     List<Event> events = new ArrayList<>();
+                    
                     if (snapshot != null) {
                         for (DocumentSnapshot doc : snapshot.getDocuments()) {
-                            Event event = Event.fromMap(doc.getData());
-                            if (event == null) continue;
-                            if (event.id == null) {
-                                event.id = doc.getId();
-                            }
-                            if (now == null || event.getStartAt() == null || event.getStartAt().after(now)) {
-                                events.add(event);
+                            try {
+                                Event event = Event.fromMap(doc.getData());
+                                if (event == null) continue;
+                                if (event.id == null) {
+                                    event.id = doc.getId();
+                                }
+                                
+                                // Filter: only include events that haven't started yet or have no start time
+                                if (event.getStartAt() == null || event.getStartAt().after(now)) {
+                                    events.add(event);
+                                }
+                            } catch (Exception e) {
+                                Log.e(TAG, "Error processing event document " + doc.getId(), e);
                             }
                         }
                     }
@@ -72,7 +79,12 @@ public class FirestoreEventRepository implements EventRepository {
                         throw new NoSuchElementException("Event not found: " + eventId);
                     }
 
-                    Event event = Event.fromMap(doc.getData());
+                    java.util.Map<String, Object> data = doc.getData();
+                    if (data == null) {
+                        throw new IllegalStateException("Event document has null data: " + eventId);
+                    }
+
+                    Event event = Event.fromMap(data);
                     if (event == null) {
                         throw new IllegalStateException("Failed to parse event: " + eventId);
                     }

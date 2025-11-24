@@ -54,25 +54,19 @@ public class MainActivity extends AppCompatActivity {
     private android.widget.TextView navLabelMyEvents;
     private android.widget.TextView navLabelDiscover;
     private android.widget.TextView navLabelAccount;
-<<<<<<< HEAD
 
     private InvitationNotificationListener invitationListener;
     private ActivityResultLauncher<String> notificationPermissionLauncher;
     private static boolean listenersInitialized = false;
-=======
->>>>>>> 590d2f49ef5cab38a8e18b47d77b0f1848ce5c79
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-<<<<<<< HEAD
 
         //FireBase
         FirebaseApp.initializeApp(this);
         Log.d("FirebaseTest", "FirebaseApp initialized: " + (FirebaseApp.getApps(this).size() > 0));
 
-=======
->>>>>>> 590d2f49ef5cab38a8e18b47d77b0f1848ce5c79
         setContentView(R.layout.entrant_activity_mainfragments);
 
         // Initialize notification permission launcher
@@ -228,9 +222,13 @@ public class MainActivity extends AppCompatActivity {
 
                     // Initialize listeners only once to prevent duplicates
                     if (!listenersInitialized) {
-                        // Initialize FCM token manager and invitation listener
+                        // Initialize FCM token manager
+                        FCMTokenManager.getInstance().initialize();
+                        
+                        // Initialize InvitationNotificationListener for local notifications
+                        // (Cloud Functions may also send notifications, but local listener ensures
+                        // notifications work even if Cloud Functions fail, and has cooldown to prevent duplicates)
                         if (invitationListener == null) {
-                            FCMTokenManager.getInstance().initialize();
                             invitationListener = new InvitationNotificationListener(this);
                             invitationListener.startListening();
                         }
@@ -313,13 +311,13 @@ public class MainActivity extends AppCompatActivity {
     }
     
     /**
-     * Initializes FCM token manager and invitation listener.
+     * Initializes FCM token manager.
      * Should be called after notification permission is granted (or on older Android versions).
+     * Note: Notifications are sent via Cloud Functions, not local listeners, to avoid duplicates.
      */
     private void initializeNotifications() {
         FCMTokenManager.getInstance().initialize();
-        invitationListener = new InvitationNotificationListener(this);
-        invitationListener.startListening();
+        // Note: InvitationNotificationListener is disabled - notifications are sent via Cloud Functions
     }
 
     @Override
@@ -412,8 +410,3 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 }
-<<<<<<< HEAD
-
-
-=======
->>>>>>> 590d2f49ef5cab38a8e18b47d77b0f1848ce5c79
