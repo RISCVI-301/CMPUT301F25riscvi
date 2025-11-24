@@ -1,0 +1,420 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/dialogBlurBackground"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/entrant_dialog_blur_background"
+    android:clickable="true"
+    android:focusable="true">
+
+    <androidx.cardview.widget.CardView
+        android:id="@+id/dialogCardView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_gravity="center"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginTop="48dp"
+        android:layout_marginBottom="48dp"
+        android:backgroundTint="#E9F2FF"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="16dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:paddingStart="12dp"
+                android:paddingTop="14dp"
+                android:paddingEnd="14dp"
+                android:paddingBottom="8dp">
+
+                <ImageButton
+                    android:id="@+id/btnFilterClose"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:background="@android:color/transparent"
+                    android:contentDescription="@string/back"
+                    android:padding="6dp"
+                    android:src="@drawable/arrow_back"
+                    android:tint="#223C65" />
+
+                <TextView
+                    android:id="@+id/tvFilterTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="Filter"
+                    android:textColor="#223C65"
+                    android:textSize="28sp"
+                    android:textStyle="bold"
+                    android:fontFamily="@font/entrant_fredoka_one" />
+
+                <View
+                    android:layout_width="36dp"
+                    android:layout_height="1dp" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1.5dp"
+                android:background="#223C65" />
+
+            <ScrollView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fillViewport="true">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp"
+                    android:paddingBottom="20dp">
+
+                    <TextView
+                        android:id="@+id/labelDate"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/entrant_filter_section_label"
+                        android:fontFamily="@font/entrant_fredoka_one"
+                        android:paddingStart="12dp"
+                        android:paddingTop="6dp"
+                        android:paddingEnd="12dp"
+                        android:paddingBottom="6dp"
+                        android:text="Date"
+                        android:textColor="#223C65"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
+
+                    <RadioGroup
+                        android:id="@+id/dateRadioGroup"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:paddingTop="12dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:background="@drawable/entrant_dialog_option_background"
+                            android:gravity="center_vertical"
+                            android:padding="12dp"
+                            android:layout_marginBottom="8dp">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:fontFamily="@font/entrant_fredoka_one"
+                                android:text="Any date"
+                                android:textColor="#223C65"
+                                android:textSize="16sp" />
+
+                            <RadioButton
+                                android:id="@+id/radioAnyDate"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:buttonTint="#223C65" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:background="@drawable/entrant_dialog_option_background"
+                            android:gravity="center_vertical"
+                            android:padding="12dp"
+                            android:layout_marginBottom="8dp">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:fontFamily="@font/entrant_fredoka_one"
+                                android:text="Today"
+                                android:textColor="#223C65"
+                                android:textSize="16sp" />
+
+                            <RadioButton
+                                android:id="@+id/radioToday"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:buttonTint="#223C65" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:background="@drawable/entrant_dialog_option_background"
+                            android:gravity="center_vertical"
+                            android:padding="12dp"
+                            android:layout_marginBottom="8dp">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:fontFamily="@font/entrant_fredoka_one"
+                                android:text="Tomorrow"
+                                android:textColor="#223C65"
+                                android:textSize="16sp" />
+
+                            <RadioButton
+                                android:id="@+id/radioTomorrow"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:buttonTint="#223C65" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:id="@+id/chooseDateRow"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:background="@drawable/entrant_dialog_option_background"
+                            android:gravity="center_vertical"
+                            android:padding="12dp">
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:fontFamily="@font/entrant_fredoka_one"
+                                    android:text="Choose a date"
+                                    android:textColor="#223C65"
+                                    android:textSize="16sp" />
+
+                                <TextView
+                                    android:id="@+id/textChooseDateValue"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:fontFamily="@font/entrant_fredoka_one"
+                                    android:text="No date selected"
+                                    android:textColor="#446EAF"
+                                    android:textSize="12sp"
+                                    android:layout_marginTop="2dp" />
+                            </LinearLayout>
+
+                            <ImageView
+                                android:layout_width="18dp"
+                                android:layout_height="18dp"
+                                android:layout_marginEnd="8dp"
+                                android:src="@drawable/entrant_ic_arrow_forward"
+                                android:tint="#223C65" />
+
+                            <RadioButton
+                                android:id="@+id/radioCustomDate"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:buttonTint="#223C65" />
+                        </LinearLayout>
+
+                    </RadioGroup>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1.5dp"
+                        android:layout_marginTop="14dp"
+                        android:layout_marginBottom="14dp"
+                        android:background="#223C65" />
+
+                    <TextView
+                        android:id="@+id/labelInterests"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/entrant_filter_section_label"
+                        android:fontFamily="@font/entrant_fredoka_one"
+                        android:paddingStart="12dp"
+                        android:paddingTop="6dp"
+                        android:paddingEnd="12dp"
+                        android:paddingBottom="6dp"
+                        android:text="Interests"
+                        android:textColor="#223C65"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:paddingTop="12dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:background="@drawable/entrant_dialog_option_background"
+                            android:gravity="center_vertical"
+                            android:padding="12dp"
+                            android:layout_marginBottom="8dp">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:fontFamily="@font/entrant_fredoka_one"
+                                android:text="Outdoor"
+                                android:textColor="#223C65"
+                                android:textSize="16sp" />
+
+                            <CheckBox
+                                android:id="@+id/cbOutdoor"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:buttonTint="#223C65" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:background="@drawable/entrant_dialog_option_background"
+                            android:gravity="center_vertical"
+                            android:padding="12dp"
+                            android:layout_marginBottom="8dp">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:fontFamily="@font/entrant_fredoka_one"
+                                android:text="Indoor"
+                                android:textColor="#223C65"
+                                android:textSize="16sp" />
+
+                            <CheckBox
+                                android:id="@+id/cbIndoor"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:buttonTint="#223C65" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:background="@drawable/entrant_dialog_option_background"
+                            android:gravity="center_vertical"
+                            android:padding="12dp"
+                            android:layout_marginBottom="8dp">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:fontFamily="@font/entrant_fredoka_one"
+                                android:text="Family"
+                                android:textColor="#223C65"
+                                android:textSize="16sp" />
+
+                            <CheckBox
+                                android:id="@+id/cbFamily"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:buttonTint="#223C65" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:background="@drawable/entrant_dialog_option_background"
+                            android:gravity="center_vertical"
+                            android:padding="12dp"
+                            android:layout_marginBottom="8dp">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:fontFamily="@font/entrant_fredoka_one"
+                                android:text="Business"
+                                android:textColor="#223C65"
+                                android:textSize="16sp" />
+
+                            <CheckBox
+                                android:id="@+id/cbBusiness"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:buttonTint="#223C65" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:background="@drawable/entrant_dialog_option_background"
+                            android:gravity="center_vertical"
+                            android:padding="12dp"
+                            android:layout_marginBottom="8dp">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:fontFamily="@font/entrant_fredoka_one"
+                                android:text="Music"
+                                android:textColor="#223C65"
+                                android:textSize="16sp" />
+
+                            <CheckBox
+                                android:id="@+id/cbMusic"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:buttonTint="#223C65" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:background="@drawable/entrant_dialog_option_background"
+                            android:gravity="center_vertical"
+                            android:padding="12dp">
+
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:fontFamily="@font/entrant_fredoka_one"
+                                android:text="Food"
+                                android:textColor="#223C65"
+                                android:textSize="16sp" />
+
+                            <CheckBox
+                                android:id="@+id/cbFood"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:buttonTint="#223C65" />
+                        </LinearLayout>
+
+                    </LinearLayout>
+
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/btnApplyFilters"
+                        android:layout_width="match_parent"
+                        android:layout_height="56dp"
+                        android:layout_marginTop="16dp"
+                        android:text="Apply Filters"
+                        android:textAllCaps="false"
+                        android:textColor="#223C65"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        android:background="@drawable/entrant_button_guidelines_ok"
+                        android:fontFamily="@font/entrant_fredoka_one"
+                        android:elevation="6dp"
+                        style="@style/Widget.AppCompat.Button.Borderless" />
+
+                </LinearLayout>
+            </ScrollView>
+
+        </LinearLayout>
+
+    </androidx.cardview.widget.CardView>
+
+</FrameLayout>
