@@ -76,7 +76,7 @@
         android:layout_weight="1"/>
 
     <androidx.cardview.widget.CardView
-        android:id="@+id/notificationsCard"
+        android:id="@+id/notificationPreferencesCard"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginHorizontal="16dp"
@@ -85,28 +85,15 @@
         app:cardBackgroundColor="#536C8C"
         android:elevation="8dp">
 
-        <LinearLayout
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:padding="16dp">
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Notifications"
-                android:textSize="24sp"
-                android:textColor="#FFFFFF"
-                android:fontFamily="@font/entrant_fredoka_one"/>
-
-            <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:src="@drawable/entrant_ic_arrow_forward"
-                android:layout_gravity="center_vertical"
-                app:tint="#FFFFFF"/>
-        </LinearLayout>
+            android:text="Notification Preferences"
+            android:textSize="24sp"
+            android:textColor="#FFFFFF"
+            android:fontFamily="@font/entrant_fredoka_one"
+            android:gravity="center"
+            android:padding="16dp"/>
     </androidx.cardview.widget.CardView>
 
     <androidx.cardview.widget.CardView
@@ -117,7 +104,8 @@
         android:layout_marginVertical="8dp"
         app:cardCornerRadius="16dp"
         app:cardBackgroundColor="#B8E2D7"
-        android:elevation="8dp">
+        android:elevation="8dp"
+        android:visibility="gone">
 
         <TextView
             android:layout_width="match_parent"
