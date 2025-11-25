@@ -1,6 +1,10 @@
 package com.example.eventease.admin;
 
+import android.Manifest;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -9,8 +13,11 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.activity.OnBackPressedCallback;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 import androidx.core.view.WindowCompat;
 import androidx.navigation.NavController;
 import androidx.navigation.NavDestination;
@@ -18,10 +25,10 @@ import androidx.navigation.fragment.NavHostFragment;
 
 import com.example.eventease.R;
 import com.example.eventease.auth.UserRoleChecker;
+import com.example.eventease.notifications.FCMTokenManager;
 import com.example.eventease.util.ToastUtil;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.auth.FirebaseAuth;
-import android.content.SharedPreferences;
 
 /**
  * Main activity for admin users.
@@ -49,6 +56,8 @@ public class AdminMainActivity extends AppCompatActivity {
     private TextView navLabelProfiles;
     private TextView navLabelImages;
     private TextView navLabelLogs;
+    
+    private ActivityResultLauncher<String> notificationPermissionLauncher;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -67,6 +76,24 @@ public class AdminMainActivity extends AppCompatActivity {
         }
 
         setContentView(R.layout.admin_activity_mainfragments);
+        
+        // Initialize notification permission launcher
+        notificationPermissionLauncher = registerForActivityResult(
+                new ActivityResultContracts.RequestPermission(),
+                isGranted -> {
+                    if (isGranted) {
+                        Log.d("AdminMainActivity", "Notification permission granted");
+                        initializeNotifications();
+                    } else {
+                        Log.w("AdminMainActivity", "Notification permission denied");
+                        // Still initialize FCM - notifications may work on older Android versions
+                        initializeNotifications();
+                    }
+                }
+        );
+        
+        // Request notification permission if needed (Android 13+)
+        requestNotificationPermission();
 
         // Verify admin role
         UserRoleChecker.isAdmin().addOnCompleteListener(task -> {
@@ -248,6 +275,36 @@ public class AdminMainActivity extends AppCompatActivity {
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
         finish();
+    }
+    
+    /**
+     * Requests notification permission for Android 13+ (API 33+).
+     * On older versions, permission is granted automatically via manifest.
+     */
+    private void requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            // Android 13+ requires runtime permission
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) 
+                    != PackageManager.PERMISSION_GRANTED) {
+                Log.d("AdminMainActivity", "Requesting notification permission");
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS);
+            } else {
+                Log.d("AdminMainActivity", "Notification permission already granted");
+                initializeNotifications();
+            }
+        } else {
+            // Android 12 and below - permission granted via manifest
+            Log.d("AdminMainActivity", "Android version < 13, notification permission granted via manifest");
+            initializeNotifications();
+        }
+    }
+    
+    /**
+     * Initializes FCM token manager for admin users.
+     * Should be called after notification permission is granted (or on older Android versions).
+     */
+    private void initializeNotifications() {
+        FCMTokenManager.getInstance().initialize();
     }
 }
 
