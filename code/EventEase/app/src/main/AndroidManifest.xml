@@ -2,16 +2,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
-    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.CAMERA" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
@@ -31,12 +29,12 @@
         <activity
             android:name="com.example.eventease.ui.entrant.discover.EventDetailsDiscoverActivity"
             android:exported="false" />
+
         <activity
             android:name="com.example.eventease.MainActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
@@ -44,6 +42,11 @@
         <!-- Admin main screen -->
         <activity
             android:name="com.example.eventease.admin.AdminMainActivity"
+            android:exported="false" />
+
+        <!-- Admin event detail screen -->
+        <activity
+            android:name="com.example.eventease.admin.event.ui.EventDetailActivity"
             android:exported="false" />
 
         <meta-data
@@ -71,11 +74,9 @@
         <activity
             android:name=".ui.organizer.OrganizerMyEventActivity"
             android:exported="false" />
-
         <activity
             android:name=".ui.organizer.OrganizerCreateEventActivity"
             android:exported="false" />
-
         <activity
             android:name=".ui.organizer.OrganizerAccountActivity"
             android:exported="false" />
