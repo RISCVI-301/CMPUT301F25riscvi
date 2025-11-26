@@ -134,17 +134,17 @@ public class ReplacementHelper {
                                 WriteBatch batch = db.batch();
                                 List<String> userIds = new ArrayList<>();
 
-                                // Move selected entrants from WaitlistedEntrants to SelectedEntrants
+                                // Copy selected entrants from WaitlistedEntrants to SelectedEntrants
+                                // Note: We don't remove from WaitlistedEntrants to keep the original waitlist intact
                                 for (DocumentSnapshot doc : selectedForReplacement) {
                                     String userId = doc.getId();
                                     Map<String, Object> data = doc.getData();
                                     userIds.add(userId);
 
                                     if (data != null) {
-                                        // Move to SelectedEntrants
+                                        // Copy to SelectedEntrants (don't remove from WaitlistedEntrants)
                                         batch.set(eventRef.collection("SelectedEntrants").document(userId), data);
-                                        // Remove from WaitlistedEntrants
-                                        batch.delete(eventRef.collection("WaitlistedEntrants").document(userId));
+                                        // DO NOT delete from WaitlistedEntrants - keep original waitlist unchanged
                                         
                                         // Create invitation for replacement
                                         Map<String, Object> invitation = new HashMap<>();
