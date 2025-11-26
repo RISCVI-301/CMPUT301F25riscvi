@@ -238,6 +238,198 @@ exports.sendNotification = functions.firestore
     });
 
 /**
+ * Scheduled function that runs every 5 minutes to check for events whose registration period has ended.
+ * Automatically processes entrant selection for these events.
+ */
+exports.processAutomaticEntrantSelection = functions.pubsub
+    .schedule('every 5 minutes')
+    .onRun(async (context) => {
+        console.log('=== Checking for events that need automatic entrant selection ===');
+        const now = Date.now();
+        
+        try {
+            // Find events where selection hasn't been processed
+            // Query only by selectionProcessed to avoid needing a composite index
+            // Then filter by registrationEnd in code
+            const eventsSnapshot = await admin.firestore()
+                .collection('events')
+                .where('selectionProcessed', '==', false)
+                .get();
+            
+            if (eventsSnapshot.empty) {
+                console.log('No events found that need selection processing');
+                return null;
+            }
+            
+            console.log(`Found ${eventsSnapshot.size} event(s) that may need selection processing`);
+            
+            let processedCount = 0;
+            
+            for (const eventDoc of eventsSnapshot.docs) {
+                const eventId = eventDoc.id;
+                const eventData = eventDoc.data();
+                const registrationEnd = eventData.registrationEnd;
+                const selectionProcessed = eventData.selectionProcessed;
+                const selectionNotificationSent = eventData.selectionNotificationSent;
+                const startsAtEpochMs = eventData.startsAtEpochMs;
+                
+                // Skip if already processed or notification sent (double check)
+                if (selectionProcessed === true || selectionNotificationSent === true) {
+                    console.log(`Event ${eventId} already processed, skipping`);
+                    continue;
+                }
+                
+                // Skip if registrationEnd is missing or invalid
+                if (!registrationEnd || registrationEnd <= 0) {
+                    console.log(`Event ${eventId} has invalid registrationEnd, skipping`);
+                    continue;
+                }
+                
+                // Skip if registration period hasn't ended yet
+                if (registrationEnd > now) {
+                    console.log(`Event ${eventId} registration period hasn't ended yet (ends at ${new Date(registrationEnd)})`);
+                    continue;
+                }
+                
+                // Skip if event start date has already passed
+                if (startsAtEpochMs && startsAtEpochMs > 0 && now >= startsAtEpochMs) {
+                    console.log(`Event ${eventId} start date has already passed, skipping`);
+                    continue;
+                }
+                
+                console.log(`Processing automatic selection for event: ${eventData.title || eventId} (${eventId})`);
+                console.log(`  Registration ended at: ${new Date(registrationEnd)}`);
+                
+                // IMPORTANT: Skip automatic selection if NonSelectedEntrants exist
+                // This means initial selection already happened, and organizer should manually
+                // select replacements from NonSelectedEntrants when people decline
+                const nonSelectedSnapshot = await admin.firestore()
+                    .collection('events').doc(eventId)
+                    .collection('NonSelectedEntrants')
+                    .get();
+                
+                if (!nonSelectedSnapshot.empty) {
+                    console.log(`Event ${eventId} has ${nonSelectedSnapshot.size} NonSelectedEntrants. Skipping automatic selection - organizer must manually select replacements.`);
+                    // Don't mark as processed - keep selectionProcessed=false so we don't try again
+                    continue;
+                }
+                
+                // Get waitlisted entrants
+                const waitlistSnapshot = await admin.firestore()
+                    .collection('events').doc(eventId)
+                    .collection('WaitlistedEntrants')
+                    .get();
+                
+                if (waitlistSnapshot.empty) {
+                    console.log(`No waitlisted entrants for event ${eventId}, marking as processed`);
+                    await eventDoc.ref.update({ selectionProcessed: true });
+                    continue;
+                }
+                
+                const sampleSize = eventData.sampleSize || 0;
+                if (sampleSize <= 0) {
+                    console.log(`Event ${eventId} has invalid sample size: ${sampleSize}, marking as processed`);
+                    await eventDoc.ref.update({ selectionProcessed: true });
+                    continue;
+                }
+                
+                const waitlistDocs = waitlistSnapshot.docs;
+                const toSelect = Math.min(sampleSize, waitlistDocs.length);
+                
+                if (toSelect === 0) {
+                    console.log(`No entrants to select for event ${eventId}, marking as processed`);
+                    await eventDoc.ref.update({ selectionProcessed: true });
+                    continue;
+                }
+                
+                // Randomly select entrants
+                const shuffled = [...waitlistDocs].sort(() => Math.random() - 0.5);
+                const selectedDocs = shuffled.slice(0, toSelect);
+                const selectedUserIds = selectedDocs.map(doc => doc.id);
+                
+                console.log(`Selected ${selectedUserIds.length} out of ${waitlistDocs.length} waitlisted entrants for event ${eventId}`);
+                
+                // Move selected entrants to SelectedEntrants and remove from WaitlistedEntrants
+                const batch = admin.firestore().batch();
+                const selectedEntrantsRef = admin.firestore().collection('events').doc(eventId).collection('SelectedEntrants');
+                const waitlistedEntrantsRef = admin.firestore().collection('events').doc(eventId).collection('WaitlistedEntrants');
+                
+                for (const selectedDoc of selectedDocs) {
+                    const userId = selectedDoc.id;
+                    const userData = selectedDoc.data();
+                    
+                    // Add to SelectedEntrants
+                    batch.set(selectedEntrantsRef.doc(userId), userData);
+                    
+                    // Remove from WaitlistedEntrants
+                    batch.delete(waitlistedEntrantsRef.doc(userId));
+                }
+                
+                // Update waitlistCount
+                batch.update(eventDoc.ref, 'waitlistCount', admin.firestore.FieldValue.increment(-selectedUserIds.length));
+                
+                // Mark as selection processed
+                batch.update(eventDoc.ref, 'selectionProcessed', true);
+                
+                await batch.commit();
+                console.log(`✓ Moved ${selectedUserIds.length} entrants to SelectedEntrants for event ${eventId}`);
+                
+                // Create invitations for selected entrants
+                const organizerId = eventData.organizerId || 'system';
+                const deadlineEpochMs = eventData.deadlineEpochMs || (now + (7 * 24 * 60 * 60 * 1000)); // Default 7 days
+                const invitationBatch = admin.firestore().batch();
+                
+                for (const userId of selectedUserIds) {
+                    const invitationId = admin.firestore().collection('invitations').doc().id;
+                    const invitationRef = admin.firestore().collection('invitations').doc(invitationId);
+                    
+                    invitationBatch.set(invitationRef, {
+                        id: invitationId,
+                        eventId: eventId,
+                        uid: userId,
+                        entrantId: userId,
+                        organizerId: organizerId,
+                        status: 'PENDING',
+                        issuedAt: now,
+                        expiresAt: deadlineEpochMs
+                    });
+                }
+                
+                await invitationBatch.commit();
+                console.log(`✓ Created ${selectedUserIds.length} invitations for event ${eventId}`);
+                
+                // Send selection notification
+                const eventTitle = eventData.title || 'Event';
+                const deadlineText = deadlineEpochMs ? new Date(deadlineEpochMs).toLocaleString() : 'N/A';
+                const notificationRequest = {
+                    eventId: eventId,
+                    eventTitle: eventTitle,
+                    organizerId: organizerId,
+                    userIds: selectedUserIds,
+                    groupType: 'selection',
+                    title: "You've been selected! 🎉",
+                    message: `Congratulations! You've been selected for ${eventTitle}. Please check your invitations to accept or decline. Deadline to respond: ${deadlineText}`,
+                    status: 'PENDING',
+                    createdAt: now,
+                    processed: false
+                };
+                
+                await admin.firestore().collection('notificationRequests').add(notificationRequest);
+                await eventDoc.ref.update({ selectionNotificationSent: true });
+                
+                console.log(`✓ Created selection notification request for ${selectedUserIds.length} users for event ${eventId}`);
+                processedCount++;
+            }
+            
+            console.log(`✓ Processed ${processedCount} event(s) for automatic entrant selection`);
+            return null;
+        } catch (error) {
+            console.error('Error in processAutomaticEntrantSelection:', error);
+            throw error;
+        }
+    });
+
+/**
  * Scheduled function that runs every minute to check for events starting in 1 minute.
  * Sends "sorry" notifications to all not selected entrants.
  */
