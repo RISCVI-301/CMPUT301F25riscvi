@@ -342,10 +342,22 @@ exports.processAutomaticEntrantSelection = functions.pubsub
                     continue;
                 }
                 
-                // Randomly select entrants
-                const shuffled = [...waitlistDocs].sort(() => Math.random() - 0.5);
+                // Randomly select entrants using Fisher-Yates shuffle
+                // This ensures truly random selection
+                const shuffled = [...waitlistDocs];
+                for (let i = shuffled.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+                }
                 const selectedDocs = shuffled.slice(0, toSelect);
                 const selectedUserIds = selectedDocs.map(doc => doc.id);
+                
+                // CRITICAL: Ensure we never select more than sampleSize
+                if (selectedUserIds.length > sampleSize) {
+                    console.error(`ERROR: Selected ${selectedUserIds.length} users but sampleSize is ${sampleSize}, truncating`);
+                    selectedUserIds.splice(sampleSize);
+                    selectedDocs.splice(sampleSize);
+                }
                 
                 console.log(`Selected ${selectedUserIds.length} out of ${waitlistDocs.length} waitlisted entrants for event ${eventId}`);
                 
