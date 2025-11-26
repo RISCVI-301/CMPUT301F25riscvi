@@ -311,6 +311,23 @@ public class MainActivity extends AppCompatActivity {
      * Should be called after notification permission is granted (or on older Android versions).
      */
     private void initializeNotifications() {
+        // TEMPORARY FIX: Force recreate notification channel with HIGH importance
+        // This fixes the issue where old channel was created with DEFAULT importance
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            android.app.NotificationManager nm = getSystemService(android.app.NotificationManager.class);
+            if (nm != null) {
+                android.app.NotificationChannel existingChannel = nm.getNotificationChannel("event_invitations");
+                if (existingChannel != null && existingChannel.getImportance() < android.app.NotificationManager.IMPORTANCE_HIGH) {
+                    Log.d("MainActivity", "Deleting old notification channel with low importance");
+                    nm.deleteNotificationChannel("event_invitations");
+                    Log.d("MainActivity", "Old channel deleted, will be recreated with HIGH importance");
+                }
+            }
+        }
+        
+        // This will create the channel with HIGH importance (after our fix)
+        com.example.eventease.notifications.NotificationChannelManager.createNotificationChannel(this);
+        
         FCMTokenManager.getInstance().initialize();
         invitationListener = new InvitationNotificationListener(this);
         invitationListener.startListening();
