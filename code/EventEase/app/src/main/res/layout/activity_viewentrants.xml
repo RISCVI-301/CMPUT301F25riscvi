@@ -6,7 +6,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#7FDBDA"
+    android:background="#223C65"
     android:fitsSystemWindows="true"
     tools:context=".ViewEntrantsActivity">
 
@@ -36,7 +36,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="12dp"
-            android:fontFamily="@font/entrant_fredoka_one"
+            android:fontFamily="@font/fredoka_bold"
             android:gravity="start"
             android:text="EventEase"
             android:textColor="@color/header_text_green"
@@ -60,8 +60,7 @@
             android:layout_height="wrap_content"
             android:text="Selected Entrants"
             android:textStyle="bold"
-            android:textColor="#7FDBDA"
-            android:fontFamily="@font/entrant_fredoka_one"
+            android:textColor="#9EFFF1"
             android:textSize="24sp" />
 
         <ImageButton
@@ -72,7 +71,7 @@
             android:src="@drawable/notification"
             android:contentDescription="Mail Selected Entrants"
             android:layout_marginEnd="4dp"
-            android:tint="#7FDBDA" />
+            android:tint="#9EFFF1" />
     </LinearLayout>
 
     <!-- Selected Entrants Scrollable List -->
@@ -100,8 +99,7 @@
             android:layout_height="wrap_content"
             android:text="Not Selected Entrants"
             android:textStyle="bold"
-            android:textColor="#7FDBDA"
-            android:fontFamily="@font/entrant_fredoka_one"
+            android:textColor="#9EFFF1"
             android:textSize="24sp" />
 
         <!-- Mail Icon -->
@@ -112,7 +110,7 @@
             android:background="@android:color/transparent"
             android:src="@drawable/notification"
             android:contentDescription="Mail Not Selected Entrants"
-            android:tint="#7FDBDA"
+            android:tint="#9EFFF1"
             android:layout_marginEnd="8dp" />
 
         <!-- Swap Icon -->
@@ -123,7 +121,7 @@
             android:background="@android:color/transparent"
             android:src="@drawable/swap"
             android:contentDescription="Swap Not Selected Entrants"
-            android:tint="#7FDBDA" />
+            android:tint="#9EFFF1" />
     </LinearLayout>
 
     <!-- Not Selected Entrants Scrollable List -->
@@ -144,10 +142,9 @@
         android:text="View Final Entrants"
         android:textSize="20sp"
         android:textStyle="bold"
-        android:textColor="#7FDBDA"
-        android:fontFamily="@font/entrant_fredoka_one"
+        android:textColor="#223C65"
         android:layout_margin="12dp"
-        android:backgroundTint="#7FDBDA"
+        android:backgroundTint="#9EFFF1"
         app:cornerRadius="10dp" />
 
     <!-- Cancelled Entrants Title Row -->
@@ -164,8 +161,7 @@
             android:layout_height="wrap_content"
             android:text="Cancelled Entrants"
             android:textStyle="bold"
-            android:textColor="#7FDBDA"
-            android:fontFamily="@font/entrant_fredoka_one"
+            android:textColor="#9EFFF1"
             android:textSize="24sp" />
 
         <ImageButton
@@ -176,7 +172,7 @@
             android:src="@drawable/notification"
             android:contentDescription="Mail Cancelled Entrants"
             android:layout_marginEnd="4dp"
-            android:tint="#7FDBDA" />
+            android:tint="#9EFFF1" />
     </LinearLayout>
 
     <!-- Cancelled Entrants Scrollable List -->

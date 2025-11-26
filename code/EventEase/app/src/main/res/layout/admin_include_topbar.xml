@@ -16,8 +16,7 @@
         android:text="EventEase"
         android:textStyle="bold"
         android:textSize="22sp"
-        android:textColor="#1A2C44"
-        android:fontFamily="@font/entrant_fredoka_one" />
+        android:textColor="#1A2C44" />
 
     <!-- Logout Button -->
     <androidx.cardview.widget.CardView

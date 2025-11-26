@@ -5,7 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#7FDBDA">
+    android:background="#223C65">
 
     <!-- Mint title bar -->
     <TextView

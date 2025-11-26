@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#7FDBDA"
+    android:background="#223C65"
     android:gravity="center">
 
     <!-- Top bar with logout button -->
@@ -24,8 +24,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:text="Admin"
-            android:textColor="#7FDBDA"
-            android:fontFamily="@font/entrant_fredoka_one"
+            android:textColor="#223C65"
             android:textSize="22sp"
             android:textStyle="bold"
             android:paddingVertical="14dp"

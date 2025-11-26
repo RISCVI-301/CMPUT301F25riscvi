@@ -5,7 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#7FDBDA"
+    android:background="#223C65"
     android:fitsSystemWindows="true"
     tools:context=".MainActivity">
 
@@ -14,12 +14,11 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="EventEase"
-        android:textColor="#7FDBDA"
+        android:textColor="#223C65"
         android:textSize="28sp"
         android:textStyle="bold"
-        android:fontFamily="@font/entrant_fredoka_one"
         android:padding="16dp"
-        android:background="#7FDBDA" />
+        android:background="#9EFFF1" />
 
 
 </LinearLayout>

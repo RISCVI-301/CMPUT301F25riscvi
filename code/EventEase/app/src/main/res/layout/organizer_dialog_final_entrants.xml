@@ -31,10 +31,10 @@
                 android:text="Final Entrant List"
                 android:textSize="36sp"
                 android:textStyle="bold"
-                android:textColor="#7FDBDA"
+                android:textColor="#223C65"
                 android:padding="28dp"
                 android:paddingBottom="20dp"
-                android:fontFamily="@font/entrant_fredoka_one"
+                android:fontFamily="@font/fredoka_bold"
                 android:background="#FFFFFF"
                 android:shadowColor="#80000000"
                 android:shadowDx="0"
@@ -45,7 +45,7 @@
             <View
                 android:layout_width="match_parent"
                 android:layout_height="2dp"
-                android:background="#7FDBDA"/>
+                android:background="#223C65"/>
 
             <!-- Content Section - List of Entrants -->
             <ScrollView
@@ -73,7 +73,7 @@
             <View
                 android:layout_width="match_parent"
                 android:layout_height="2dp"
-                android:background="#7FDBDA"/>
+                android:background="#223C65"/>
 
             <!-- Export to CSV Button -->
             <Button
@@ -84,8 +84,7 @@
                 android:textSize="20sp"
                 android:textStyle="bold"
                 android:textColor="#FFFFFF"
-                android:fontFamily="@font/entrant_fredoka_one"
-                android:backgroundTint="#7FDBDA"
+                android:backgroundTint="#9EFFF1"
                 android:layout_margin="28dp"
                 android:layout_marginTop="20dp"
                 android:layout_marginBottom="12dp"
@@ -100,11 +99,11 @@
                 android:textSize="20sp"
                 android:textStyle="bold"
                 android:textColor="#FFFFFF"
-                android:backgroundTint="#7FDBDA"
+                android:backgroundTint="#223C65"
                 android:layout_margin="28dp"
                 android:layout_marginTop="0dp"
                 android:layout_marginBottom="20dp"
-                android:fontFamily="@font/entrant_fredoka_one"
+                android:fontFamily="@font/fredoka_bold"
                 android:elevation="8dp"
                 style="@style/Widget.AppCompat.Button.Borderless"/>
 
