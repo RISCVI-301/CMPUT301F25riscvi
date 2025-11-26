@@ -77,7 +77,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:layout_marginBottom="16dp">
+                android:layout_marginBottom="8dp">
 
                 <EditText
                     android:id="@+id/etTitle"
@@ -100,6 +100,64 @@
                     android:tint="@color/ee_text_light"
                     android:src="@android:drawable/ic_menu_camera"/>
             </LinearLayout>
+
+            <!-- Poster Preview Section -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="8dp"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Poster Preview"
+                    android:textStyle="bold"
+                    android:textSize="18sp"
+                    android:textColor="@color/ee_text_light"/>
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnCropPoster"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Adjust Crop"
+                    android:textColor="@color/ee_mint_aqua"
+                    android:textSize="14sp"
+                    android:visibility="gone"
+                    app:cornerRadius="8dp"/>
+
+            </LinearLayout>
+
+            <androidx.cardview.widget.CardView
+                android:id="@+id/posterPreviewCard"
+                android:layout_width="match_parent"
+                android:layout_height="200dp"
+                android:layout_marginBottom="16dp"
+                android:visibility="gone"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="4dp"
+                app:cardBackgroundColor="@color/ee_card">
+
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:clipChildren="true">
+
+                    <ImageView
+                        android:id="@+id/posterPreview"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:scaleType="matrix"
+                        android:contentDescription="Poster preview"
+                        android:background="@drawable/ee_card_bg"/>
+
+                </FrameLayout>
+
+            </androidx.cardview.widget.CardView>
 
             <!-- Description + pencil -->
             <TextView
@@ -381,11 +439,11 @@
                     android:textSize="16sp"/>
             </LinearLayout>
 
-            <!-- Entrants -->
+            <!-- Waiting List Capacity -->
             <TextView
                 android:layout_marginTop="16dp"
                 android:layout_marginBottom="8dp"
-                android:text="Number of Entrants"
+                android:text="Waiting List Capacity"
                 android:textStyle="bold"
                 android:textSize="20sp"
                 android:textColor="@color/ee_text_light"
@@ -421,15 +479,39 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:layout_marginBottom="16dp"
+                android:layout_marginBottom="8dp"
                 android:background="@drawable/ee_card_bg"
                 android:enabled="false"
-                android:hint="Enter capacity"
+                android:hint="Enter waiting list capacity"
                 android:inputType="number"
                 android:padding="18dp"
                 android:textColor="@color/ee_text_light"
                 android:textColorHint="#80FFFFFF"
                 android:visibility="gone"/>
+
+            <TextView
+                android:id="@+id/tvSampleSize"
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="8dp"
+                android:text="Sample Size for Initial Invitation"
+                android:textStyle="bold"
+                android:textSize="20sp"
+                android:textColor="@color/ee_text_light"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"/>
+
+            <EditText
+                android:id="@+id/etSampleSize"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="16dp"
+                android:background="@drawable/ee_card_bg"
+                android:hint="Enter sample size (number of initial invitations)"
+                android:inputType="number"
+                android:padding="18dp"
+                android:textColor="@color/ee_text_light"
+                android:textColorHint="#80FFFFFF"/>
 
         </LinearLayout>
     </ScrollView>

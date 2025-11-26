@@ -11,10 +11,8 @@
     <color name="ee_mint_aqua">#7FDBDA</color>
     <color name="ee_brand_primary">#7FDBDA</color>
     <color name="toolbar_button">#C0D0E1</color>
-
     <!-- Colors from Organizer Waitlist Feature -->
     <color name="header_text_green">#114C43</color>
     <color name="event_name_bg_blue">#9DBCD6</color>
     <color name="medium_blue_component">#4A628A</color>
 </resources>
-

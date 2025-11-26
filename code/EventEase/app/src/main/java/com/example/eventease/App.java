@@ -2,6 +2,7 @@ package com.example.eventease;
 
 import android.app.Application;
 import com.example.eventease.data.firebase.FirebaseDevGraph;
+import com.example.eventease.notifications.NotificationChannelManager;
 
 /**
  * Main application class that initializes the dependency graph.
@@ -19,6 +20,10 @@ public class App extends Application {
     @Override public void onCreate() {
         super.onCreate();
         GRAPH = new FirebaseDevGraph();
+        
+        // Create notification channel early so it's always available
+        // This ensures notifications work properly from the start
+        NotificationChannelManager.createNotificationChannel(this);
     }
 
     /**

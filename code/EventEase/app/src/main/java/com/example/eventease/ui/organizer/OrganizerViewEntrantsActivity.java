@@ -114,10 +114,28 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
         listNotSelected.setAdapter(notSelectedAdapter);
         listCancelled.setAdapter(cancelledAdapter);
 
+        // Add click listeners for moving entrants between categories
+        listSelected.setOnItemClickListener((parent, view, position, id) -> {
+            String entrantName = selectedList.get(position);
+            showMoveEntrantDialog(entrantName, "SelectedEntrants", position);
+        });
+
+        listNotSelected.setOnItemClickListener((parent, view, position, id) -> {
+            String entrantName = notSelectedList.get(position);
+            showMoveEntrantDialog(entrantName, "NonSelectedEntrants", position);
+        });
+
+        listCancelled.setOnItemClickListener((parent, view, position, id) -> {
+            String entrantName = cancelledList.get(position);
+            showMoveEntrantDialog(entrantName, "CancelledEntrants", position);
+        });
+
         eventId = getIntent().getStringExtra("eventId");
         if (eventId != null && !eventId.isEmpty()) {
             checkAndProcessSelection(eventId);
             loadEventTitle();
+            // Also check and process deadline for non-responders
+            checkAndProcessDeadline(eventId);
         }
 
         loadEntrantsFromFirestore();
@@ -132,6 +150,18 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
         ImageButton btnSwapNotSelected = findViewById(R.id.btnSwapNotSelected);
         if (btnSwapNotSelected != null) {
             btnSwapNotSelected.setOnClickListener(v -> showReplacementSwapDialog());
+        }
+
+        // Set up notification button for Not Selected Entrants
+        ImageButton btnMailNotSelected = findViewById(R.id.btnMailNotSelected);
+        if (btnMailNotSelected != null) {
+            btnMailNotSelected.setOnClickListener(v -> showSendNotificationsToNotSelectedConfirmation());
+        }
+
+        // Set up notification button for Cancelled Entrants
+        ImageButton btnMailCancelled = findViewById(R.id.btnMailCancelled);
+        if (btnMailCancelled != null) {
+            btnMailCancelled.setOnClickListener(v -> showSendNotificationsToCancelledConfirmation());
         }
     }
 
@@ -153,45 +183,157 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
 
     private void showSendInvitationsConfirmation() {
         if (selectedList.isEmpty()) {
-            Toast.makeText(this, "No selected entrants to send invitations to", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "No selected entrants to send notifications to", Toast.LENGTH_SHORT).show();
             return;
         }
 
         int count = selectedList.size();
-        String message = "Send invitations to " + count + " selected entrant" + (count > 1 ? "s" : "") + "? They will receive push notifications about their selection.";
+        String message = "Send notifications to " + count + " selected entrant" + (count > 1 ? "s" : "") + "? They will receive push notifications even when the app is closed.";
 
         new MaterialAlertDialogBuilder(this)
-                .setTitle("Send Invitations")
+                .setTitle("Send Notifications")
                 .setMessage(message)
-                .setPositiveButton("Send", (dialog, which) -> sendInvitations())
+                .setPositiveButton("Send", (dialog, which) -> sendNotificationsToSelected())
                 .setNegativeButton("Cancel", null)
                 .show();
     }
 
-    private void sendInvitations() {
+    private void sendNotificationsToSelected() {
         if (eventId == null || eventId.isEmpty()) {
             Toast.makeText(this, "Event ID not found", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        Toast.makeText(this, "Sending invitations...", Toast.LENGTH_SHORT).show();
+        if (eventTitle == null || eventTitle.isEmpty()) {
+            Toast.makeText(this, "Event title not loaded", Toast.LENGTH_SHORT).show();
+            return;
+        }
 
-        InvitationHelper invitationHelper = new InvitationHelper();
-        invitationHelper.sendInvitationsToSelectedEntrants(eventId, eventTitle, new InvitationHelper.InvitationCallback() {
+        Toast.makeText(this, "Sending notifications...", Toast.LENGTH_SHORT).show();
+
+        // Use NotificationHelper to send notifications via Cloud Function
+        // This works even when the app is closed (user logged in with "remember me")
+        NotificationHelper notificationHelper = new NotificationHelper();
+        String message = "You have an update regarding \"" + eventTitle + "\". Please check your invitations.";
+        
+        notificationHelper.sendNotificationsToSelected(eventId, eventTitle, message, new NotificationHelper.NotificationCallback() {
             @Override
             public void onComplete(int sentCount) {
                 Toast.makeText(OrganizerViewEntrantsActivity.this,
-                        "Successfully sent " + sentCount + " invitation" + (sentCount > 1 ? "s" : ""),
+                        "Successfully sent notifications to " + sentCount + " selected entrant" + (sentCount > 1 ? "s" : ""),
                         Toast.LENGTH_LONG).show();
-                Log.d(TAG, "Sent " + sentCount + " invitations");
+                Log.d(TAG, "Sent notifications to " + sentCount + " selected entrants");
             }
 
             @Override
             public void onError(String error) {
                 Toast.makeText(OrganizerViewEntrantsActivity.this,
-                        "Failed to send invitations: " + error,
+                        "Failed to send notifications: " + error,
                         Toast.LENGTH_LONG).show();
-                Log.e(TAG, "Failed to send invitations: " + error);
+                Log.e(TAG, "Failed to send notifications: " + error);
+            }
+        });
+    }
+
+    private void showSendNotificationsToNotSelectedConfirmation() {
+        if (notSelectedList.isEmpty()) {
+            Toast.makeText(this, "No not selected entrants to send notifications to", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        int count = notSelectedList.size();
+        String message = "Send notifications to " + count + " not selected entrant" + (count > 1 ? "s" : "") + "? They will receive push notifications even when the app is closed.";
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Send Notifications")
+                .setMessage(message)
+                .setPositiveButton("Send", (dialog, which) -> sendNotificationsToNotSelected())
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void sendNotificationsToNotSelected() {
+        if (eventId == null || eventId.isEmpty()) {
+            Toast.makeText(this, "Event ID not found", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (eventTitle == null || eventTitle.isEmpty()) {
+            Toast.makeText(this, "Event title not loaded", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        Toast.makeText(this, "Sending notifications...", Toast.LENGTH_SHORT).show();
+
+        // Not Selected Entrants are stored in NonSelectedEntrants collection
+        NotificationHelper notificationHelper = new NotificationHelper();
+        // Use default message from NotificationHelper
+        notificationHelper.sendNotificationsToNonSelected(eventId, eventTitle, null, new NotificationHelper.NotificationCallback() {
+            @Override
+            public void onComplete(int sentCount) {
+                Toast.makeText(OrganizerViewEntrantsActivity.this,
+                        "Successfully sent notifications to " + sentCount + " not selected entrant" + (sentCount > 1 ? "s" : ""),
+                        Toast.LENGTH_LONG).show();
+                Log.d(TAG, "Sent notifications to " + sentCount + " not selected entrants");
+            }
+
+            @Override
+            public void onError(String error) {
+                Toast.makeText(OrganizerViewEntrantsActivity.this,
+                        "Failed to send notifications: " + error,
+                        Toast.LENGTH_LONG).show();
+                Log.e(TAG, "Failed to send notifications: " + error);
+            }
+        });
+    }
+
+    private void showSendNotificationsToCancelledConfirmation() {
+        if (cancelledList.isEmpty()) {
+            Toast.makeText(this, "No cancelled entrants to send notifications to", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        int count = cancelledList.size();
+        String message = "Send notifications to " + count + " cancelled entrant" + (count > 1 ? "s" : "") + "? They will receive push notifications even when the app is closed.";
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Send Notifications")
+                .setMessage(message)
+                .setPositiveButton("Send", (dialog, which) -> sendNotificationsToCancelled())
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void sendNotificationsToCancelled() {
+        if (eventId == null || eventId.isEmpty()) {
+            Toast.makeText(this, "Event ID not found", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (eventTitle == null || eventTitle.isEmpty()) {
+            Toast.makeText(this, "Event title not loaded", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        Toast.makeText(this, "Sending notifications...", Toast.LENGTH_SHORT).show();
+
+        NotificationHelper notificationHelper = new NotificationHelper();
+        // Use default message from NotificationHelper
+        notificationHelper.sendNotificationsToCancelled(eventId, eventTitle, null, new NotificationHelper.NotificationCallback() {
+            @Override
+            public void onComplete(int sentCount) {
+                Toast.makeText(OrganizerViewEntrantsActivity.this,
+                        "Successfully sent notifications to " + sentCount + " cancelled entrant" + (sentCount > 1 ? "s" : ""),
+                        Toast.LENGTH_LONG).show();
+                Log.d(TAG, "Sent notifications to " + sentCount + " cancelled entrants");
+            }
+
+            @Override
+            public void onError(String error) {
+                Toast.makeText(OrganizerViewEntrantsActivity.this,
+                        "Failed to send notifications: " + error,
+                        Toast.LENGTH_LONG).show();
+                Log.e(TAG, "Failed to send notifications: " + error);
             }
         });
     }
@@ -210,6 +352,44 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
             public void onError(String error) {
             }
         });
+    }
+
+    /**
+     * Checks and processes deadline for non-responders.
+     * This ensures that entrants who didn't respond by the deadline are moved to CancelledEntrants.
+     */
+    private void checkAndProcessDeadline(String eventId) {
+        db.collection("events").document(eventId).get()
+                .addOnSuccessListener(eventDoc -> {
+                    if (eventDoc == null || !eventDoc.exists()) {
+                        return;
+                    }
+                    
+                    Long deadlineEpochMs = eventDoc.getLong("deadlineEpochMs");
+                    long currentTime = System.currentTimeMillis();
+                    
+                    // Only process if deadline has passed
+                    if (deadlineEpochMs != null && deadlineEpochMs > 0 && currentTime >= deadlineEpochMs) {
+                        InvitationDeadlineProcessor deadlineProcessor = new InvitationDeadlineProcessor();
+                        deadlineProcessor.processDeadlineForEvent(eventId, new InvitationDeadlineProcessor.DeadlineCallback() {
+                            @Override
+                            public void onComplete(int processedCount) {
+                                if (processedCount > 0) {
+                                    Log.d(TAG, "Processed " + processedCount + " non-responders, reloading entrants");
+                                    loadEntrantsFromFirestore();
+                                }
+                            }
+                            
+                            @Override
+                            public void onError(String error) {
+                                Log.e(TAG, "Error processing deadline: " + error);
+                            }
+                        });
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to check deadline", e);
+                });
     }
 
     private void loadEntrantsFromFirestore() {
@@ -231,7 +411,9 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
                     selectedAdapter.notifyDataSetChanged();
                 });
 
-        db.collection("events").document(eventId).collection("WaitlistedEntrants").get()
+        // Not Selected Entrants are in NonSelectedEntrants collection (moved there after deadline)
+        // Waitlisted entrants stay in WaitlistedEntrants until first random roll happens
+        db.collection("events").document(eventId).collection("NonSelectedEntrants").get()
                 .addOnSuccessListener(snap -> {
                     for (DocumentSnapshot doc : snap.getDocuments()) {
                         notSelectedList.add(safeName(doc));
@@ -246,15 +428,8 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
                     }
                     cancelledAdapter.notifyDataSetChanged();
                     
-                    // Check for automatic replacement after loading cancelled entrants
-                    checkAndAutoReplace(eventId);
+                    // NOTE: Automatic replacement is disabled - organizer must manually replace via button
                 });
-    }
-
-    private void checkAndAutoReplace(String eventId) {
-        // Use ReplacementHelper for automatic replacement
-        ReplacementHelper replacementHelper = new ReplacementHelper();
-        replacementHelper.autoReplaceCancelledEntrants(eventId, eventTitle);
     }
 
     private String safeName(DocumentSnapshot doc) {
@@ -917,26 +1092,170 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
                 eventTitle, deadlineStr
         );
 
-        WriteBatch batch = db.batch();
-        for (String userId : userIds) {
-            Map<String, Object> notification = new HashMap<>();
-            notification.put("userId", userId);
-            notification.put("eventId", eventId);
-            notification.put("title", "Replacement Invitation");
-            notification.put("message", message);
-            notification.put("type", "REPLACEMENT_INVITATION");
-            notification.put("createdAt", System.currentTimeMillis());
-            notification.put("read", false);
-            
-            batch.set(db.collection("notifications").document(), notification);
+        // Use NotificationHelper for push notifications (works when app is closed via Cloud Functions)
+        NotificationHelper notificationHelper = new NotificationHelper();
+        notificationHelper.sendNotificationsToUsers(
+                userIds,
+                "Replacement Invitation",
+                message,
+                eventId,
+                eventTitle != null ? eventTitle : "the event",
+                false, // filterDeclined = false (they're new replacements, haven't declined yet)
+                new NotificationHelper.NotificationCallback() {
+                    @Override
+                    public void onComplete(int sentCount) {
+                        Log.d(TAG, "Successfully sent " + sentCount + " replacement push notifications");
+                    }
+                    
+                    @Override
+                    public void onError(String error) {
+                        Log.e(TAG, "Failed to send replacement notifications: " + error);
+                    }
+                }
+        );
+    }
+
+    /**
+     * Shows a dialog to move an entrant between categories (Selected, Not Selected, Cancelled).
+     */
+    private void showMoveEntrantDialog(String entrantName, String currentCollection, int position) {
+        if (eventId == null || eventId.isEmpty()) {
+            Toast.makeText(this, "Event ID not found", Toast.LENGTH_SHORT).show();
+            return;
         }
 
-        batch.commit()
-                .addOnSuccessListener(v -> {
-                    Log.d(TAG, "Sent " + userIds.size() + " replacement notifications");
+        // Find the userId by name - we need to search in the current collection
+        DocumentReference eventRef = db.collection("events").document(eventId);
+        final String finalCurrentCollection = currentCollection; // Make effectively final
+        eventRef.collection(currentCollection).get()
+                .addOnSuccessListener(snapshot -> {
+                    String foundUserId = null;
+                    Map<String, Object> foundEntrantData = null;
+                    
+                    for (DocumentSnapshot doc : snapshot.getDocuments()) {
+                        String name = safeName(doc);
+                        if (name.equals(entrantName)) {
+                            foundUserId = doc.getId();
+                            foundEntrantData = doc.getData();
+                            break;
+                        }
+                    }
+                    
+                    if (foundUserId == null) {
+                        Toast.makeText(this, "Entrant not found", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    
+                    // Make final for use in lambda
+                    final String finalUserId = foundUserId;
+                    final Map<String, Object> finalEntrantData = foundEntrantData;
+                    
+                    // Show move options dialog
+                    String[] options;
+                    if ("SelectedEntrants".equals(finalCurrentCollection)) {
+                        options = new String[]{"Move to Not Selected", "Move to Cancelled"};
+                    } else if ("NonSelectedEntrants".equals(finalCurrentCollection)) {
+                        options = new String[]{"Move to Selected", "Move to Cancelled"};
+                    } else { // CancelledEntrants
+                        options = new String[]{"Move to Selected", "Move to Not Selected"};
+                    }
+                    
+                    new MaterialAlertDialogBuilder(this)
+                            .setTitle("Move Entrant: " + entrantName)
+                            .setItems(options, (dialog, which) -> {
+                                String targetCollection;
+                                if ("SelectedEntrants".equals(finalCurrentCollection)) {
+                                    targetCollection = which == 0 ? "NonSelectedEntrants" : "CancelledEntrants";
+                                } else if ("NonSelectedEntrants".equals(finalCurrentCollection)) {
+                                    targetCollection = which == 0 ? "SelectedEntrants" : "CancelledEntrants";
+                                } else { // CancelledEntrants
+                                    targetCollection = which == 0 ? "SelectedEntrants" : "NonSelectedEntrants";
+                                }
+                                
+                                moveEntrantBetweenCollections(finalUserId, finalEntrantData, finalCurrentCollection, targetCollection);
+                            })
+                            .setNegativeButton("Cancel", null)
+                            .show();
                 })
                 .addOnFailureListener(e -> {
-                    Log.e(TAG, "Failed to send replacement notifications", e);
+                    Log.e(TAG, "Failed to find entrant", e);
+                    Toast.makeText(this, "Failed to find entrant: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                });
+    }
+
+    /**
+     * Moves an entrant from one collection to another.
+     */
+    private void moveEntrantBetweenCollections(String userId, Map<String, Object> entrantData,
+                                                String fromCollection, String toCollection) {
+        if (eventId == null || eventId.isEmpty() || userId == null) {
+            Toast.makeText(this, "Invalid data", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        DocumentReference eventRef = db.collection("events").document(eventId);
+        DocumentReference fromRef = eventRef.collection(fromCollection).document(userId);
+        DocumentReference toRef = eventRef.collection(toCollection).document(userId);
+
+        WriteBatch batch = db.batch();
+        
+        if (entrantData != null) {
+            batch.set(toRef, entrantData);
+        } else {
+            // If no data, fetch from users collection
+            db.collection("users").document(userId).get()
+                    .addOnSuccessListener(userDoc -> {
+                        Map<String, Object> userData = new HashMap<>();
+                        if (userDoc != null && userDoc.exists()) {
+                            String name = userDoc.getString("fullName");
+                            if (name == null || name.trim().isEmpty()) {
+                                name = userDoc.getString("name");
+                            }
+                            if (name == null || name.trim().isEmpty()) {
+                                String first = userDoc.getString("firstName");
+                                String last = userDoc.getString("lastName");
+                                name = ((first != null ? first : "") + " " + (last != null ? last : "")).trim();
+                            }
+                            if (name != null && !name.trim().isEmpty()) {
+                                userData.put("name", name);
+                            }
+                            String email = userDoc.getString("email");
+                            if (email != null && !email.trim().isEmpty()) {
+                                userData.put("email", email);
+                            }
+                            userData.put("userId", userId);
+                        }
+                        
+                        WriteBatch moveBatch = db.batch();
+                        moveBatch.set(toRef, userData);
+                        moveBatch.delete(fromRef);
+                        moveBatch.commit()
+                                .addOnSuccessListener(aVoid -> {
+                                    Toast.makeText(this, "Entrant moved successfully", Toast.LENGTH_SHORT).show();
+                                    loadEntrantsFromFirestore();
+                                })
+                                .addOnFailureListener(e -> {
+                                    Log.e(TAG, "Failed to move entrant", e);
+                                    Toast.makeText(this, "Failed to move entrant: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                                });
+                    })
+                    .addOnFailureListener(e -> {
+                        Log.e(TAG, "Failed to fetch user data", e);
+                        Toast.makeText(this, "Failed to fetch user data", Toast.LENGTH_SHORT).show();
+                    });
+            return;
+        }
+        
+        batch.delete(fromRef);
+        
+        batch.commit()
+                .addOnSuccessListener(aVoid -> {
+                    Toast.makeText(this, "Entrant moved successfully", Toast.LENGTH_SHORT).show();
+                    loadEntrantsFromFirestore();
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to move entrant", e);
+                    Toast.makeText(this, "Failed to move entrant: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                 });
     }
 }

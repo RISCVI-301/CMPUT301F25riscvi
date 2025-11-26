@@ -1,6 +1,9 @@
 package com.example.eventease;
 
+import android.Manifest;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -8,8 +11,11 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 
 import androidx.activity.OnBackPressedCallback;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 import androidx.core.view.WindowCompat;
 import androidx.navigation.NavController;
 import androidx.navigation.NavDestination;
@@ -21,6 +27,7 @@ import com.example.eventease.R;
 import com.example.eventease.auth.UserRoleChecker;
 import com.example.eventease.notifications.FCMTokenManager;
 import com.example.eventease.notifications.InvitationNotificationListener;
+import com.example.eventease.ui.organizer.AutomaticEntrantSelectionService;
 
 /**
  * Main activity that hosts navigation fragments and manages bottom navigation for entrant users.
@@ -49,6 +56,8 @@ public class MainActivity extends AppCompatActivity {
     private android.widget.TextView navLabelAccount;
 
     private InvitationNotificationListener invitationListener;
+    private ActivityResultLauncher<String> notificationPermissionLauncher;
+    private static boolean listenersInitialized = false;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -59,6 +68,25 @@ public class MainActivity extends AppCompatActivity {
         Log.d("FirebaseTest", "FirebaseApp initialized: " + (FirebaseApp.getApps(this).size() > 0));
 
         setContentView(R.layout.entrant_activity_mainfragments);
+
+        // Initialize notification permission launcher
+        notificationPermissionLauncher = registerForActivityResult(
+                new ActivityResultContracts.RequestPermission(),
+                isGranted -> {
+                    if (isGranted) {
+                        Log.d("MainActivity", "Notification permission granted");
+                        // Initialize FCM after permission is granted
+                        initializeNotifications();
+                    } else {
+                        Log.w("MainActivity", "Notification permission denied");
+                        // Still initialize FCM - notifications may work on older Android versions
+                        initializeNotifications();
+                    }
+                }
+        );
+
+        // Request notification permission if needed (Android 13+)
+        requestNotificationPermission();
 
         // Don't draw behind system bars
         WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
@@ -192,11 +220,26 @@ public class MainActivity extends AppCompatActivity {
                     topBar.setVisibility(View.VISIBLE);
                     updateNavigationSelection(id);
 
-                    // Initialize FCM token manager and invitation listener if not already done
-                    if (invitationListener == null) {
-                        FCMTokenManager.getInstance().initialize();
-                        invitationListener = new InvitationNotificationListener(this);
-                        invitationListener.startListening();
+                    // Initialize listeners only once to prevent duplicates
+                    if (!listenersInitialized) {
+                        // Initialize FCM token manager and invitation listener
+                        if (invitationListener == null) {
+                            FCMTokenManager.getInstance().initialize();
+                            invitationListener = new InvitationNotificationListener(this);
+                            invitationListener.startListening();
+                        }
+                        
+                        // Setup automatic entrant selection listener (only once)
+                        AutomaticEntrantSelectionService.setupAutomaticSelectionListener();
+                        
+                        // Setup automatic deadline processor service (only once)
+                        com.example.eventease.ui.organizer.AutomaticDeadlineProcessorService.setupDeadlineProcessorListener();
+                        
+                        // Setup automatic sorry notification service (only once)
+                        com.example.eventease.ui.organizer.SorryNotificationService.setupSorryNotificationListener();
+                        
+                        listenersInitialized = true;
+                        Log.d("MainActivity", "Listeners initialized once");
                     }
                 } else {
                     // User not authenticated, hide bars
@@ -237,7 +280,37 @@ public class MainActivity extends AppCompatActivity {
             updateNavigationSelection(R.id.discoverFragment);
         });
 
-        // Initialize FCM token manager and invitation listener
+        // Initialize notifications (permission already requested in onCreate)
+        initializeNotifications();
+    }
+    
+    /**
+     * Requests notification permission for Android 13+ (API 33+).
+     * On older versions, permission is granted automatically via manifest.
+     */
+    private void requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            // Android 13+ requires runtime permission
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) 
+                    != PackageManager.PERMISSION_GRANTED) {
+                Log.d("MainActivity", "Requesting notification permission");
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS);
+            } else {
+                Log.d("MainActivity", "Notification permission already granted");
+                initializeNotifications();
+            }
+        } else {
+            // Android 12 and below - permission granted via manifest
+            Log.d("MainActivity", "Android version < 13, notification permission granted via manifest");
+            initializeNotifications();
+        }
+    }
+    
+    /**
+     * Initializes FCM token manager and invitation listener.
+     * Should be called after notification permission is granted (or on older Android versions).
+     */
+    private void initializeNotifications() {
         FCMTokenManager.getInstance().initialize();
         invitationListener = new InvitationNotificationListener(this);
         invitationListener.startListening();
@@ -259,6 +332,18 @@ public class MainActivity extends AppCompatActivity {
 
     private void handleExternalNav(android.content.Intent intent) {
         if (intent == null) return;
+        
+        // Check if notification contains eventId - open event detail page
+        String eventId = intent.getStringExtra("eventId");
+        if (eventId != null && !eventId.isEmpty()) {
+            Log.d("MainActivity", "Opening event detail page for eventId: " + eventId);
+            Intent eventDetailIntent = new Intent(this, com.example.eventease.ui.entrant.discover.EventDetailsDiscoverActivity.class);
+            eventDetailIntent.putExtra(com.example.eventease.ui.entrant.discover.EventDetailsDiscoverActivity.EXTRA_EVENT_ID, eventId);
+            eventDetailIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(eventDetailIntent);
+            return;
+        }
+        
         String target = intent.getStringExtra("nav_target");
         if (target == null) return;
         bottomNav.post(() -> {
@@ -321,5 +406,3 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 }
-
-
