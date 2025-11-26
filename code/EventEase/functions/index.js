@@ -430,6 +430,40 @@ exports.processAutomaticEntrantSelection = functions.pubsub
                 await eventDoc.ref.update({ selectionNotificationSent: true });
                 
                 console.log(`✓ Created selection notification request for ${selectedUserIds.length} users for event ${eventId}`);
+                
+                // Move remaining waitlisted entrants to NonSelectedEntrants
+                const remainingWaitlistSnapshot = await admin.firestore()
+                    .collection('events').doc(eventId)
+                    .collection('WaitlistedEntrants')
+                    .get();
+                
+                if (!remainingWaitlistSnapshot.empty) {
+                    console.log(`Moving ${remainingWaitlistSnapshot.size} remaining waitlisted entrants to NonSelectedEntrants`);
+                    
+                    const nonSelectedBatch = admin.firestore().batch();
+                    const nonSelectedRef = admin.firestore().collection('events').doc(eventId).collection('NonSelectedEntrants');
+                    const remainingWaitlistRef = admin.firestore().collection('events').doc(eventId).collection('WaitlistedEntrants');
+                    
+                    for (const remainingDoc of remainingWaitlistSnapshot.docs) {
+                        const userId = remainingDoc.id;
+                        const userData = remainingDoc.data();
+                        
+                        // Add to NonSelectedEntrants
+                        nonSelectedBatch.set(nonSelectedRef.doc(userId), userData);
+                        
+                        // Remove from WaitlistedEntrants
+                        nonSelectedBatch.delete(remainingWaitlistRef.doc(userId));
+                    }
+                    
+                    // Update waitlistCount to 0 (all remaining moved to NonSelectedEntrants)
+                    nonSelectedBatch.update(eventDoc.ref, 'waitlistCount', 0);
+                    
+                    await nonSelectedBatch.commit();
+                    console.log(`✓ Moved ${remainingWaitlistSnapshot.size} remaining entrants to NonSelectedEntrants`);
+                } else {
+                    console.log('No remaining waitlisted entrants to move');
+                }
+                
                 processedCount++;
             }
             
