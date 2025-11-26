@@ -1,17 +1,13 @@
 package com.example.eventease.ui.organizer;
 
-import android.app.job.JobInfo;
+
 import android.app.job.JobParameters;
 import android.app.job.JobService;
 import android.util.Log;
 
-import androidx.annotation.NonNull;
-
-import com.google.android.gms.tasks.Tasks;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.Query;
-import com.google.firebase.firestore.QuerySnapshot;
 
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -148,6 +144,77 @@ public class AutomaticEntrantSelectionService extends JobService {
         listenerSetupTime = System.currentTimeMillis();
         isInitialLoad = true; // Reset flag when setting up new listener
         
+        // FIX: First, query for events that already need processing (registrationEnd in the past)
+        // This ensures events are processed even if the app was closed when registration ended
+        long currentTime = System.currentTimeMillis();
+        Log.d(TAG, "Querying for events that need selection processing (registrationEnd <= " + new java.util.Date(currentTime) + ")");
+        
+        db.collection("events")
+                .whereGreaterThan("registrationEnd", 0L)
+                .whereEqualTo("selectionProcessed", false)
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    if (querySnapshot != null && !querySnapshot.isEmpty()) {
+                        Log.d(TAG, "Found " + querySnapshot.size() + " events that may need selection processing");
+                        int processedCount = 0;
+                        
+                        for (DocumentSnapshot eventDoc : querySnapshot.getDocuments()) {
+                            Long registrationEnd = eventDoc.getLong("registrationEnd");
+                            Boolean selectionProcessed = eventDoc.getBoolean("selectionProcessed");
+                            Boolean selectionNotificationSent = eventDoc.getBoolean("selectionNotificationSent");
+                            String eventId = eventDoc.getId();
+                            
+                            // Skip if already processed or notification sent
+                            if (Boolean.TRUE.equals(selectionProcessed) || Boolean.TRUE.equals(selectionNotificationSent)) {
+                                continue;
+                            }
+                            
+                            // Skip if already processing
+                            if (processingEventIds.contains(eventId)) {
+                                continue;
+                            }
+                            
+                            // Skip if event start date has already passed
+                            Long startsAtEpochMs = eventDoc.getLong("startsAtEpochMs");
+                            if (startsAtEpochMs != null && startsAtEpochMs > 0 && currentTime >= startsAtEpochMs) {
+                                continue;
+                            }
+                            
+                            // Process if registration period has ended
+                            if (registrationEnd != null && registrationEnd > 0 && currentTime >= registrationEnd) {
+                                processingEventIds.add(eventId);
+                                Log.d(TAG, "Processing existing event that needs selection: " + eventId + 
+                                    " (registration ended at " + new java.util.Date(registrationEnd) + ")");
+                                
+                                selectionHelper.checkAndProcessEventSelection(eventId, new EventSelectionHelper.SelectionCallback() {
+                                    @Override
+                                    public void onComplete(int selectedCount) {
+                                        processingEventIds.remove(eventId);
+                                        if (selectedCount > 0) {
+                                            Log.d(TAG, "Auto-selection completed for existing event: " + selectedCount + " entrants selected for event " + eventId);
+                                        }
+                                    }
+                                    
+                                    @Override
+                                    public void onError(String error) {
+                                        processingEventIds.remove(eventId);
+                                        Log.e(TAG, "Auto-selection error for existing event " + eventId + ": " + error);
+                                    }
+                                });
+                                
+                                processedCount++;
+                            }
+                        }
+                        
+                        Log.d(TAG, "Processed " + processedCount + " existing events that needed selection");
+                    } else {
+                        Log.d(TAG, "No existing events found that need selection processing");
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to query existing events for selection processing", e);
+                });
+        
         // Listen to events where registrationEnd is in the past and selectionProcessed is false
         // Only process document changes to avoid processing all events on every snapshot
         selectionListenerRegistration = db.collection("events")
@@ -161,7 +228,7 @@ public class AutomaticEntrantSelectionService extends JobService {
                         return;
                     }
                     
-                    long currentTime = System.currentTimeMillis();
+                    long snapshotCurrentTime = System.currentTimeMillis();
                     
                     // Only process changed documents (ADDED or MODIFIED)
                     // This prevents processing all events on every snapshot
@@ -203,7 +270,7 @@ public class AutomaticEntrantSelectionService extends JobService {
                         
                         // Skip if event start date has already passed
                         Long startsAtEpochMs = eventDoc.getLong("startsAtEpochMs");
-                        if (startsAtEpochMs != null && startsAtEpochMs > 0 && currentTime >= startsAtEpochMs) {
+                        if (startsAtEpochMs != null && startsAtEpochMs > 0 && snapshotCurrentTime >= startsAtEpochMs) {
                             Log.d(TAG, "Event " + eventId + " start date has already passed, skipping selection");
                             continue;
                         }
@@ -213,27 +280,13 @@ public class AutomaticEntrantSelectionService extends JobService {
                         // For existing events, only process if they were just modified and registrationEnd just passed
                         if (registrationEnd != null && registrationEnd > 0) {
                             // Check if registration period has ended
-                            long timeUntilRegistrationEnd = registrationEnd - currentTime;
+                            long timeUntilRegistrationEnd = registrationEnd - snapshotCurrentTime;
                             Log.d(TAG, "Event " + eventId + " - Time until registration end: " + 
                                 (timeUntilRegistrationEnd / 1000) + " seconds");
                             
-                            if (currentTime >= registrationEnd) {
-                                // For initial load, skip events that were created before listener setup
-                                // This prevents processing old events when app starts
-                                if (isInitialLoad) {
-                                    // Check if event was created before listener setup (more than 5 seconds ago)
-                                    Long createdAt = eventDoc.getLong("createdAt");
-                                    if (createdAt == null || createdAt == 0) {
-                                        // No createdAt field, check if registrationEnd is old (more than 5 seconds ago)
-                                        if ((currentTime - registrationEnd) > 5000) {
-                                            Log.d(TAG, "Skipping old event " + eventId + " on initial load");
-                                            continue;
-                                        }
-                                    } else if (listenerSetupTime > 0 && (createdAt < (listenerSetupTime - 5000))) {
-                                        Log.d(TAG, "Skipping old event " + eventId + " created before listener setup");
-                                        continue;
-                                    }
-                                }
+                            if (snapshotCurrentTime >= registrationEnd) {
+                                // FIX: Don't skip events on initial load - we want to process all events that need selection
+                                // The duplicate prevention is handled by selectionProcessed flag and processingEventIds set
                                 
                                 // Mark as processing to prevent duplicate processing
                                 processingEventIds.add(eventId);

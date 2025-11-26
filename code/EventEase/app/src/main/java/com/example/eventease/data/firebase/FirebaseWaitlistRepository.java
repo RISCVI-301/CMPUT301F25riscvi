@@ -79,26 +79,27 @@ public class FirebaseWaitlistRepository implements WaitlistRepository {
             Long capacityLong = eventDoc.getLong("capacity");
             int capacity = capacityLong != null ? capacityLong.intValue() : 0;
             if (capacity > 0) {
-                Long waitlistCountLong = eventDoc.getLong("waitlistCount");
-                int currentWaitlistCount = waitlistCountLong != null ? waitlistCountLong.intValue() : 0;
-                
-                // Also check actual count in subcollection as fallback
-                if (currentWaitlistCount == 0) {
-                    return eventRef.collection("WaitlistedEntrants").get().continueWithTask(countTask -> {
-                        int actualCount = countTask.isSuccessful() && countTask.getResult() != null ? 
-                            countTask.getResult().size() : 0;
-                        
-                        if (actualCount >= capacity) {
-                            Log.d(TAG, "Waitlist capacity reached for event " + eventId + " (capacity: " + capacity + ", current: " + actualCount + ")");
-                            return Tasks.forException(new Exception("Waitlist is full. Capacity reached."));
-                        }
-                        
-                        return proceedWithJoin(eventRef, eventId, uid);
-                    });
-                } else if (currentWaitlistCount >= capacity) {
-                    Log.d(TAG, "Waitlist capacity reached for event " + eventId + " (capacity: " + capacity + ", current: " + currentWaitlistCount + ")");
-                    return Tasks.forException(new Exception("Waitlist is full. Capacity reached."));
-                }
+                // FIX: Always check the actual subcollection count to ensure accuracy
+                // The stored waitlistCount field can be stale, especially after deadline changes
+                return eventRef.collection("WaitlistedEntrants").get().continueWithTask(countTask -> {
+                    int actualCount = countTask.isSuccessful() && countTask.getResult() != null ? 
+                        countTask.getResult().size() : 0;
+                    
+                    Log.d(TAG, "Capacity check for event " + eventId + ": capacity=" + capacity + ", actualWaitlistCount=" + actualCount);
+                    
+                    if (actualCount >= capacity) {
+                        Log.d(TAG, "Waitlist capacity reached for event " + eventId + " (capacity: " + capacity + ", actual: " + actualCount + ")");
+                        return Tasks.forException(new Exception("Waitlist is full. Capacity reached."));
+                    }
+                    
+                    // Also update the waitlistCount field to keep it in sync
+                    if (actualCount >= 0) {
+                        eventRef.update("waitlistCount", actualCount)
+                                .addOnFailureListener(e -> Log.w(TAG, "Failed to sync waitlistCount field", e));
+                    }
+                    
+                    return proceedWithJoin(eventRef, eventId, uid);
+                });
             }
 
             return proceedWithJoin(eventRef, eventId, uid);

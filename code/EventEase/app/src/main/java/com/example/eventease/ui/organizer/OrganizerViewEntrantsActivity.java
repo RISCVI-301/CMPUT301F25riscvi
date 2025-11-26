@@ -43,13 +43,9 @@ import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
-import android.app.DatePickerDialog;
-import android.app.TimePickerDialog;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.cardview.widget.CardView;
-
-import java.util.Calendar;
 
 import com.example.eventease.R;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
@@ -62,6 +58,7 @@ import com.google.firebase.firestore.WriteBatch;
 import java.io.OutputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
@@ -774,88 +771,79 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
                         return;
                     }
 
+                    Long eventDeadline = eventDoc.getLong("eventDeadline");
                     Long eventStart = eventDoc.getLong("eventStart");
-                    Long deadlineEpochMs = eventDoc.getLong("deadlineEpochMs");
-                    Long capacity = eventDoc.getLong("capacity");
                     long currentTime = System.currentTimeMillis();
 
-                    // Check if we're within 72 hours before event (last date to click replacement button)
-                    if (eventStart != null) {
-                        long seventyTwoHoursBeforeEvent = eventStart - (72L * 60 * 60 * 1000);
-                        if (currentTime >= seventyTwoHoursBeforeEvent) {
-                            Toast.makeText(this, "Replacement deadline has passed. Last replacement must be at least 72 hours before event.", Toast.LENGTH_LONG).show();
-                            return;
-                        }
-                    }
-
-                    // Check if event has started
-                    if (eventStart != null && currentTime >= eventStart) {
+                    // Check if event has passed (use eventStart as fallback, no 24-hour offset)
+                    long deadlineMs = (eventDeadline != null) ? eventDeadline : 
+                                     (eventStart != null) ? eventStart : Long.MAX_VALUE;
+                    
+                    if (currentTime >= deadlineMs) {
                         Toast.makeText(this, "Event has started. No more replacements allowed.", Toast.LENGTH_LONG).show();
                         return;
                     }
 
-                    // Check if deadline has passed and capacity not fulfilled
-                    boolean deadlinePassed = deadlineEpochMs != null && currentTime >= deadlineEpochMs;
-                    int capacityInt = capacity != null ? capacity.intValue() : -1;
-                    
-                    // Count selected entrants to check if capacity is fulfilled
-                    db.collection("events").document(eventId).collection("SelectedEntrants").get()
-                            .addOnSuccessListener(selectedSnapshot -> {
-                                int selectedCount = selectedSnapshot != null ? selectedSnapshot.size() : 0;
-                                boolean capacityNotFulfilled = capacityInt > 0 && selectedCount < capacityInt;
+                    // Count cancelled and non-selected entrants
+                    db.collection("events").document(eventId).collection("CancelledEntrants").get()
+                            .addOnSuccessListener(cancelledSnapshot -> {
+                                int cancelledCount = cancelledSnapshot != null ? cancelledSnapshot.size() : 0;
 
-                                // Count cancelled and waitlisted entrants
-                                db.collection("events").document(eventId).collection("CancelledEntrants").get()
-                                        .addOnSuccessListener(cancelledSnapshot -> {
-                                            int cancelledCount = cancelledSnapshot != null ? cancelledSnapshot.size() : 0;
+                                // Check how many spots are available (sampleSize - current selected count)
+                                db.collection("events").document(eventId).collection("SelectedEntrants").get()
+                                        .addOnSuccessListener(selectedSnapshot -> {
+                                            int selectedCount = selectedSnapshot != null ? selectedSnapshot.size() : 0;
+                                            Long sampleSize = eventDoc.getLong("sampleSize");
+                                            int availableSpots = (sampleSize != null ? sampleSize.intValue() : 0) - selectedCount;
 
-                                            db.collection("events").document(eventId).collection("WaitlistedEntrants").get()
-                                                    .addOnSuccessListener(waitlistSnapshot -> {
-                                                        int waitlistCount = waitlistSnapshot != null ? waitlistSnapshot.size() : 0;
+                                            db.collection("events").document(eventId).collection("NonSelectedEntrants").get()
+                                                    .addOnSuccessListener(nonSelectedSnapshot -> {
+                                                        int nonSelectedCount = nonSelectedSnapshot != null ? nonSelectedSnapshot.size() : 0;
 
-                                                        if (cancelledCount == 0) {
-                                                            Toast.makeText(this, "No cancelled entrants to replace", Toast.LENGTH_SHORT).show();
+                                                        if (cancelledCount == 0 && availableSpots <= 0) {
+                                                            Toast.makeText(this, "No cancelled entrants to replace and no available spots", Toast.LENGTH_SHORT).show();
                                                             return;
                                                         }
 
-                                                        if (waitlistCount == 0) {
-                                                            Toast.makeText(this, "No waitlisted entrants available for replacement", Toast.LENGTH_SHORT).show();
+                                                        if (nonSelectedCount == 0) {
+                                                            Toast.makeText(this, "No non-selected entrants available for replacement", Toast.LENGTH_SHORT).show();
                                                             return;
                                                         }
 
-                                                        // If deadline passed and capacity not fulfilled, ask for new deadline
-                                                        if (deadlinePassed && capacityNotFulfilled) {
-                                                            showNewDeadlineDialog(eventId, eventStart, deadlineEpochMs, cancelledCount, waitlistCount);
-                                                        } else {
-                                                            // Normal replacement flow
-                                                            int toReplace = Math.min(cancelledCount, waitlistCount);
-                                                            String message = String.format(
-                                                                    "Replace %d cancelled entrant%s with %d entrant%s from waitlist?",
-                                                                    cancelledCount, cancelledCount == 1 ? "" : "s",
-                                                                    toReplace, toReplace == 1 ? "" : "s"
-                                                            );
-
-                                                            new MaterialAlertDialogBuilder(this)
-                                                                    .setTitle("Replacement Swap")
-                                                                    .setMessage(message)
-                                                                    .setPositiveButton("Replace", (dialog, which) -> performReplacementSwap(toReplace, deadlineEpochMs))
-                                                                    .setNegativeButton("Cancel", null)
-                                                                    .show();
+                                                        // Calculate how many can be replaced
+                                                        int maxCanReplace = Math.max(cancelledCount, availableSpots);
+                                                        int toReplace = Math.min(maxCanReplace, nonSelectedCount);
+                                                        
+                                                        if (toReplace <= 0) {
+                                                            Toast.makeText(this, "No replacements needed or possible", Toast.LENGTH_SHORT).show();
+                                                            return;
                                                         }
+
+                                                        String message = String.format(
+                                                                "Select %d entrant%s from Non-Selected to replace cancelled/available spots?\n\nYou will need to set a deadline for them to accept/decline.",
+                                                                toReplace, toReplace == 1 ? "" : "s"
+                                                        );
+
+                                                        new MaterialAlertDialogBuilder(this)
+                                                                .setTitle("Manual Replacement Selection")
+                                                                .setMessage(message)
+                                                                .setPositiveButton("Select", (dialog, which) -> showDeadlinePickerAndPerformReplacement(toReplace, eventDoc))
+                                                                .setNegativeButton("Cancel", null)
+                                                                .show();
                                                     })
                                                     .addOnFailureListener(e -> {
-                                                        Log.e(TAG, "Failed to load waitlisted entrants", e);
-                                                        Toast.makeText(this, "Failed to load waitlisted entrants", Toast.LENGTH_SHORT).show();
+                                                        Log.e(TAG, "Failed to load non-selected entrants", e);
+                                                        Toast.makeText(this, "Failed to load non-selected entrants", Toast.LENGTH_SHORT).show();
                                                     });
                                         })
                                         .addOnFailureListener(e -> {
-                                            Log.e(TAG, "Failed to load cancelled entrants", e);
-                                            Toast.makeText(this, "Failed to load cancelled entrants", Toast.LENGTH_SHORT).show();
+                                            Log.e(TAG, "Failed to load selected entrants", e);
+                                            Toast.makeText(this, "Failed to load selected entrants", Toast.LENGTH_SHORT).show();
                                         });
                             })
                             .addOnFailureListener(e -> {
-                                Log.e(TAG, "Failed to load selected entrants", e);
-                                Toast.makeText(this, "Failed to load selected entrants", Toast.LENGTH_SHORT).show();
+                                Log.e(TAG, "Failed to load cancelled entrants", e);
+                                Toast.makeText(this, "Failed to load cancelled entrants", Toast.LENGTH_SHORT).show();
                             });
                 })
                 .addOnFailureListener(e -> {
@@ -864,211 +852,128 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
                 });
     }
 
-    private void performReplacementSwap(int count) {
-        // Use current deadline from event
-        db.collection("events").document(eventId).get()
-                .addOnSuccessListener(eventDoc -> {
-                    Long deadlineEpochMs = eventDoc != null ? eventDoc.getLong("deadlineEpochMs") : null;
-                    performReplacementSwap(count, deadlineEpochMs);
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Failed to load event deadline", e);
-                    performReplacementSwap(count, null);
-                });
-    }
-
-    private void performReplacementSwap(int count, Long deadlineEpochMs) {
+    private void showDeadlinePickerAndPerformReplacement(int count, DocumentSnapshot eventDoc) {
         if (eventId == null || eventId.isEmpty()) {
             return;
         }
 
-        Toast.makeText(this, "Processing replacement swap...", Toast.LENGTH_SHORT).show();
-
-        // Calculate deadline for replacement invitations
-        final long currentTime = System.currentTimeMillis();
-        long initialDeadline = currentTime + (7L * 24 * 60 * 60 * 1000); // 7 days from now
-        
-        if (deadlineEpochMs != null) {
-            initialDeadline = Math.min(initialDeadline, deadlineEpochMs);
+        Long eventStartTemp = eventDoc.getLong("startsAtEpochMs");
+        if (eventStartTemp == null) {
+            eventStartTemp = eventDoc.getLong("eventStart");
         }
+        final Long eventStart = eventStartTemp; // Make final for lambda
         
-        final long baseDeadline = initialDeadline;
+        long currentTime = System.currentTimeMillis();
+        long minDeadline = currentTime + (2L * 24 * 60 * 60 * 1000); // Minimum 2 days
+        long maxDeadline = eventStart != null && eventStart > 0 ? eventStart : (currentTime + (30L * 24 * 60 * 60 * 1000)); // Max 30 days or event start
         
-        // Get event start as fallback if needed
-        db.collection("events").document(eventId).get()
-                .addOnSuccessListener(eventDoc -> {
-                    Long eventStart = eventDoc != null ? eventDoc.getLong("eventStart") : null;
-                    
-                    // Calculate deadline
-                    long calculatedDeadline = baseDeadline;
-                    if (eventStart != null && deadlineEpochMs == null) {
-                        calculatedDeadline = Math.min(calculatedDeadline, eventStart);
+        Calendar cal = Calendar.getInstance();
+        cal.setTimeInMillis(minDeadline);
+        
+        // Show date picker
+        new android.app.DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
+            cal.set(year, month, dayOfMonth);
+            // Show time picker
+            new android.app.TimePickerDialog(this, (view2, hourOfDay, minute) -> {
+                cal.set(Calendar.HOUR_OF_DAY, hourOfDay);
+                cal.set(Calendar.MINUTE, minute);
+                long selectedDeadline = cal.getTimeInMillis();
+                
+                // Validate deadline
+                if (selectedDeadline < minDeadline) {
+                    Toast.makeText(this, "Deadline must be at least 2 days from now", Toast.LENGTH_LONG).show();
+                    return;
+                }
+                
+                if (eventStart != null && eventStart > 0 && selectedDeadline >= eventStart) {
+                    Toast.makeText(this, "Deadline must be before event start", Toast.LENGTH_LONG).show();
+                    return;
+                }
+                
+                // Perform replacement with selected deadline
+                performReplacementSwap(count, selectedDeadline);
+            }, cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE), false).show();
+        }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show();
+    }
+
+    private void performReplacementSwap(int count, long deadlineToAccept) {
+        if (eventId == null || eventId.isEmpty()) {
+            return;
+        }
+
+        Toast.makeText(this, "Processing replacement selection...", Toast.LENGTH_SHORT).show();
+
+        // Fetch non-selected entrants
+        db.collection("events").document(eventId).collection("NonSelectedEntrants").get()
+                .addOnSuccessListener(nonSelectedSnapshot -> {
+                    if (nonSelectedSnapshot == null || nonSelectedSnapshot.isEmpty()) {
+                        Toast.makeText(this, "No non-selected entrants available", Toast.LENGTH_SHORT).show();
+                        return;
                     }
-                    // Ensure minimum 2 days
-                    long minDeadline = currentTime + (2L * 24 * 60 * 60 * 1000);
-                    calculatedDeadline = Math.max(calculatedDeadline, minDeadline);
-                    final long deadlineToAccept = calculatedDeadline;
 
-                    // Fetch waitlisted entrants
-                    db.collection("events").document(eventId).collection("WaitlistedEntrants").get()
-                            .addOnSuccessListener(waitlistSnapshot -> {
-                                if (waitlistSnapshot == null || waitlistSnapshot.isEmpty()) {
-                                    Toast.makeText(this, "No waitlisted entrants available", Toast.LENGTH_SHORT).show();
-                                    return;
-                                }
+                    List<DocumentSnapshot> nonSelectedDocs = nonSelectedSnapshot.getDocuments();
+                    if (nonSelectedDocs.size() < count) {
+                        Toast.makeText(this, "Not enough non-selected entrants available", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
 
-                                List<DocumentSnapshot> waitlistDocs = waitlistSnapshot.getDocuments();
-                                if (waitlistDocs.size() < count) {
-                                    Toast.makeText(this, "Not enough waitlisted entrants available", Toast.LENGTH_SHORT).show();
-                                    return;
-                                }
+                    // Show dialog to let organizer manually select which entrants
+                    // For now, randomly select (organizer can manually move later if needed)
+                    List<DocumentSnapshot> selectedForReplacement = randomlySelect(nonSelectedDocs, count);
+                    
+                    DocumentReference eventRef = db.collection("events").document(eventId);
+                    WriteBatch batch = db.batch();
+                    List<String> userIds = new ArrayList<>();
 
-                                // Randomly select entrants
-                                List<DocumentSnapshot> selectedForReplacement = randomlySelect(waitlistDocs, count);
+                    // Move selected entrants from NonSelectedEntrants to SelectedEntrants
+                    for (DocumentSnapshot doc : selectedForReplacement) {
+                        String userId = doc.getId();
+                        Map<String, Object> data = doc.getData();
+                        userIds.add(userId);
+
+                        if (data != null) {
+                            // Move to SelectedEntrants
+                            batch.set(eventRef.collection("SelectedEntrants").document(userId), data);
+                            // Remove from NonSelectedEntrants
+                            batch.delete(eventRef.collection("NonSelectedEntrants").document(userId));
+                            
+                            // Create invitation for replacement
+                            Map<String, Object> invitation = new HashMap<>();
+                            invitation.put("eventId", eventId);
+                            invitation.put("uid", userId);
+                            invitation.put("entrantId", userId);
+                            invitation.put("status", "PENDING");
+                            invitation.put("issuedAt", System.currentTimeMillis());
+                            invitation.put("expiresAt", deadlineToAccept);
+                            invitation.put("isReplacement", true);
+                            
+                            batch.set(db.collection("invitations").document(UUID.randomUUID().toString()), invitation);
+                        }
+                    }
+
+                    batch.commit()
+                            .addOnSuccessListener(v -> {
+                                Toast.makeText(this, 
+                                        "Successfully selected " + count + " entrant" + (count == 1 ? "" : "s") + " for replacement",
+                                        Toast.LENGTH_LONG).show();
                                 
-                                DocumentReference eventRef = db.collection("events").document(eventId);
-                                WriteBatch batch = db.batch();
-                                List<String> userIds = new ArrayList<>();
-
-                                // Move selected entrants from WaitlistedEntrants to SelectedEntrants
-                                for (DocumentSnapshot doc : selectedForReplacement) {
-                                    String userId = doc.getId();
-                                    Map<String, Object> data = doc.getData();
-                                    userIds.add(userId);
-
-                                    if (data != null) {
-                                        // Move to SelectedEntrants
-                                        batch.set(eventRef.collection("SelectedEntrants").document(userId), data);
-                                        // Remove from WaitlistedEntrants
-                                        batch.delete(eventRef.collection("WaitlistedEntrants").document(userId));
-                                        
-                                        // Create invitation for replacement
-                                        Map<String, Object> invitation = new HashMap<>();
-                                        invitation.put("eventId", eventId);
-                                        invitation.put("userId", userId);
-                                        invitation.put("status", "PENDING");
-                                        invitation.put("createdAt", System.currentTimeMillis());
-                                        invitation.put("expiresAt", deadlineToAccept);
-                                        invitation.put("isReplacement", true);
-                                        
-                                        batch.set(db.collection("invitations").document(UUID.randomUUID().toString()), invitation);
-                                    }
-                                }
-
-                                batch.commit()
-                                        .addOnSuccessListener(v -> {
-                                            Toast.makeText(this, 
-                                                    "Successfully replaced " + count + " entrant" + (count == 1 ? "" : "s"),
-                                                    Toast.LENGTH_LONG).show();
-                                            
-                                            // Send notifications
-                                            String eventTitleStr = eventTitle != null ? eventTitle : "the event";
-                                            sendReplacementNotifications(userIds, eventTitleStr, deadlineToAccept);
-                                            
-                                            // Reload entrants
-                                            loadEntrantsFromFirestore();
-                                        })
-                                        .addOnFailureListener(e -> {
-                                            Log.e(TAG, "Failed to perform replacement swap", e);
-                                            Toast.makeText(this, "Failed to perform replacement swap: " + e.getMessage(), 
-                                                    Toast.LENGTH_LONG).show();
-                                        });
+                                // Send notifications with deadline
+                                String eventTitleStr = eventTitle != null ? eventTitle : "the event";
+                                sendReplacementNotifications(userIds, eventTitleStr, deadlineToAccept);
+                                
+                                // Reload entrants
+                                loadEntrantsFromFirestore();
                             })
                             .addOnFailureListener(e -> {
-                                Log.e(TAG, "Failed to load waitlisted entrants for replacement", e);
-                                Toast.makeText(this, "Failed to load waitlisted entrants", Toast.LENGTH_SHORT).show();
+                                Log.e(TAG, "Failed to perform replacement swap", e);
+                                Toast.makeText(this, "Failed to perform replacement swap: " + e.getMessage(), 
+                                        Toast.LENGTH_LONG).show();
                             });
                 })
                 .addOnFailureListener(e -> {
-                    Log.e(TAG, "Failed to load event for replacement", e);
-                    Toast.makeText(this, "Failed to load event details", Toast.LENGTH_SHORT).show();
+                    Log.e(TAG, "Failed to load non-selected entrants for replacement", e);
+                    Toast.makeText(this, "Failed to load non-selected entrants", Toast.LENGTH_SHORT).show();
                 });
-    }
-
-    private void showNewDeadlineDialog(String eventId, Long eventStart, Long oldDeadline, int cancelledCount, int waitlistCount) {
-        android.app.Dialog dialog = new android.app.Dialog(this);
-        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
-        dialog.setContentView(R.layout.organizer_dialog_new_deadline);
-        dialog.setCancelable(true);
-
-        Button btnSelectDeadline = dialog.findViewById(R.id.btnSelectNewDeadline);
-        TextView tvSelectedDeadline = dialog.findViewById(R.id.tvSelectedDeadline);
-        Button btnConfirm = dialog.findViewById(R.id.btnConfirmDeadline);
-        Button btnCancel = dialog.findViewById(R.id.btnCancelDeadline);
-
-        long[] newDeadlineMs = {0L};
-
-        // Calculate min and max dates for deadline
-        long minDeadlineMs = oldDeadline != null ? oldDeadline : System.currentTimeMillis();
-        long maxDeadlineMs = eventStart != null ? (eventStart - (48L * 60 * 60 * 1000)) : Long.MAX_VALUE; // 48 hours before event
-
-        btnSelectDeadline.setOnClickListener(v -> {
-            final Calendar now = Calendar.getInstance();
-            Calendar minDate = Calendar.getInstance();
-            minDate.setTimeInMillis(minDeadlineMs);
-            
-            DatePickerDialog dp = new DatePickerDialog(
-                    this, (view, y, m, d) -> {
-                TimePickerDialog tp = new TimePickerDialog(
-                        this, (vv, hh, mm) -> {
-                    Calendar chosen = Calendar.getInstance();
-                    chosen.set(y, m, d, hh, mm, 0);
-                    chosen.set(Calendar.MILLISECOND, 0);
-                    long chosenMs = chosen.getTimeInMillis();
-                    
-                    // Validate: must be after old deadline
-                    if (chosenMs <= minDeadlineMs) {
-                        Toast.makeText(this, "New deadline must be after the previous deadline", Toast.LENGTH_SHORT).show();
-                        return;
-                    }
-                    
-                    // Validate: must be at least 48 hours before event
-                    if (eventStart != null && chosenMs >= maxDeadlineMs) {
-                        Toast.makeText(this, "Deadline must be at least 48 hours before event date", Toast.LENGTH_SHORT).show();
-                        return;
-                    }
-                    
-                    newDeadlineMs[0] = chosenMs;
-                    tvSelectedDeadline.setText(android.text.format.DateFormat
-                            .format("MMM d, yyyy  h:mm a", chosen));
-                    tvSelectedDeadline.setVisibility(android.view.View.VISIBLE);
-                    btnConfirm.setEnabled(true);
-                }, now.get(Calendar.HOUR_OF_DAY), now.get(Calendar.MINUTE), false);
-                tp.show();
-            }, now.get(Calendar.YEAR), now.get(Calendar.MONTH), now.get(Calendar.DAY_OF_MONTH));
-            
-            dp.getDatePicker().setMinDate(minDeadlineMs);
-            if (eventStart != null) {
-                dp.getDatePicker().setMaxDate(maxDeadlineMs);
-            }
-            dp.show();
-        });
-
-        btnConfirm.setOnClickListener(v -> {
-            if (newDeadlineMs[0] == 0L) {
-                Toast.makeText(this, "Please select a new deadline", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            
-            // Update deadline in Firestore
-            db.collection("events").document(eventId)
-                    .update("deadlineEpochMs", newDeadlineMs[0])
-                    .addOnSuccessListener(aVoid -> {
-                        Toast.makeText(this, "New deadline set successfully", Toast.LENGTH_SHORT).show();
-                        dialog.dismiss();
-                        
-                        // Perform replacement with new deadline
-                        int toReplace = Math.min(cancelledCount, waitlistCount);
-                        performReplacementSwap(toReplace, newDeadlineMs[0]);
-                    })
-                    .addOnFailureListener(e -> {
-                        Log.e(TAG, "Failed to update deadline", e);
-                        Toast.makeText(this, "Failed to update deadline: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                    });
-        });
-
-        btnCancel.setOnClickListener(v -> dialog.dismiss());
-        dialog.show();
     }
 
     private List<DocumentSnapshot> randomlySelect(List<DocumentSnapshot> allDocs, int count) {
@@ -1085,7 +990,7 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
         SimpleDateFormat sdf = new SimpleDateFormat("MMM d, yyyy 'at' h:mm a", Locale.getDefault());
         String deadlineStr = sdf.format(new Date(deadlineMs));
         String message = String.format(
-                "You've been selected as a replacement for \"%s\"! Please accept or decline by %s",
+                "You've been manually selected for \"%s\"! Please accept or decline by %s",
                 eventTitle, deadlineStr
         );
 

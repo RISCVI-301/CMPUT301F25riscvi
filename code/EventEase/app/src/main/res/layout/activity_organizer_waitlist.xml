@@ -172,6 +172,24 @@
             app:backgroundTint="#9EFFF1"
             app:cornerRadius="12dp" />
 
+        <!-- Change Deadlines Button (for testing) -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/change_deadlines_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginStart="24dp"
+            android:layout_marginTop="16dp"
+            android:layout_marginEnd="24dp"
+            android:fontFamily="@font/fredoka_bold"
+            android:paddingVertical="10dp"
+            android:text="Change Deadlines (Testing)"
+            android:textColor="#223C65"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            app:backgroundTint="#FFD700"
+            app:cornerRadius="12dp" />
+
 
         <LinearLayout
             android:layout_width="match_parent"

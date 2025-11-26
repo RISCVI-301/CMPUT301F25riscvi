@@ -590,6 +590,9 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
     
     /**
      * Check if the waitlist capacity is full
+     * FIX: This method should ideally check the actual subcollection count,
+     * but for UI responsiveness, we use the cached waitlistCount.
+     * The actual check happens in FirebaseWaitlistRepository.join() which always verifies the real count.
      */
     private boolean isCapacityFull() {
         if (currentEvent == null) {
@@ -601,6 +604,8 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
             return false; // No capacity limit
         }
         
+        // Use the waitlistCount from the event, which should be kept in sync
+        // The actual verification happens server-side in FirebaseWaitlistRepository
         int waitlistCount = currentEvent.getWaitlistCount();
         return waitlistCount >= capacity;
     }

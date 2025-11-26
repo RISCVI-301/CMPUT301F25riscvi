@@ -32,6 +32,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Calendar;
+import java.text.SimpleDateFormat;
+import java.util.Locale;
+import android.app.DatePickerDialog;
+import android.app.TimePickerDialog;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 
 public class OrganizerWaitlistActivity extends AppCompatActivity {
     private static final String TAG = "OrganizerWaitlist";
@@ -43,6 +50,7 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
     private ImageView backButton;
     private MaterialButton deleteEventButton;
     private MaterialButton entrantDetailsButton;
+    private MaterialButton changeDeadlinesButton;
 
     private FirebaseAuth mAuth;
     private FirebaseFirestore db;
@@ -77,6 +85,7 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
         backButton = findViewById(R.id.back_button);
         entrantDetailsButton = findViewById(R.id.entrant_details_button);
         deleteEventButton = findViewById(R.id.delete_event_button);
+        changeDeadlinesButton = findViewById(R.id.change_deadlines_button);
 
         currentEventId = getIntent().getStringExtra("eventId");
 
@@ -100,6 +109,11 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
             }
         });
         deleteEventButton.setOnClickListener(v -> showDeleteEventConfirmation());
+        
+        // Set up change deadlines button (for testing)
+        if (changeDeadlinesButton != null) {
+            changeDeadlinesButton.setOnClickListener(v -> showChangeDeadlinesDialog());
+        }
 
         // Set up notification button for Waitlisted Entrants
         ImageView mailIcon = findViewById(R.id.mail_icon);
@@ -491,6 +505,256 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
                 Log.e(TAG, "Failed to send notifications: " + error);
             }
         });
+    }
+    
+    /**
+     * Shows a dialog to change event deadlines for testing purposes.
+     */
+    private void showChangeDeadlinesDialog() {
+        if (currentEventId == null || currentEventId.isEmpty()) {
+            Toast.makeText(this, "Event ID not found", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        // Load current event data
+        db.collection("events").document(currentEventId).get()
+                .addOnSuccessListener(eventDoc -> {
+                    if (eventDoc == null || !eventDoc.exists()) {
+                        Toast.makeText(this, "Event not found", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    
+                    Long registrationEnd = eventDoc.getLong("registrationEnd");
+                    Long deadlineEpochMs = eventDoc.getLong("deadlineEpochMs");
+                    Long startsAtEpochMs = eventDoc.getLong("startsAtEpochMs");
+                    
+                    // Create dialog layout
+                    LinearLayout dialogLayout = new LinearLayout(this);
+                    dialogLayout.setOrientation(LinearLayout.VERTICAL);
+                    dialogLayout.setPadding(50, 40, 50, 10);
+                    
+                    // Registration End Date/Time
+                    TextView regEndLabel = new TextView(this);
+                    regEndLabel.setText("Registration End:");
+                    regEndLabel.setTextSize(16);
+                    regEndLabel.setTextColor(android.graphics.Color.BLACK);
+                    dialogLayout.addView(regEndLabel);
+                    
+                    TextView regEndDisplay = new TextView(this);
+                    regEndDisplay.setId(android.R.id.text1);
+                    regEndDisplay.setTextSize(14);
+                    regEndDisplay.setPadding(0, 5, 0, 15);
+                    regEndDisplay.setTextColor(android.graphics.Color.DKGRAY);
+                    if (registrationEnd != null && registrationEnd > 0) {
+                        SimpleDateFormat sdf = new SimpleDateFormat("MMM d, yyyy 'at' h:mm a", Locale.getDefault());
+                        regEndDisplay.setText("Current: " + sdf.format(new java.util.Date(registrationEnd)));
+                    } else {
+                        regEndDisplay.setText("Not set");
+                    }
+                    dialogLayout.addView(regEndDisplay);
+                    
+                    // Invitation Deadline Date/Time
+                    TextView deadlineLabel = new TextView(this);
+                    deadlineLabel.setText("Invitation Deadline:");
+                    deadlineLabel.setTextSize(16);
+                    deadlineLabel.setTextColor(android.graphics.Color.BLACK);
+                    dialogLayout.addView(deadlineLabel);
+                    
+                    TextView deadlineDisplay = new TextView(this);
+                    deadlineDisplay.setId(android.R.id.text2);
+                    deadlineDisplay.setTextSize(14);
+                    deadlineDisplay.setPadding(0, 5, 0, 15);
+                    deadlineDisplay.setTextColor(android.graphics.Color.DKGRAY);
+                    if (deadlineEpochMs != null && deadlineEpochMs > 0) {
+                        SimpleDateFormat sdf = new SimpleDateFormat("MMM d, yyyy 'at' h:mm a", Locale.getDefault());
+                        deadlineDisplay.setText("Current: " + sdf.format(new java.util.Date(deadlineEpochMs)));
+                    } else {
+                        deadlineDisplay.setText("Not set");
+                    }
+                    dialogLayout.addView(deadlineDisplay);
+                    
+                    // Event Start Date/Time
+                    TextView startLabel = new TextView(this);
+                    startLabel.setText("Event Start:");
+                    startLabel.setTextSize(16);
+                    startLabel.setTextColor(android.graphics.Color.BLACK);
+                    dialogLayout.addView(startLabel);
+                    
+                    TextView startDisplay = new TextView(this);
+                    startDisplay.setId(android.R.id.button1);
+                    startDisplay.setTextSize(14);
+                    startDisplay.setPadding(0, 5, 0, 15);
+                    startDisplay.setTextColor(android.graphics.Color.DKGRAY);
+                    if (startsAtEpochMs != null && startsAtEpochMs > 0) {
+                        SimpleDateFormat sdf = new SimpleDateFormat("MMM d, yyyy 'at' h:mm a", Locale.getDefault());
+                        startDisplay.setText("Current: " + sdf.format(new java.util.Date(startsAtEpochMs)));
+                    } else {
+                        startDisplay.setText("Not set");
+                    }
+                    dialogLayout.addView(startDisplay);
+                    
+                    // Store current values for use in pickers
+                    final long[] newRegistrationEnd = {registrationEnd != null ? registrationEnd : System.currentTimeMillis()};
+                    final long[] newDeadlineEpochMs = {deadlineEpochMs != null ? deadlineEpochMs : System.currentTimeMillis()};
+                    final long[] newStartsAtEpochMs = {startsAtEpochMs != null ? startsAtEpochMs : System.currentTimeMillis()};
+                    
+                    // Create date/time picker helper
+                    Runnable updateRegEnd = () -> {
+                        Calendar cal = Calendar.getInstance();
+                        cal.setTimeInMillis(newRegistrationEnd[0]);
+                        new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
+                            cal.set(year, month, dayOfMonth);
+                            new TimePickerDialog(this, (view2, hourOfDay, minute) -> {
+                                cal.set(Calendar.HOUR_OF_DAY, hourOfDay);
+                                cal.set(Calendar.MINUTE, minute);
+                                newRegistrationEnd[0] = cal.getTimeInMillis();
+                                SimpleDateFormat sdf = new SimpleDateFormat("MMM d, yyyy 'at' h:mm a", Locale.getDefault());
+                                regEndDisplay.setText("New: " + sdf.format(cal.getTime()));
+                            }, cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE), false).show();
+                        }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show();
+                    };
+                    
+                    Runnable updateDeadline = () -> {
+                        Calendar cal = Calendar.getInstance();
+                        cal.setTimeInMillis(newDeadlineEpochMs[0]);
+                        new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
+                            cal.set(year, month, dayOfMonth);
+                            new TimePickerDialog(this, (view2, hourOfDay, minute) -> {
+                                cal.set(Calendar.HOUR_OF_DAY, hourOfDay);
+                                cal.set(Calendar.MINUTE, minute);
+                                newDeadlineEpochMs[0] = cal.getTimeInMillis();
+                                SimpleDateFormat sdf = new SimpleDateFormat("MMM d, yyyy 'at' h:mm a", Locale.getDefault());
+                                deadlineDisplay.setText("New: " + sdf.format(cal.getTime()));
+                            }, cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE), false).show();
+                        }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show();
+                    };
+                    
+                    Runnable updateStart = () -> {
+                        Calendar cal = Calendar.getInstance();
+                        cal.setTimeInMillis(newStartsAtEpochMs[0]);
+                        new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
+                            cal.set(year, month, dayOfMonth);
+                            new TimePickerDialog(this, (view2, hourOfDay, minute) -> {
+                                cal.set(Calendar.HOUR_OF_DAY, hourOfDay);
+                                cal.set(Calendar.MINUTE, minute);
+                                newStartsAtEpochMs[0] = cal.getTimeInMillis();
+                                SimpleDateFormat sdf = new SimpleDateFormat("MMM d, yyyy 'at' h:mm a", Locale.getDefault());
+                                startDisplay.setText("New: " + sdf.format(cal.getTime()));
+                            }, cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE), false).show();
+                        }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show();
+                    };
+                    
+                    // Make text views clickable
+                    regEndDisplay.setOnClickListener(v -> updateRegEnd.run());
+                    deadlineDisplay.setOnClickListener(v -> updateDeadline.run());
+                    startDisplay.setOnClickListener(v -> updateStart.run());
+                    
+                    regEndDisplay.setClickable(true);
+                    regEndDisplay.setFocusable(true);
+                    deadlineDisplay.setClickable(true);
+                    deadlineDisplay.setFocusable(true);
+                    startDisplay.setClickable(true);
+                    startDisplay.setFocusable(true);
+                    
+                    new MaterialAlertDialogBuilder(this)
+                            .setTitle("Change Deadlines (Testing)")
+                            .setView(dialogLayout)
+                            .setMessage("Tap on each date/time to change it. This is for testing purposes only.")
+                            .setPositiveButton("Save", (dialog, which) -> {
+                                updateDeadlines(newRegistrationEnd[0], newDeadlineEpochMs[0], newStartsAtEpochMs[0]);
+                            })
+                            .setNegativeButton("Cancel", null)
+                            .show();
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to load event for deadline change", e);
+                    Toast.makeText(this, "Failed to load event: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                });
+    }
+    
+    /**
+     * Updates the event deadlines in Firestore.
+     */
+    private void updateDeadlines(long registrationEnd, long deadlineEpochMs, long startsAtEpochMs) {
+        if (currentEventId == null || currentEventId.isEmpty()) {
+            Toast.makeText(this, "Event ID not found", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        Toast.makeText(this, "Updating deadlines...", Toast.LENGTH_SHORT).show();
+        
+        // FIX: First, update the waitlistCount to match the actual count in the subcollection
+        // This ensures the capacity check is accurate after deadline changes
+        DocumentReference eventRef = db.collection("events").document(currentEventId);
+        eventRef.collection("WaitlistedEntrants").get()
+                .addOnSuccessListener(waitlistSnapshot -> {
+                    int actualWaitlistCount = waitlistSnapshot != null ? waitlistSnapshot.size() : 0;
+                    Log.d(TAG, "Actual waitlist count: " + actualWaitlistCount);
+                    
+                    Map<String, Object> updates = new HashMap<>();
+                    updates.put("registrationEnd", registrationEnd);
+                    updates.put("deadlineEpochMs", deadlineEpochMs);
+                    updates.put("startsAtEpochMs", startsAtEpochMs);
+                    updates.put("waitlistCount", actualWaitlistCount); // FIX: Update waitlistCount to actual count
+                    
+                    // Also reset flags so automatic processes can run again
+                    updates.put("selectionProcessed", false);
+                    updates.put("selectionNotificationSent", false);
+                    updates.put("deadlineNotificationSent", false);
+                    updates.put("sorryNotificationSent", false);
+                    
+                    eventRef.update(updates)
+                            .addOnSuccessListener(aVoid -> {
+                                Log.d(TAG, "Deadlines updated successfully. WaitlistCount set to: " + actualWaitlistCount);
+                                SimpleDateFormat sdf = new SimpleDateFormat("MMM d, yyyy 'at' h:mm a", Locale.getDefault());
+                                String message = "Deadlines updated:\n" +
+                                        "Registration End: " + sdf.format(new java.util.Date(registrationEnd)) + "\n" +
+                                        "Invitation Deadline: " + sdf.format(new java.util.Date(deadlineEpochMs)) + "\n" +
+                                        "Event Start: " + sdf.format(new java.util.Date(startsAtEpochMs)) + "\n" +
+                                        "Waitlist Count: " + actualWaitlistCount;
+                                Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+                                
+                                // Reload event data to reflect changes
+                                loadEventDataFromFirestore(currentEventId);
+                            })
+                            .addOnFailureListener(e -> {
+                                Log.e(TAG, "Failed to update deadlines", e);
+                                Toast.makeText(this, "Failed to update deadlines: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                            });
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to count waitlist entries, proceeding with update anyway", e);
+                    // On error, still update deadlines but set waitlistCount to 0 as fallback
+                    Map<String, Object> updates = new HashMap<>();
+                    updates.put("registrationEnd", registrationEnd);
+                    updates.put("deadlineEpochMs", deadlineEpochMs);
+                    updates.put("startsAtEpochMs", startsAtEpochMs);
+                    updates.put("waitlistCount", 0); // Fallback to 0 if we can't count
+                    
+                    // Also reset flags so automatic processes can run again
+                    updates.put("selectionProcessed", false);
+                    updates.put("selectionNotificationSent", false);
+                    updates.put("deadlineNotificationSent", false);
+                    updates.put("sorryNotificationSent", false);
+                    
+                    eventRef.update(updates)
+                            .addOnSuccessListener(aVoid -> {
+                                Log.d(TAG, "Deadlines updated (with fallback waitlistCount=0)");
+                                SimpleDateFormat sdf = new SimpleDateFormat("MMM d, yyyy 'at' h:mm a", Locale.getDefault());
+                                String message = "Deadlines updated:\n" +
+                                        "Registration End: " + sdf.format(new java.util.Date(registrationEnd)) + "\n" +
+                                        "Invitation Deadline: " + sdf.format(new java.util.Date(deadlineEpochMs)) + "\n" +
+                                        "Event Start: " + sdf.format(new java.util.Date(startsAtEpochMs));
+                                Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+                                
+                                // Reload event data to reflect changes
+                                loadEventDataFromFirestore(currentEventId);
+                            })
+                            .addOnFailureListener(e2 -> {
+                                Log.e(TAG, "Failed to update deadlines", e2);
+                                Toast.makeText(this, "Failed to update deadlines: " + e2.getMessage(), Toast.LENGTH_LONG).show();
+                            });
+                });
     }
 
 }
