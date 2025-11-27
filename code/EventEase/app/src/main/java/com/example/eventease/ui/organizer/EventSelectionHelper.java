@@ -365,21 +365,52 @@ public class EventSelectionHelper {
                             @Override
                             public void onComplete(int sentCount) {
                                 Log.d(TAG, "✓ Successfully sent " + sentCount + " invitations with push notifications");
-                                markAsProcessed(eventRef, new SelectionCallback() {
+                                
+                                // Move remaining waitlisted entrants to NonSelectedEntrants
+                                moveRemainingWaitlistedToNonSelected(eventRef, eventId, new SelectionCallback() {
                                     @Override
-                                    public void onComplete(int selectedCount) {
-                                        Log.d(TAG, "=== Selection process completed successfully ===");
-                                        if (callback != null) {
-                                            callback.onComplete(finalSelectedDocs.size());
-                                        }
+                                    public void onComplete(int movedCount) {
+                                        Log.d(TAG, "✓ Moved " + movedCount + " remaining entrants to NonSelectedEntrants");
+                                        
+                                        // Now mark as processed
+                                        markAsProcessed(eventRef, new SelectionCallback() {
+                                            @Override
+                                            public void onComplete(int selectedCount) {
+                                                Log.d(TAG, "=== Selection process completed successfully ===");
+                                                if (callback != null) {
+                                                    callback.onComplete(finalSelectedDocs.size());
+                                                }
+                                            }
+                                            
+                                            @Override
+                                            public void onError(String error) {
+                                                Log.e(TAG, "Error marking as processed: " + error);
+                                                if (callback != null) {
+                                                    callback.onComplete(finalSelectedDocs.size());
+                                                }
+                                            }
+                                        });
                                     }
                                     
                                     @Override
                                     public void onError(String error) {
-                                        Log.e(TAG, "Error marking as processed: " + error);
-                                        if (callback != null) {
-                                            callback.onComplete(finalSelectedDocs.size());
-                                        }
+                                        Log.e(TAG, "Error moving remaining to NonSelectedEntrants: " + error);
+                                        // Still mark as processed even if this fails
+                                        markAsProcessed(eventRef, new SelectionCallback() {
+                                            @Override
+                                            public void onComplete(int selectedCount) {
+                                                if (callback != null) {
+                                                    callback.onComplete(finalSelectedDocs.size());
+                                                }
+                                            }
+                                            
+                                            @Override
+                                            public void onError(String error2) {
+                                                if (callback != null) {
+                                                    callback.onComplete(finalSelectedDocs.size());
+                                                }
+                                            }
+                                        });
                                     }
                                 });
                             }
@@ -387,20 +418,50 @@ public class EventSelectionHelper {
                             @Override
                             public void onError(String error) {
                                 Log.e(TAG, "Failed to send invitations: " + error);
-                                // Still mark as processed since selection was successful
-                                markAsProcessed(eventRef, new SelectionCallback() {
+                                
+                                // Still move remaining to NonSelectedEntrants
+                                moveRemainingWaitlistedToNonSelected(eventRef, eventId, new SelectionCallback() {
                                     @Override
-                                    public void onComplete(int selectedCount) {
-                                        if (callback != null) {
-                                            callback.onComplete(finalSelectedDocs.size());
-                                        }
+                                    public void onComplete(int movedCount) {
+                                        Log.d(TAG, "✓ Moved " + movedCount + " remaining entrants to NonSelectedEntrants despite invitation error");
+                                        
+                                        // Still mark as processed since selection was successful
+                                        markAsProcessed(eventRef, new SelectionCallback() {
+                                            @Override
+                                            public void onComplete(int selectedCount) {
+                                                if (callback != null) {
+                                                    callback.onComplete(finalSelectedDocs.size());
+                                                }
+                                            }
+                                            
+                                            @Override
+                                            public void onError(String error2) {
+                                                if (callback != null) {
+                                                    callback.onComplete(finalSelectedDocs.size());
+                                                }
+                                            }
+                                        });
                                     }
                                     
                                     @Override
-                                    public void onError(String error2) {
-                                        if (callback != null) {
-                                            callback.onComplete(finalSelectedDocs.size());
-                                        }
+                                    public void onError(String error3) {
+                                        Log.e(TAG, "Error moving remaining to NonSelectedEntrants: " + error3);
+                                        // Still mark as processed
+                                        markAsProcessed(eventRef, new SelectionCallback() {
+                                            @Override
+                                            public void onComplete(int selectedCount) {
+                                                if (callback != null) {
+                                                    callback.onComplete(finalSelectedDocs.size());
+                                                }
+                                            }
+                                            
+                                            @Override
+                                            public void onError(String error2) {
+                                                if (callback != null) {
+                                                    callback.onComplete(finalSelectedDocs.size());
+                                                }
+                                            }
+                                        });
                                     }
                                 });
                             }

@@ -772,15 +772,12 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
                     }
 
                     Long eventDeadline = eventDoc.getLong("eventDeadline");
-                    Long eventStart = eventDoc.getLong("eventStart");
+                    Long startsAtEpochMs = eventDoc.getLong("startsAtEpochMs");
                     long currentTime = System.currentTimeMillis();
 
-                    // Check if event has passed (use eventStart as fallback, no 24-hour offset)
-                    long deadlineMs = (eventDeadline != null) ? eventDeadline : 
-                                     (eventStart != null) ? eventStart : Long.MAX_VALUE;
-                    
-                    if (currentTime >= deadlineMs) {
-                        Toast.makeText(this, "Event has started. No more replacements allowed.", Toast.LENGTH_LONG).show();
+                    // Allow replacements before event starts
+                    if (startsAtEpochMs != null && currentTime >= startsAtEpochMs) {
+                        Toast.makeText(this, "Event has already started. No more replacements allowed.", Toast.LENGTH_LONG).show();
                         return;
                     }
 

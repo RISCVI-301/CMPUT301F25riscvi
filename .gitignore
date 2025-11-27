@@ -52,3 +52,8 @@ Icon?
 *.bak
 *.swp
 *.swo
+
+# Local-only documentation (do not push)
+README.md
+NOTIFICATION_SCHEDULE.md
+RANDOM_SELECTION_FIXES.md

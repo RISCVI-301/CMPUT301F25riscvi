@@ -43,12 +43,11 @@ public class NotificationChannelManager {
         NotificationChannel channel = notificationManager.getNotificationChannel(CHANNEL_ID);
         
         if (channel == null) {
-            // Channel doesn't exist, create it with DEFAULT importance (normal notifications)
-            // DEFAULT is standard and less likely to be blocked by system/user
+            // Channel doesn't exist, create it with HIGH importance for heads-up notifications
             channel = new NotificationChannel(
                     CHANNEL_ID,
                     CHANNEL_NAME,
-                    NotificationManager.IMPORTANCE_DEFAULT
+                    NotificationManager.IMPORTANCE_HIGH
             );
             channel.setDescription("Notifications for event invitations");
             channel.enableLights(true);
@@ -60,7 +59,7 @@ public class NotificationChannelManager {
             );
             
             notificationManager.createNotificationChannel(channel);
-            Log.d(TAG, "✓ Notification channel created: " + CHANNEL_ID + " with DEFAULT importance (normal notifications)");
+            Log.d(TAG, "✓ Notification channel created: " + CHANNEL_ID + " with HIGH importance (heads-up notifications)");
         } else {
             // Channel exists - check its importance
             int currentImportance = channel.getImportance();
@@ -86,11 +85,11 @@ public class NotificationChannelManager {
                         Thread.currentThread().interrupt();
                     }
                     
-                    // Recreate with DEFAULT importance
+                    // Recreate with HIGH importance for heads-up notifications
                     channel = new NotificationChannel(
                             CHANNEL_ID,
                             CHANNEL_NAME,
-                            NotificationManager.IMPORTANCE_DEFAULT
+                            NotificationManager.IMPORTANCE_HIGH
                     );
                     channel.setDescription("Notifications for event invitations");
                     channel.enableLights(true);
@@ -158,7 +157,7 @@ public class NotificationChannelManager {
                     channel = new NotificationChannel(
                             CHANNEL_ID,
                             CHANNEL_NAME,
-                            NotificationManager.IMPORTANCE_DEFAULT
+                            NotificationManager.IMPORTANCE_HIGH
                     );
                     channel.setDescription("Notifications for event invitations");
                     channel.enableLights(true);
@@ -169,7 +168,7 @@ public class NotificationChannelManager {
                             null
                     );
                     notificationManager.createNotificationChannel(channel);
-                    Log.d(TAG, "✓ Channel updated to DEFAULT importance");
+                    Log.d(TAG, "✓ Channel updated to HIGH importance");
                 } catch (Exception e) {
                     Log.w(TAG, "Could not update channel importance (user may have locked it)", e);
                 }
