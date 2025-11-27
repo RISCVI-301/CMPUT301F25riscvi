@@ -400,21 +400,54 @@ public class MainActivity extends AppCompatActivity {
         android.net.Uri data = intent.getData();
         if (data != null) {
             String eventId = null;
+            String scheme = data.getScheme();
+            String host = data.getHost();
+            String path = data.getPath();
+            String fullUri = data.toString();
+            
+            Log.d("MainActivity", "Deep link received - Scheme: " + scheme + ", Host: " + host + ", Path: " + path + ", Full URI: " + fullUri);
             
             // Handle HTTP URL format: https://eventease.app/event/{eventId}
-            if ("https".equals(data.getScheme()) && "eventease.app".equals(data.getHost())) {
-                String path = data.getPath();
-                if (path != null && path.startsWith("/event/")) {
-                    eventId = path.substring(7); // Remove leading "/event/"
+            if ("https".equals(scheme) && "eventease.app".equals(host)) {
+                if (path != null) {
+                    if (path.startsWith("/event/")) {
+                        eventId = path.substring(7); // Remove leading "/event/"
+                    } else if (path.startsWith("/event")) {
+                        eventId = path.substring(6); // Remove leading "/event"
+                        if (eventId.startsWith("/")) {
+                            eventId = eventId.substring(1); // Remove any remaining "/"
+                        }
+                    }
                 }
             }
             // Handle custom scheme format: eventease://event/{eventId}
-            else if ("eventease".equals(data.getScheme()) && "event".equals(data.getHost())) {
-                String path = data.getPath();
-                if (path != null && path.startsWith("/")) {
-                    eventId = path.substring(1); // Remove leading "/"
+            else if ("eventease".equals(scheme) && "event".equals(host)) {
+                if (path != null) {
+                    // Remove leading "/" if present
+                    if (path.startsWith("/")) {
+                        eventId = path.substring(1);
+                    } else {
+                        eventId = path;
+                    }
+                } else {
+                    // If no path, try to get from query or use the full URI
+                    // Some QR scanners might encode it differently
+                    String query = data.getQuery();
+                    if (query != null && query.startsWith("id=")) {
+                        eventId = query.substring(3);
+                    }
                 }
             }
+            
+            // Clean up eventId - remove any trailing slashes or whitespace
+            if (eventId != null) {
+                eventId = eventId.trim();
+                if (eventId.endsWith("/")) {
+                    eventId = eventId.substring(0, eventId.length() - 1);
+                }
+            }
+            
+            Log.d("MainActivity", "Extracted eventId: " + eventId);
             
             if (eventId != null && !eventId.isEmpty()) {
                 Log.d("MainActivity", "Opening EventDetailActivity from QR code - eventId: " + eventId);
@@ -423,6 +456,8 @@ public class MainActivity extends AppCompatActivity {
                 detailIntent.putExtra("eventId", eventId);
                 startActivity(detailIntent);
                 return;
+            } else {
+                Log.w("MainActivity", "Could not extract eventId from deep link: " + fullUri);
             }
         }
         

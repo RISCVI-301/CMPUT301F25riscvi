@@ -73,7 +73,6 @@ public class EventDetailActivity extends AppCompatActivity {
     private Button btnDecline;
     private Button btnOptOut;
     private Button btnGuidelines;
-    private Button btnEventQR;
     private ImageButton btnBack;
     private ImageButton btnShare;
     private ImageView ivEventImage;
@@ -134,7 +133,6 @@ public class EventDetailActivity extends AppCompatActivity {
         btnDecline = findViewById(R.id.btnDecline);
         btnOptOut = findViewById(R.id.btnOptOut);
         btnGuidelines = findViewById(R.id.btnGuidelines);
-        btnEventQR = findViewById(R.id.btnEventQR);
         btnBack = findViewById(R.id.btnBack);
         btnShare = findViewById(R.id.btnShare);
         ivEventImage = findViewById(R.id.ivEventImage);
@@ -147,21 +145,12 @@ public class EventDetailActivity extends AppCompatActivity {
         btnBack.setOnClickListener(v -> finish());
 
         // Set up share button
-        btnShare.setOnClickListener(v -> {
-            Toast.makeText(this, "Share functionality coming soon", Toast.LENGTH_SHORT).show();
-        });
+        btnShare.setOnClickListener(v -> showEventQRDialog());
 
         // Set up guidelines button
         btnGuidelines.setOnClickListener(v -> {
             showGuidelinesDialog();
         });
-
-        // Set up Event QR button
-        if (btnEventQR != null) {
-            btnEventQR.setOnClickListener(v -> {
-                showEventQRDialog();
-            });
-        }
 
         // Set up register button (Accept invitation)
         btnRegister.setOnClickListener(v -> {

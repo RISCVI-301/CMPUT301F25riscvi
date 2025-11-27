@@ -63,10 +63,10 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
     private EditText overviewEditText;
     private ListView waitlistListView;
     private ImageView backButton;
+    private ImageView shareButton;
     private MaterialButton deleteEventButton;
     private MaterialButton entrantDetailsButton;
     private MaterialButton changeDeadlinesButton;
-    private Button btnEventQR;
 
     private FirebaseAuth mAuth;
     private FirebaseFirestore db;
@@ -111,10 +111,10 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
         eventPosterImageView = findViewById(R.id.event_poster_placeholder);
         waitlistListView = findViewById(R.id.waitlist_listview);
         backButton = findViewById(R.id.back_button);
+        shareButton = findViewById(R.id.share_button);
         entrantDetailsButton = findViewById(R.id.entrant_details_button);
         deleteEventButton = findViewById(R.id.delete_event_button);
         changeDeadlinesButton = findViewById(R.id.change_deadlines_button);
-        btnEventQR = findViewById(R.id.btnEventQR);
 
         currentEventId = getIntent().getStringExtra("eventId");
 
@@ -145,8 +145,8 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
         }
         
         // Set up Event QR button
-        if (btnEventQR != null) {
-            btnEventQR.setOnClickListener(v -> showEventQRDialog());
+        if (shareButton != null) {
+            shareButton.setOnClickListener(v -> showEventQRDialog());
         }
 
         // Set up notification button for Waitlisted Entrants

@@ -63,7 +63,6 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
     private ProgressBar progressBar;
     private ImageButton shareButton;
     private Button waitlistButton;
-    private Button btnEventQR;
     private String guidelinesBody;
 
     private ListenerRegistration eventRegistration;
@@ -134,7 +133,6 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
         shareButton = findViewById(R.id.btnShare);
         waitlistButton = findViewById(R.id.waitlist_join);
         Button guidelinesButton = findViewById(R.id.btnGuidelines);
-        btnEventQR = findViewById(R.id.btnEventQR);
         ImageButton backButton = findViewById(R.id.btnBack);
 
         setLoading(true);
@@ -143,15 +141,10 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
         guidelinesBody = getString(R.string.event_details_guidelines_body);
 
         backButton.setOnClickListener(v -> getOnBackPressedDispatcher().onBackPressed());
-        shareButton.setOnClickListener(v -> shareEvent());
+        shareButton.setOnClickListener(v -> showEventQRDialog());
         waitlistButton.setOnClickListener(v -> handleJoinWaitlist());
         guidelinesButton.setOnClickListener(v -> showGuidelinesDialog());
         
-        // Set up Event QR button
-        if (btnEventQR != null) {
-            btnEventQR.setOnClickListener(v -> showEventQRDialog());
-        }
-
         // Wire bottom nav include buttons
         android.widget.LinearLayout navButtonMyEvents = findViewById(R.id.nav_button_my_events);
         android.widget.LinearLayout navButtonDiscover = findViewById(R.id.nav_button_discover);
