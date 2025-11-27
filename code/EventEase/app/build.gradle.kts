@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.EventEase"
+    namespace = "com.example.eventease"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.EventEase"
+        applicationId = "com.example.eventease"
         minSdk = 26
         targetSdk = 36
         versionCode = 1
@@ -36,24 +36,33 @@ android {
 }
 
 dependencies {
-
+    implementation("com.github.bumptech.glide:glide:4.16.0")
+    annotationProcessor("com.github.bumptech.glide:compiler:4.16.0")
     implementation(libs.appcompat)
     implementation(libs.material)
     implementation(libs.activity)
     implementation(libs.constraintlayout)
     implementation(libs.navigation.fragment)
-    implementation("com.google.android.material:material:1.12.0")
     implementation(libs.navigation.ui)
-    implementation(libs.firebase.firestore)
-    implementation(libs.glide)
-    testImplementation(libs.junit)
-    androidTestImplementation(libs.ext.junit)
-    androidTestImplementation(libs.espresso.core)
+
+    // Firebase BOM - must be declared before other Firebase dependencies
     implementation(platform("com.google.firebase:firebase-bom:34.4.0"))
+    // Firebase dependencies (versions managed by BOM)
     implementation("com.google.firebase:firebase-analytics")
     implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-firestore")
     implementation("com.google.firebase:firebase-storage")
+    implementation("com.google.firebase:firebase-messaging")
     implementation("com.google.android.gms:play-services-location:21.1.0")
+
+    implementation("com.google.zxing:core:3.5.3")
+
+    testImplementation(libs.junit)
+    testImplementation("org.robolectric:robolectric:4.11.1")
+    testImplementation("org.mockito:mockito-core:5.5.0")
+    testImplementation("org.mockito:mockito-inline:5.2.0")
+    androidTestImplementation(libs.ext.junit)
+    androidTestImplementation(libs.espresso.core)
 }
 
 afterEvaluate {

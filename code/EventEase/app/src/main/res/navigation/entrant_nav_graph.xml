@@ -6,7 +6,7 @@
 
     <fragment
         android:id="@+id/welcomeFragment"
-        android:name="com.EventEase.auth.WelcomeFragment"
+        android:name="com.example.eventease.auth.WelcomeFragment"
         android:label="Welcome">
         <action
             android:id="@+id/action_welcome_to_signup"
@@ -18,7 +18,7 @@
 
     <fragment
         android:id="@+id/signupFragment"
-        android:name="com.EventEase.auth.SignupFragment"
+        android:name="com.example.eventease.auth.SignupFragment"
         android:label="Sign Up">
         <action
             android:id="@+id/action_signup_to_login"
@@ -32,7 +32,7 @@
 
     <fragment
         android:id="@+id/uploadProfilePictureFragment"
-        android:name="com.EventEase.auth.UploadProfilePictureFragment"
+        android:name="com.example.eventease.auth.UploadProfilePictureFragment"
         android:label="Upload Profile Picture">
         <action
             android:id="@+id/action_upload_to_locationPermission"
@@ -41,7 +41,7 @@
 
     <fragment
         android:id="@+id/locationPermissionFragment"
-        android:name="com.EventEase.auth.LocationPermissionFragment"
+        android:name="com.example.eventease.auth.LocationPermissionFragment"
         android:label="Location Permission">
         <action
             android:id="@+id/action_locationPermission_to_discover"
@@ -52,7 +52,7 @@
 
     <fragment
         android:id="@+id/loginFragment"
-        android:name="com.EventEase.auth.LoginFragment"
+        android:name="com.example.eventease.auth.LoginFragment"
         android:label="Login">
         <action
             android:id="@+id/action_login_to_signup"
@@ -69,7 +69,7 @@
 
     <fragment
         android:id="@+id/forgotPasswordFragment"
-        android:name="com.EventEase.auth.ForgotPasswordFragment"
+        android:name="com.example.eventease.auth.ForgotPasswordFragment"
         android:label="Forgot Password">
         <action
             android:id="@+id/action_forgotPassword_to_login"
@@ -80,7 +80,7 @@
 
     <fragment
         android:id="@+id/eventsSelectionFragment"
-        android:name="com.EventEase.ui.entrant.EventsSelectionFragment"
+        android:name="com.example.eventease.ui.entrant.EventsSelectionFragment"
         android:label="Events Selection">
         <action
             android:id="@+id/action_eventsSelection_to_upcomingEvents"
@@ -95,27 +95,27 @@
 
     <fragment
         android:id="@+id/upcomingEventsFragment"
-        android:name="com.EventEase.ui.entrant.UpcomingEventsFragment"
+        android:name="com.example.eventease.ui.entrant.UpcomingEventsFragment"
         android:label="Upcoming Events" />
 
     <fragment
         android:id="@+id/myEventsFragment"
-        android:name="com.EventEase.ui.entrant.myevents.MyEventsFragment"
+        android:name="com.example.eventease.ui.entrant.myevents.MyEventsFragment"
         android:label="Waitlisted Events" />
 
     <fragment
         android:id="@+id/previousEventsFragment"
-        android:name="com.EventEase.ui.entrant.PreviousEventsFragment"
+        android:name="com.example.eventease.ui.entrant.PreviousEventsFragment"
         android:label="Previous Events" />
 
     <fragment
         android:id="@+id/discoverFragment"
-        android:name="com.EventEase.ui.entrant.discover.DiscoverFragment"
+        android:name="com.example.eventease.ui.entrant.discover.DiscoverFragment"
         android:label="Discover" />
 
     <fragment
         android:id="@+id/accountFragment"
-        android:name="com.EventEase.ui.entrant.profile.AccountFragment"
+        android:name="com.example.eventease.ui.entrant.profile.AccountFragment"
         android:label="Account">
         <action
             android:id="@+id/action_accountFragment_to_editProfileFragment"
@@ -129,13 +129,13 @@
 
     <fragment
         android:id="@+id/editProfileFragment"
-        android:name="com.EventEase.ui.entrant.profile.EditProfileFragment"
+        android:name="com.example.eventease.ui.entrant.profile.EditProfileFragment"
         android:label="Edit Profile" />
 
     <!-- Activity placeholders (IDs only); actual navigation to these may be via intents later -->
     <activity
         android:id="@+id/eventDetailActivity"
-        android:name="com.EventEase.ui.entrant.eventdetail.EventDetailActivity"
+        android:name="com.example.eventease.ui.entrant.eventdetail.EventDetailActivity"
         android:label="Event Detail" />
 </navigation>
 

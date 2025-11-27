@@ -1,0 +1,43 @@
+# EventEase .gitignore
+
+
+
+# Android Studio / IntelliJ IDEA
+*.iml
+.idea/
+local.properties
+.DS_Store
+
+# Build files
+build/
+*.class
+*.dex
+*.apk
+*.ap_
+*.aab
+
+# Gradle
+.gradle/
+gradle-app.setting
+!gradle-wrapper.jar
+
+# Firebase
+google-services.json
+google-services.json.bak
+
+# Misc
+*.swp
+*~
+.cache/
+
+
+
+firebase.json
+firestore.indexes.json
+firestore.rules
+functions/.gitignore
+
+# Local organization folders (not needed remotely)
+config/
+logs/
+compiled/
