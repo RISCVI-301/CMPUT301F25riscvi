@@ -29,6 +29,10 @@
         <activity
             android:name="com.example.eventease.ui.entrant.discover.EventDetailsDiscoverActivity"
             android:exported="false" />
+        <!-- Admin Event Detail Activity -->
+        <activity
+            android:name="com.example.eventease.admin.event.ui.EventDetailActivity"
+            android:exported="false" />
         <activity
             android:name="com.example.eventease.MainActivity"
             android:exported="true">

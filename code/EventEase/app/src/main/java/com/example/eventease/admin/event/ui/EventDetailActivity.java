@@ -55,8 +55,17 @@ public class EventDetailActivity extends AppCompatActivity {
         ImageView ivPoster       = findViewById(R.id.ivPoster);
         TextView tvDescription   = findViewById(R.id.tvDescription);
         TextView tvWaitlistCount = findViewById(R.id.tvWaitlistCount);
-        TextView tvGuidelines    = findViewById(R.id.tvGuidelines); // NEW
+        TextView tvGuidelines    = findViewById(R.id.tvGuidelines);
         MaterialButton btnDelete = findViewById(R.id.btnDeleteEvent);
+
+        // Check if views are found
+        if (btnBack == null || tvEventTitle == null || ivPoster == null || 
+            tvDescription == null || tvWaitlistCount == null || tvGuidelines == null || 
+            btnDelete == null) {
+            Toast.makeText(this, "Error loading event details", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
 
         Event event = (Event) getIntent().getSerializableExtra(EXTRA_EVENT);
         int waitlistCount = getIntent().getIntExtra(EXTRA_WAITLIST_COUNT, 0);
@@ -67,8 +76,12 @@ public class EventDetailActivity extends AppCompatActivity {
             return;
         }
 
-        tvEventTitle.setText(event.getTitle());
+        // Set event title
+        if (event.getTitle() != null) {
+            tvEventTitle.setText(event.getTitle());
+        }
 
+        // Load poster image
         String posterUrl = event.getPosterUrl();
         if (!TextUtils.isEmpty(posterUrl)) {
             Glide.with(this)
@@ -78,29 +91,39 @@ public class EventDetailActivity extends AppCompatActivity {
                     .into(ivPoster);
         }
 
+        // Set description
         tvDescription.setText(
                 TextUtils.isEmpty(event.getDescription())
                         ? "No description provided."
                         : event.getDescription()
         );
 
+        // Set waitlist count
         tvWaitlistCount.setText(String.valueOf(waitlistCount));
 
-        // NEW: show guidelines
+        // Set guidelines
         String guidelines = event.getGuidelines();
         tvGuidelines.setText(TextUtils.isEmpty(guidelines)
                 ? "No guidelines provided."
                 : guidelines);
 
-        btnBack.setOnClickListener(v -> onBackPressed());
+        // Setup back button
+        btnBack.setOnClickListener(v -> {
+            try {
+                onBackPressed();
+            } catch (Exception e) {
+                finish();
+            }
+        });
 
+        // Setup delete button
         btnDelete.setOnClickListener(v -> {
             new AlertDialog.Builder(this)
                     .setTitle("Delete event?")
                     .setMessage("This action cannot be undone.")
                     .setPositiveButton("Delete", (d, which) -> {
                         if (onDeleteCallback != null) {
-                            onDeleteCallback.accept(event); // use the passed-in delete function
+                            onDeleteCallback.accept(event);
                         }
                         Toast.makeText(this, "Event deleted", Toast.LENGTH_SHORT).show();
                         finish();
