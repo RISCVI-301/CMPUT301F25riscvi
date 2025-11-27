@@ -33,6 +33,7 @@ public class WorkflowTestActivity extends AppCompatActivity {
     private StringBuilder logBuilder;
     private FirebaseFirestore db;
     private FirebaseAuth auth;
+    private Button btnOpenOrganizerView;
     
     private String testEventId;
     private List<String> testUserIds;
@@ -48,6 +49,7 @@ public class WorkflowTestActivity extends AppCompatActivity {
         Button btnStart = findViewById(R.id.btnStartTest);
         Button btnCheckState = findViewById(R.id.btnCheckState);
         Button btnCleanup = findViewById(R.id.btnCleanup);
+        btnOpenOrganizerView = findViewById(R.id.btnOpenOrganizerView);
         
         logBuilder = new StringBuilder();
         db = FirebaseFirestore.getInstance();
@@ -58,25 +60,46 @@ public class WorkflowTestActivity extends AppCompatActivity {
         btnStart.setOnClickListener(v -> runWorkflowTest());
         btnCheckState.setOnClickListener(v -> checkCurrentState());
         btnCleanup.setOnClickListener(v -> cleanupTestData());
+        btnOpenOrganizerView.setOnClickListener(v -> openOrganizerView());
+        
+        // Check if there's an existing test event
+        if (testEventId != null && !testEventId.isEmpty()) {
+            btnOpenOrganizerView.setEnabled(true);
+        }
         
         log("🎬 Workflow Test Ready! (⚡ FAST MODE)");
         log("📱 Organizer ID: " + organizerId);
         log("");
-        log("📝 Using existing users:");
-        log("   1. shinchan@gmail.com");
-        log("   2. himawari@gmail.com");
-        log("   3. sanika1234@gmail.com");
-        log("   4. chotabheem@gmail.com");
+        log("📝 Test Users:");
+        log("   1. shinchan@gmail.com (pwd: shinchan)");
+        log("   2. himawari@gmail.com (pwd: himawari)");
+        log("   3. sanika1234@gmail.com (pwd: sanika@123)");
+        log("   4. chotabheem@gmail.com (pwd: chotabheem)");
         log("");
-        log("⚡ FAST MODE: Registration ends in 15 seconds!");
+        log("═══════════════════════════════════════");
+        log("⚡ MULTI-ACCOUNT TESTING WORKFLOW");
+        log("═══════════════════════════════════════");
         log("");
-        log("Instructions:");
-        log("1. Click 'Start Test' to create event and add users");
-        log("2. Wait ~15 seconds for registration to end");
-        log("3. Selection happens automatically within 1 minute!");
-        log("4. Click 'Check State' to see current status");
-        log("5. Test notifications manually");
-        log("6. Click 'Cleanup' when done");
+        log("PHASE 1: Setup (as Organizer)");
+        log("  1. Click 'Start Test' → creates event");
+        log("  2. Wait 15 seconds → selection happens");
+        log("  3. Click 'Check State' → see who's selected");
+        log("");
+        log("PHASE 2: Accept/Decline (as Entrant)");
+        log("  1. Log out");
+        log("  2. Log in as selected user");
+        log("  3. Check notification → accept or decline");
+        log("  4. Test stays active - don't worry!");
+        log("");
+        log("PHASE 3: Replacement (back to Organizer)");
+        log("  1. Log out from entrant");
+        log("  2. Log back in as organizer");
+        log("  3. Click '🎯 Open Organizer View' button");
+        log("  4. Click 'Replacement' → select from NonSelected");
+        log("  5. Provide deadline → send invitation");
+        log("");
+        log("💡 TIP: Test event persists across logins!");
+        log("You can switch accounts and come back anytime.");
         log("");
     }
     
@@ -134,6 +157,12 @@ public class WorkflowTestActivity extends AppCompatActivity {
                     SimpleDateFormat sdfLong = new SimpleDateFormat("HH:mm:ss", Locale.getDefault());
                     
                     log("✅ Event created: " + testEventId);
+                    log("");
+                    
+                    // Enable the organizer view button
+                    if (btnOpenOrganizerView != null) {
+                        btnOpenOrganizerView.setEnabled(true);
+                    }
                     log("");
                     log("═══════════════════════════════════════");
                     log("⏰ COMPLETE TIMELINE");
@@ -345,25 +374,55 @@ public class WorkflowTestActivity extends AppCompatActivity {
                         entrant.put("userId", userId);
                         entrant.put("joinedAt", now);
                         
-                        // Add name fields so they show in Firebase Console
+                        // Get all available fields from user document
                         String firstName = userDoc.getString("firstName");
                         String lastName = userDoc.getString("lastName");
                         String fullName = userDoc.getString("fullName");
+                        String name = userDoc.getString("name");
                         String displayName = userDoc.getString("displayName");
+                        String email = userDoc.getString("email");
+                        String phoneNumber = userDoc.getString("phoneNumber");
                         
-                        if (firstName != null) entrant.put("firstName", firstName);
-                        if (lastName != null) entrant.put("lastName", lastName);
-                        if (fullName != null) entrant.put("fullName", fullName);
-                        if (displayName != null) entrant.put("displayName", displayName);
+                        // ALWAYS add email if it exists
+                        if (email != null && !email.isEmpty()) {
+                            entrant.put("email", email);
+                        }
                         
-                        // Create displayName if not exists
+                        // Add name fields if they exist
+                        if (firstName != null && !firstName.isEmpty()) {
+                            entrant.put("firstName", firstName);
+                        }
+                        if (lastName != null && !lastName.isEmpty()) {
+                            entrant.put("lastName", lastName);
+                        }
+                        if (fullName != null && !fullName.isEmpty()) {
+                            entrant.put("fullName", fullName);
+                        }
+                        if (name != null && !name.isEmpty()) {
+                            entrant.put("name", name);
+                        }
+                        if (phoneNumber != null && !phoneNumber.isEmpty()) {
+                            entrant.put("phoneNumber", phoneNumber);
+                        }
+                        
+                        // Build displayName (priority: displayName > fullName > firstName+lastName > name > email)
                         if (displayName == null || displayName.isEmpty()) {
-                            displayName = (firstName != null ? firstName : "") + " " + (lastName != null ? lastName : "");
-                            displayName = displayName.trim();
-                            if (!displayName.isEmpty()) {
-                                entrant.put("displayName", displayName);
+                            if (fullName != null && !fullName.isEmpty()) {
+                                displayName = fullName;
+                            } else if (firstName != null && !firstName.isEmpty()) {
+                                displayName = firstName + (lastName != null && !lastName.isEmpty() ? " " + lastName : "");
+                            } else if (name != null && !name.isEmpty()) {
+                                displayName = name;
+                            } else if (email != null && !email.isEmpty()) {
+                                // Fallback: use email prefix as display name
+                                displayName = email.split("@")[0];
+                            } else {
+                                displayName = "User " + userNum;
                             }
                         }
+                        
+                        // ALWAYS add displayName
+                        entrant.put("displayName", displayName);
                         
                         final String finalDisplayName = displayName;
                         
@@ -626,6 +685,39 @@ public class WorkflowTestActivity extends AppCompatActivity {
         
         testEventId = null;
         testUserIds = null;
+    }
+    
+    private void openOrganizerView() {
+        if (testEventId == null || testEventId.isEmpty()) {
+            log("❌ No test event available. Start test first!");
+            return;
+        }
+        
+        log("");
+        log("═══════════════════════════════════════");
+        log("🎯 Opening Organizer View for Replacement");
+        log("═══════════════════════════════════════");
+        log("");
+        log("Event ID: " + testEventId);
+        log("");
+        log("Opening OrganizerViewEntrantsActivity...");
+        log("");
+        log("In the opened activity:");
+        log("  1. Check 'NonSelectedEntrants' tab");
+        log("  2. Click 'Replacement' button");
+        log("  3. Select how many to replace");
+        log("  4. Provide deadline (before event start)");
+        log("  5. Notification sent automatically!");
+        log("");
+        
+        // Open OrganizerViewEntrantsActivity with the test event
+        android.content.Intent intent = new android.content.Intent(
+            this, 
+            com.example.eventease.ui.organizer.OrganizerViewEntrantsActivity.class
+        );
+        intent.putExtra("eventId", testEventId);
+        intent.putExtra("eventTitle", "Test Event - Workflow");
+        startActivity(intent);
     }
 }
 

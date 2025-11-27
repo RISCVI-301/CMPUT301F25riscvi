@@ -21,7 +21,7 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center"
-        android:paddingBottom="16dp">
+        android:paddingBottom="8dp">
 
         <Button
             android:id="@+id/btnStartTest"
@@ -49,6 +49,15 @@
             android:text="Cleanup"
             android:backgroundTint="#F44336"/>
     </LinearLayout>
+
+    <Button
+        android:id="@+id/btnOpenOrganizerView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="🎯 Open Organizer View (for Replacement)"
+        android:backgroundTint="#FF9800"
+        android:layout_marginBottom="16dp"
+        android:enabled="false"/>
 
     <ScrollView
         android:id="@+id/scrollView"
