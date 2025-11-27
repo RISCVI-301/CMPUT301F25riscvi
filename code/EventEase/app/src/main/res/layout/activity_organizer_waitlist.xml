@@ -191,6 +191,32 @@
             app:cornerRadius="12dp" />
 
 
+        <!-- Event QR Button -->
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="24dp"
+            android:layout_marginTop="16dp"
+            android:layout_marginEnd="24dp"
+            android:layout_marginBottom="12dp"
+            app:cardBackgroundColor="#7FDBDA"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="0dp">
+
+            <Button
+                android:id="@+id/btnEventQR"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@android:color/transparent"
+                android:fontFamily="@font/fredoka_bold"
+                android:padding="14dp"
+                android:text="Event QR"
+                android:textAllCaps="false"
+                android:textColor="#2C4A6E"
+                android:textSize="20sp"/>
+
+        </androidx.cardview.widget.CardView>
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

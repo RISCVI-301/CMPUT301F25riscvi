@@ -41,6 +41,20 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Deep link intent filter for QR codes - HTTP URL format -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="eventease.app" android:pathPrefix="/event" />
+            </intent-filter>
+            <!-- Fallback: Custom scheme for backward compatibility -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="eventease" android:host="event" />
+            </intent-filter>
         </activity>
 
         <!-- Admin Activity -->

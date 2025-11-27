@@ -715,7 +715,8 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         doc.put("organizerId", organizerId);
         doc.put("createdAt", System.currentTimeMillis());
         doc.put("createdAtEpochMs", System.currentTimeMillis());
-        doc.put("qrPayload", generateQr ? ("event:" + id) : null);
+        // Use HTTP URL format for better QR scanner compatibility
+        doc.put("qrPayload", generateQr ? ("https://eventease.app/event/" + id) : null);
         FirebaseFirestore.getInstance()
                 .collection("events")
                 .document(id)
@@ -723,7 +724,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                 .addOnSuccessListener(v -> {
                     btnSave.setEnabled(true);
                     btnSave.setText("SAVE CHANGES");
-                    showSuccessDialog(id, title, generateQr ? ("event:" + id) : null);
+                    showSuccessDialog(id, title, generateQr ? ("https://eventease.app/event/" + id) : null);
                 })
                 .addOnFailureListener(e -> {
                     Log.e(TAG, "Firestore write failed", e);

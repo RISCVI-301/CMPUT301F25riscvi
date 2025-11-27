@@ -396,6 +396,36 @@ public class MainActivity extends AppCompatActivity {
     private void handleExternalNav(android.content.Intent intent) {
         if (intent == null) return;
         
+        // Handle deep link from QR code (https://eventease.app/event/{eventId} or eventease://event/{eventId})
+        android.net.Uri data = intent.getData();
+        if (data != null) {
+            String eventId = null;
+            
+            // Handle HTTP URL format: https://eventease.app/event/{eventId}
+            if ("https".equals(data.getScheme()) && "eventease.app".equals(data.getHost())) {
+                String path = data.getPath();
+                if (path != null && path.startsWith("/event/")) {
+                    eventId = path.substring(7); // Remove leading "/event/"
+                }
+            }
+            // Handle custom scheme format: eventease://event/{eventId}
+            else if ("eventease".equals(data.getScheme()) && "event".equals(data.getHost())) {
+                String path = data.getPath();
+                if (path != null && path.startsWith("/")) {
+                    eventId = path.substring(1); // Remove leading "/"
+                }
+            }
+            
+            if (eventId != null && !eventId.isEmpty()) {
+                Log.d("MainActivity", "Opening EventDetailActivity from QR code - eventId: " + eventId);
+                // Open EventDetailActivity directly
+                Intent detailIntent = new Intent(this, com.example.eventease.ui.entrant.eventdetail.EventDetailActivity.class);
+                detailIntent.putExtra("eventId", eventId);
+                startActivity(detailIntent);
+                return;
+            }
+        }
+        
         // Check if notification contains eventId - open EventDetailActivity directly
         String eventId = intent.getStringExtra("eventId");
         if (eventId != null && !eventId.isEmpty()) {
