@@ -39,6 +39,13 @@
             </intent-filter>
         </activity>
 
+        <!-- Admin Activity -->
+        <activity
+            android:name="com.example.eventease.admin.AdminMainActivity"
+            android:exported="false"
+            android:label="Admin Dashboard"
+            android:theme="@style/Theme.EventEase" />
+
         <meta-data
             android:name="preloaded_fonts"
             android:resource="@array/preloaded_fonts" />

@@ -183,6 +183,54 @@ public class EventDetailActivity extends AppCompatActivity {
     }
 
     private void loadEventData() {
+        // If event title is missing, fetch from Firestore
+        if (eventId != null && (eventTitle == null || eventTitle.isEmpty())) {
+            android.util.Log.d("EventDetailActivity", "Fetching event data from Firestore...");
+            com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    .collection("events")
+                    .document(eventId)
+                    .get()
+                    .addOnSuccessListener(eventDoc -> {
+                        if (eventDoc.exists()) {
+                            // Update all event fields from Firestore
+                            eventTitle = eventDoc.getString("title");
+                            eventLocation = eventDoc.getString("location");
+                            eventNotes = eventDoc.getString("description");
+                            eventGuidelines = eventDoc.getString("guidelines");
+                            eventPosterUrl = eventDoc.getString("posterUrl");
+                            
+                            Long startsAt = eventDoc.getLong("startsAtEpochMs");
+                            if (startsAt != null) eventStartTime = startsAt;
+                            
+                            Integer capacity = eventDoc.getLong("capacity") != null ? 
+                                eventDoc.getLong("capacity").intValue() : 0;
+                            eventCapacity = capacity;
+                            
+                            Integer waitlist = eventDoc.getLong("waitlistCount") != null ?
+                                eventDoc.getLong("waitlistCount").intValue() : 0;
+                            eventWaitlistCount = waitlist;
+                            
+                            android.util.Log.d("EventDetailActivity", "✅ Event data loaded from Firestore");
+                            android.util.Log.d("EventDetailActivity", "Title: " + eventTitle);
+                            
+                            // Display the data
+                            displayEventData();
+                        } else {
+                            android.util.Log.e("EventDetailActivity", "Event document not found in Firestore!");
+                            displayEventData(); // Show with placeholder data
+                        }
+                    })
+                    .addOnFailureListener(e -> {
+                        android.util.Log.e("EventDetailActivity", "Failed to fetch event data", e);
+                        displayEventData(); // Show with placeholder data
+                    });
+        } else {
+            // Data already provided in Intent
+            displayEventData();
+        }
+    }
+    
+    private void displayEventData() {
         // Display event name
         tvEventName.setText(eventTitle != null ? eventTitle : "Event Name");
         
@@ -194,7 +242,7 @@ public class EventDetailActivity extends AppCompatActivity {
         }
         
         // Waitlist count will be updated by the listener
-        tvWaitlistCount.setText("Loading...");
+        tvWaitlistCount.setText(String.valueOf(eventWaitlistCount));
         
         // Load event image using Glide
         if (eventPosterUrl != null && !eventPosterUrl.isEmpty()) {
@@ -214,7 +262,7 @@ public class EventDetailActivity extends AppCompatActivity {
         String dateStr = eventStartTime > 0 ? sdf.format(new Date(eventStartTime)) : "TBD";
         
         // You can show more event details in a toast or update UI as needed
-        String detailMsg = "Event at " + eventLocation + " on " + dateStr;
+        String detailMsg = "Event at " + (eventLocation != null ? eventLocation : "location TBD") + " on " + dateStr;
         long eventDeadline = getIntent().getLongExtra("eventDeadline", 0);
         if (eventDeadline > 0) {
             detailMsg += " (Deadline: " + sdf.format(new Date(eventDeadline)) + ")";
@@ -637,11 +685,12 @@ public class EventDetailActivity extends AppCompatActivity {
         btnDecline.setEnabled(false);
         btnDecline.setText("Processing...");
         
-        // Decline the invitation (but keep user in waitlist)
+        // Decline the invitation (moves user to CancelledEntrants)
         invitationRepo.decline(invitationId, eventId, uid)
                 .addOnSuccessListener(aVoid -> {
-                    android.util.Log.d("EventDetailActivity", "Invitation declined successfully (user remains in waitlist)");
-                    Toast.makeText(this, "Invitation declined. You remain on the waitlist.", Toast.LENGTH_LONG).show();
+                    android.util.Log.d("EventDetailActivity", "✅ Invitation declined successfully!");
+                    android.util.Log.d("EventDetailActivity", "User moved to CancelledEntrants");
+                    Toast.makeText(this, "Invitation declined. You've been moved to cancelled.", Toast.LENGTH_LONG).show();
                     // Hide the buttons since invitation is now declined
                     btnRegister.setVisibility(View.GONE);
                     btnDecline.setVisibility(View.GONE);
@@ -649,7 +698,8 @@ public class EventDetailActivity extends AppCompatActivity {
                     finish();
                 })
                 .addOnFailureListener(e -> {
-                    android.util.Log.e("EventDetailActivity", "Failed to decline invitation", e);
+                    android.util.Log.e("EventDetailActivity", "❌ Failed to decline invitation!", e);
+                    android.util.Log.e("EventDetailActivity", "Error: " + e.getMessage());
                     Toast.makeText(this, "Failed to decline invitation: " + e.getMessage(), Toast.LENGTH_LONG).show();
                     // Restore buttons
                     btnRegister.setEnabled(true);

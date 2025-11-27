@@ -275,16 +275,30 @@ public class FirebaseInvitationRepository implements InvitationRepository {
 
     @Override
     public Task<Void> decline(String invitationId, String eventId, String uid) {
-        Log.d(TAG, "Decline called with invitationId: " + invitationId + ", eventId: " + eventId + ", uid: " + uid);
+        Log.d(TAG, "═══ DECLINE INVITATION ═══");
+        Log.d(TAG, "Invitation ID: " + invitationId);
+        Log.d(TAG, "Event ID: " + eventId);
+        Log.d(TAG, "User ID: " + uid);
         
         DocumentReference eventRef = db.collection("events").document(eventId);
         DocumentReference waitlistDoc = eventRef.collection("WaitlistedEntrants").document(uid);
         DocumentReference selectedDoc = eventRef.collection("SelectedEntrants").document(uid);
         DocumentReference cancelledDoc = eventRef.collection("CancelledEntrants").document(uid);
         
+        Log.d(TAG, "Fetching user document...");
         return db.collection("users").document(uid).get().continueWithTask(userTask -> {
+            if (!userTask.isSuccessful()) {
+                Log.e(TAG, "Failed to fetch user document", userTask.getException());
+            }
+            
             DocumentSnapshot userDoc = userTask.isSuccessful() ? userTask.getResult() : null;
             Map<String, Object> cancelledData = buildCancelledEntry(uid, userDoc);
+            
+            Log.d(TAG, "Building batch operations:");
+            Log.d(TAG, "  1. Update invitation status to DECLINED");
+            Log.d(TAG, "  2. Add to CancelledEntrants");
+            Log.d(TAG, "  3. Delete from WaitlistedEntrants");
+            Log.d(TAG, "  4. Delete from SelectedEntrants");
             
             Map<String, Object> invitationUpdates = new HashMap<>();
             invitationUpdates.put("status", "DECLINED");
@@ -296,10 +310,16 @@ public class FirebaseInvitationRepository implements InvitationRepository {
             batch.delete(waitlistDoc);
             batch.delete(selectedDoc);
             
+            Log.d(TAG, "Committing batch...");
             return batch.commit()
                     .continueWith(commitTask -> {
                         if (commitTask.isSuccessful()) {
-                            Log.d(TAG, "SUCCESS: Invitation declined, user moved to CancelledEntrants");
+                            Log.d(TAG, "✅ SUCCESS: Batch committed successfully!");
+                            Log.d(TAG, "  ✓ Invitation status → DECLINED");
+                            Log.d(TAG, "  ✓ User added to → CancelledEntrants");
+                            Log.d(TAG, "  ✓ User deleted from → WaitlistedEntrants");
+                            Log.d(TAG, "  ✓ User deleted from → SelectedEntrants");
+                            
                             Invitation inv = byId.get(invitationId);
                             if (inv != null) {
                                 inv.setStatus(Status.DECLINED);
@@ -308,7 +328,8 @@ public class FirebaseInvitationRepository implements InvitationRepository {
                             
                             // NOTE: Automatic replacement is disabled - organizer must manually replace via button
                         } else {
-                            Log.e(TAG, "FAILED to decline invitation and move to cancelled", commitTask.getException());
+                            Log.e(TAG, "❌ FAILED: Batch commit failed!");
+                            Log.e(TAG, "Error: " + commitTask.getException().getMessage(), commitTask.getException());
                         }
                         return null;
                     });

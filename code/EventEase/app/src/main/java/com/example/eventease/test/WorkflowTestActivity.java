@@ -207,9 +207,41 @@ public class WorkflowTestActivity extends AppCompatActivity {
         };
         
         log("   🔍 Looking up existing users by email...");
+        log("   📊 Querying: users collection, field: 'email'");
+        log("");
         
+        // First, let's check if there are ANY users in the collection
+        db.collection("users").limit(3).get()
+                .addOnSuccessListener(snapshot -> {
+                    log("   📋 Sample of users in Firestore:");
+                    if (snapshot.isEmpty()) {
+                        log("   ⚠️  WARNING: 'users' collection is EMPTY!");
+                        log("   Please sign in with at least one account first.");
+                    } else {
+                        for (DocumentSnapshot doc : snapshot.getDocuments()) {
+                            String email = doc.getString("email");
+                            String firstName = doc.getString("firstName");
+                            log("   - " + firstName + " (" + email + ")");
+                        }
+                    }
+                    log("");
+                    
+                    // Now query for our specific test users
+                    queryTestUsers(testEmails);
+                })
+                .addOnFailureListener(e -> {
+                    log("   ❌ Failed to check users collection: " + e.getMessage());
+                    log("");
+                    // Still try to query for test users
+                    queryTestUsers(testEmails);
+                });
+    }
+    
+    private void queryTestUsers(String[] testEmails) {
         // Query Firestore for users with these emails
         List<com.google.android.gms.tasks.Task<?>> tasks = new ArrayList<>();
+        List<String> foundUserIds = new ArrayList<>();
+        List<String> notFoundEmails = new ArrayList<>();
         
         for (int i = 0; i < testEmails.length; i++) {
             final String email = testEmails[i];
@@ -224,18 +256,24 @@ public class WorkflowTestActivity extends AppCompatActivity {
                         if (!querySnapshot.isEmpty()) {
                             DocumentSnapshot userDoc = querySnapshot.getDocuments().get(0);
                             String userId = userDoc.getId();
+                            foundUserIds.add(userId);
                             testUserIds.add(userId);
                             
                             String firstName = userDoc.getString("firstName");
-                            log("   ✅ User " + userNum + " found: " + firstName + " (" + email + ")");
-                            log("      UID: " + userId.substring(0, 20) + "...");
+                            String fcmToken = userDoc.getString("fcmToken");
+                            log("   ✅ User " + userNum + " found!");
+                            log("      Name: " + firstName);
+                            log("      Email: " + email);
+                            log("      UID: " + userId.substring(0, Math.min(20, userId.length())) + "...");
+                            log("      FCM Token: " + (fcmToken != null ? "✓ Present" : "✗ Missing"));
                         } else {
-                            log("   ❌ User not found: " + email);
-                            log("      Please make sure this user exists in Firebase");
+                            notFoundEmails.add(email);
+                            log("   ❌ User " + userNum + " NOT FOUND: " + email);
                         }
                     })
                     .addOnFailureListener(e -> {
-                        log("   ❌ Failed to find user " + email + ": " + e.getMessage());
+                        notFoundEmails.add(email);
+                        log("   ❌ Error finding user " + userNum + " (" + email + "): " + e.getMessage());
                     });
             
             tasks.add(task);
@@ -244,25 +282,46 @@ public class WorkflowTestActivity extends AppCompatActivity {
         // Wait for all queries to complete
         com.google.android.gms.tasks.Tasks.whenAllComplete(tasks)
                 .addOnSuccessListener(taskResults -> {
+                    log("");
+                    log("═══════════════════════════════════════");
+                    log("📊 USER LOOKUP RESULTS");
+                    log("═══════════════════════════════════════");
+                    log("   Found: " + foundUserIds.size() + "/4 users");
+                    log("   Missing: " + notFoundEmails.size() + " users");
+                    log("");
+                    
                     if (testUserIds.size() == 4) {
-                        log("");
-                        log("✅ All 4 users found!");
+                        log("✅ All 4 users found! Proceeding...");
                         log("");
                         log("📝 Step 3: Adding users to waitlist...");
                         addUsersToWaitlist();
                     } else {
+                        log("❌ Cannot proceed - missing users!");
                         log("");
-                        log("❌ Only found " + testUserIds.size() + "/4 users");
-                        log("   Make sure all users exist in Firebase:");
-                        for (String email : testEmails) {
-                            log("   - " + email);
+                        log("🔍 Troubleshooting:");
+                        log("");
+                        log("1. Missing users:");
+                        for (String email : notFoundEmails) {
+                            log("   ✗ " + email);
                         }
                         log("");
-                        log("💡 Tip: Sign in with each user account in the app first");
+                        log("2. Sign in to the app with each account:");
+                        log("   • Open EventEase app");
+                        log("   • Sign in with the missing email");
+                        log("   • This creates the user in Firestore");
+                        log("");
+                        log("3. Check Firebase Console:");
+                        log("   • Go to Firestore Database");
+                        log("   • Check 'users' collection");
+                        log("   • Look for documents with 'email' field");
+                        log("");
+                        log("4. Try again after signing in");
                     }
                 })
                 .addOnFailureListener(e -> {
+                    log("");
                     log("❌ Failed to query users: " + e.getMessage());
+                    log("   Error type: " + e.getClass().getSimpleName());
                 });
     }
     
@@ -271,27 +330,58 @@ public class WorkflowTestActivity extends AppCompatActivity {
         
         for (int i = 0; i < testUserIds.size(); i++) {
             String userId = testUserIds.get(i);
-            
-            Map<String, Object> entrant = new HashMap<>();
-            entrant.put("userId", userId);
-            entrant.put("joinedAt", now);
-            
             final int userNum = i + 1;
-            db.collection("events").document(testEventId)
-                    .collection("WaitlistedEntrants")
-                    .document(userId)
-                    .set(entrant)
-                    .addOnSuccessListener(aVoid -> {
-                        log("   ✅ User " + userNum + " added to waitlist");
+            
+            // Fetch user data to include name information
+            db.collection("users").document(userId).get()
+                    .addOnSuccessListener(userDoc -> {
+                        if (!userDoc.exists()) {
+                            log("   ❌ User " + userNum + " document not found in users collection!");
+                            return;
+                        }
                         
-                        // Update waitlist count
+                        // Build entrant data with user information (includes names)
+                        Map<String, Object> entrant = new HashMap<>();
+                        entrant.put("userId", userId);
+                        entrant.put("joinedAt", now);
+                        
+                        // Add name fields so they show in Firebase Console
+                        String firstName = userDoc.getString("firstName");
+                        String lastName = userDoc.getString("lastName");
+                        String fullName = userDoc.getString("fullName");
+                        String displayName = userDoc.getString("displayName");
+                        
+                        if (firstName != null) entrant.put("firstName", firstName);
+                        if (lastName != null) entrant.put("lastName", lastName);
+                        if (fullName != null) entrant.put("fullName", fullName);
+                        if (displayName != null) entrant.put("displayName", displayName);
+                        
+                        // Create displayName if not exists
+                        if (displayName == null || displayName.isEmpty()) {
+                            displayName = (firstName != null ? firstName : "") + " " + (lastName != null ? lastName : "");
+                            displayName = displayName.trim();
+                            if (!displayName.isEmpty()) {
+                                entrant.put("displayName", displayName);
+                            }
+                        }
+                        
+                        final String finalDisplayName = displayName;
+                        
                         db.collection("events").document(testEventId)
-                                .update("waitlistCount", userNum);
-                        
-                        // If last user, show next steps
-                        if (userNum == 4) {
-                            log("");
-                            log("✅ All users added to waitlist!");
+                                .collection("WaitlistedEntrants")
+                                .document(userId)
+                                .set(entrant)
+                                .addOnSuccessListener(aVoid -> {
+                                    log("   ✅ User " + userNum + " added to waitlist: " + finalDisplayName);
+                                    
+                                    // Update waitlist count
+                                    db.collection("events").document(testEventId)
+                                            .update("waitlistCount", userNum);
+                                    
+                                    // If last user, show next steps
+                                    if (userNum == 4) {
+                                        log("");
+                                        log("✅ All users added to waitlist!");
                             log("");
                             log("═══════════════════════════════════════");
                             log("📋 TESTING CHECKLIST (FAST MODE ⚡)");
@@ -356,6 +446,10 @@ public class WorkflowTestActivity extends AppCompatActivity {
                     .addOnFailureListener(e -> {
                         log("   ❌ Failed to add user " + userNum + " to waitlist: " + e.getMessage());
                     });
+                })
+                .addOnFailureListener(e -> {
+                    log("   ❌ Failed to fetch user " + userNum + " data: " + e.getMessage());
+                });
         }
     }
     
@@ -443,6 +537,20 @@ public class WorkflowTestActivity extends AppCompatActivity {
                     log("   " + collectionName + ": " + snapshot.size());
                     for (DocumentSnapshot doc : snapshot.getDocuments()) {
                         String userId = doc.getId();
+                        String firstName = doc.getString("firstName");
+                        String lastName = doc.getString("lastName");
+                        String displayName = doc.getString("displayName");
+                        
+                        // Build display string
+                        String nameStr = displayName;
+                        if (nameStr == null || nameStr.isEmpty()) {
+                            nameStr = (firstName != null ? firstName : "") + " " + (lastName != null ? lastName : "");
+                            nameStr = nameStr.trim();
+                        }
+                        if (nameStr.isEmpty()) {
+                            nameStr = "Unknown";
+                        }
+                        
                         // Find user number
                         int userNum = 0;
                         for (int i = 0; i < testUserIds.size(); i++) {
@@ -451,7 +559,7 @@ public class WorkflowTestActivity extends AppCompatActivity {
                                 break;
                             }
                         }
-                        log("     - User " + userNum + " (" + userId.substring(0, 15) + "...)");
+                        log("     - " + nameStr + " (User " + userNum + ")");
                     }
                 });
     }
