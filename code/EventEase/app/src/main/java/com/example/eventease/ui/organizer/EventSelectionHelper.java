@@ -327,7 +327,7 @@ public class EventSelectionHelper {
         if (!batchTasks.isEmpty()) {
             Tasks.whenAll(batchTasks)
                     .addOnSuccessListener(aVoid -> {
-                        Log.d(TAG, "✓ Successfully moved " + selectedDocs.size() + " entrants to SelectedEntrants");
+                        Log.d(TAG, "Successfully moved " + selectedDocs.size() + " entrants to SelectedEntrants");
                         Log.d(TAG, "=== Now sending invitations and notifications ===");
                         
                         // Automatically send invitations and notifications
@@ -335,7 +335,7 @@ public class EventSelectionHelper {
                                                   new InvitationHelper.InvitationCallback() {
                             @Override
                             public void onComplete(int sentCount) {
-                                Log.d(TAG, "✓ Successfully sent " + sentCount + " invitations with push notifications");
+                                Log.d(TAG, "Successfully sent " + sentCount + " invitations with push notifications");
                                 markAsProcessed(eventRef, new SelectionCallback() {
                                     @Override
                                     public void onComplete(int selectedCount) {
@@ -490,7 +490,7 @@ public class EventSelectionHelper {
             deadlineText = dateFormat.format(new java.util.Date(deadlineEpochMs));
         }
         
-        String notificationTitle = "You've been selected! 🎉";
+        String notificationTitle = "You've been selected!";
         String notificationMessage = "Congratulations! You've been selected for " + 
             (eventTitle != null ? eventTitle : "this event") + 
             ". Please check your invitations to accept or decline. " +
@@ -502,7 +502,7 @@ public class EventSelectionHelper {
                 new NotificationHelper.NotificationCallback() {
                     @Override
                     public void onComplete(int sentCount) {
-                        Log.d(TAG, "✓ Sent push notifications to " + sentCount + " users");
+                        Log.d(TAG, "Sent push notifications to " + sentCount + " users");
                         // Flag already set before sending, no need to set again
                         if (callback != null) {
                             callback.onComplete(userIds.size());
@@ -599,7 +599,7 @@ public class EventSelectionHelper {
         if (!invitationTasks.isEmpty()) {
             Tasks.whenAll(invitationTasks)
                     .addOnSuccessListener(aVoid -> {
-                        Log.d(TAG, "✓ Created " + userIds.size() + " invitation documents");
+                        Log.d(TAG, "Created " + userIds.size() + " invitation documents");
                         
                         // Check if selection notification already sent to prevent duplicates
                         checkAndSendSelectionNotification(eventId, eventTitle, userIds, deadlineEpochMs, callback);
@@ -672,7 +672,7 @@ public class EventSelectionHelper {
                     if (!batchTasks.isEmpty()) {
                         Tasks.whenAll(batchTasks)
                                 .addOnSuccessListener(aVoid -> {
-                                    Log.d(TAG, "✓ Successfully moved " + waitlistedDocs.size() + 
+                                    Log.d(TAG, "Successfully moved " + waitlistedDocs.size() + 
                                         " waitlisted entrants to NonSelectedEntrants");
                                     if (callback != null) {
                                         callback.onComplete(0);
@@ -704,7 +704,7 @@ public class EventSelectionHelper {
     private void markAsProcessed(DocumentReference eventRef, SelectionCallback callback) {
         eventRef.update("selectionProcessed", true)
                 .addOnSuccessListener(aVoid -> {
-                    Log.d(TAG, "✓ Marked event as selection processed");
+                    Log.d(TAG, "Marked event as selection processed");
                     if (callback != null) {
                         callback.onComplete(0);
                     }

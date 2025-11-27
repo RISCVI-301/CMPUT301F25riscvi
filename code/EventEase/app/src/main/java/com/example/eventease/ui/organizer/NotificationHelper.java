@@ -225,7 +225,7 @@ public class NotificationHelper {
             case "waitlist":
                 return "Update: " + eventName;
             case "selected":
-                return "You've been selected! 🎉";
+                return "You've been selected!";
             case "cancelled":
                 return "Update: " + eventName;
             case "nonSelected":
@@ -507,7 +507,7 @@ public class NotificationHelper {
             // Check for invited/selected notifications
             if (titleLower.contains("selected") || titleLower.contains("chosen") || 
                 titleLower.contains("invited") || titleLower.contains("congratulations") ||
-                titleLower.contains("won") || titleLower.contains("🎉")) {
+                titleLower.contains("won")) {
                 isInvitedNotification = true;
             }
             // Check for not invited/not selected notifications

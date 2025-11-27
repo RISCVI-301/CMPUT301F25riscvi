@@ -137,7 +137,7 @@ public class InvitationNotificationListener {
     }
     
     private void showInvitationNotification(String eventId, String eventTitle) {
-        String title = "Yay! You are chosen for the " + (eventTitle != null ? eventTitle : "event") + " event 🎉";
+        String title = "You are chosen for the " + (eventTitle != null ? eventTitle : "event") + " event";
         String body = "You've been selected! Tap to view details and accept your invitation.";
         
         Intent intent = new Intent(context, MainActivity.class);

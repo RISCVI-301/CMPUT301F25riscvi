@@ -214,7 +214,7 @@ public class InvitationDeadlineProcessor {
                     if (!batchTasks.isEmpty()) {
                         Tasks.whenAll(batchTasks)
                                 .addOnSuccessListener(aVoid -> {
-                                    Log.d(TAG, "✓ Successfully moved " + userIds.size() + 
+                                    Log.d(TAG, "Successfully moved " + userIds.size() + 
                                         " non-responders to CancelledEntrants");
                                     
                                     // Send "sorry" notification to those who missed the deadline

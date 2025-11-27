@@ -45,7 +45,7 @@ public class WorkflowIntegrationTest {
         
         // Create event
         Map<String, Object> event = createEvent("Test Event", registrationStart, registrationEnd, deadline, eventStart, 2, 2);
-        System.out.println("✓ Event created: " + event.get("title"));
+        System.out.println("Event created: " + event.get("title"));
         System.out.println("  Registration: " + formatTime(registrationStart) + " to " + formatTime(registrationEnd));
         System.out.println("  Deadline: " + formatTime(deadline));
         System.out.println("  Event Start: " + formatTime(eventStart));
@@ -55,11 +55,11 @@ public class WorkflowIntegrationTest {
         waitlistedUsers.add("user1");
         waitlistedUsers.add("user2");
         waitlistedUsers.add("user3");
-        System.out.println("\n✓ " + waitlistedUsers.size() + " users joined waitlist");
+        System.out.println("\n" + waitlistedUsers.size() + " users joined waitlist");
         
         // Simulate time progression to registration end
         long currentTime = registrationEnd + 1000; // 1 second after registration ends
-        System.out.println("\n⏰ Time: " + formatTime(currentTime) + " (Registration period ended)");
+        System.out.println("\nTime: " + formatTime(currentTime) + " (Registration period ended)");
         
         // Verify selection should happen
         assertTrue("Selection should happen after registration ends", currentTime >= registrationEnd);
@@ -73,7 +73,7 @@ public class WorkflowIntegrationTest {
         event.put("selectionProcessed", true);
         event.put("selectionNotificationSent", true);
         
-        System.out.println("✓ Selection completed:");
+        System.out.println("Selection completed:");
         System.out.println("  Selected: " + selectedUsers.size() + " users - " + selectedUsers);
         System.out.println("  Non-selected: " + nonSelectedUsers.size() + " users - " + nonSelectedUsers);
         
@@ -83,7 +83,7 @@ public class WorkflowIntegrationTest {
         
         // Simulate time progression to deadline
         currentTime = deadline + 1000; // 1 second after deadline
-        System.out.println("\n⏰ Time: " + formatTime(currentTime) + " (Deadline passed)");
+        System.out.println("\nTime: " + formatTime(currentTime) + " (Deadline passed)");
         
         // Simulate deadline processing
         Map<String, String> invitationStatus = new HashMap<>();
@@ -97,7 +97,7 @@ public class WorkflowIntegrationTest {
             }
         }
         
-        System.out.println("✓ Deadline processing:");
+        System.out.println("Deadline processing:");
         System.out.println("  Accepted: user1");
         System.out.println("  Non-responders: " + nonResponders);
         
@@ -107,17 +107,17 @@ public class WorkflowIntegrationTest {
         // Simulate time progression to 48 hours before event
         long sorryNotificationTime = eventStart - (48L * 60 * 60 * 1000);
         currentTime = sorryNotificationTime;
-        System.out.println("\n⏰ Time: " + formatTime(currentTime) + " (48 hours before event)");
+        System.out.println("\nTime: " + formatTime(currentTime) + " (48 hours before event)");
         
         // Simulate sorry notification
         event.put("sorryNotificationSent", true);
-        System.out.println("✓ Sorry notifications sent to " + nonSelectedUsers.size() + " non-selected users");
+        System.out.println("Sorry notifications sent to " + nonSelectedUsers.size() + " non-selected users");
         
         assertTrue("Sorry notification should be sent", (Boolean) event.get("sorryNotificationSent"));
         
         // Final verification
         System.out.println("\n========================================");
-        System.out.println("✓ Complete workflow test passed!");
+        System.out.println("Complete workflow test passed!");
         System.out.println("========================================\n");
         
         // Verify final state
@@ -151,11 +151,11 @@ public class WorkflowIntegrationTest {
         
         // Only first 2 should be able to join (capacity = 2)
         List<String> waitlisted = users.subList(0, (Integer) event.get("capacity"));
-        System.out.println("✓ Users in waitlist: " + waitlisted.size() + " - " + waitlisted);
+        System.out.println("Users in waitlist: " + waitlisted.size() + " - " + waitlisted);
         
         assertEquals("Waitlist should respect capacity", (Integer) event.get("capacity"), (Integer) waitlisted.size());
         
-        System.out.println("\n✓ Capacity limit test passed!\n");
+        System.out.println("\nCapacity limit test passed!\n");
     }
     
     /**
@@ -179,7 +179,7 @@ public class WorkflowIntegrationTest {
         assertTrue("Deadline should be after registration end", deadline > regEnd);
         assertTrue("Event start should be after deadline", eventStart > deadline);
         
-        System.out.println("✓ Timeline validation:");
+        System.out.println("Timeline validation:");
         System.out.println("  Registration: " + formatTime(regStart) + " → " + formatTime(regEnd));
         System.out.println("  Deadline: " + formatTime(deadline));
         System.out.println("  Event Start: " + formatTime(eventStart));
@@ -188,7 +188,7 @@ public class WorkflowIntegrationTest {
         long invalidDeadline = baseTime + 60000; // Before registration end
         assertFalse("Invalid deadline should be rejected", invalidDeadline > regEnd);
         
-        System.out.println("\n✓ Timing validation test passed!\n");
+        System.out.println("\nTiming validation test passed!\n");
     }
     
     /**
@@ -208,24 +208,24 @@ public class WorkflowIntegrationTest {
         // Simulate selection notification
         event.put("selectionNotificationSent", true);
         assertTrue("Selection notification flag should be set", (Boolean) event.get("selectionNotificationSent"));
-        System.out.println("✓ Selection notification flag set");
+        System.out.println("Selection notification flag set");
         
         // Try to send again (should be prevented)
         if ((Boolean) event.get("selectionNotificationSent")) {
-            System.out.println("✓ Duplicate selection notification prevented");
+            System.out.println("Duplicate selection notification prevented");
         }
         
         // Simulate deadline notification
         event.put("deadlineNotificationSent", true);
         assertTrue("Deadline notification flag should be set", (Boolean) event.get("deadlineNotificationSent"));
-        System.out.println("✓ Deadline notification flag set");
+        System.out.println("Deadline notification flag set");
         
         // Simulate sorry notification
         event.put("sorryNotificationSent", true);
         assertTrue("Sorry notification flag should be set", (Boolean) event.get("sorryNotificationSent"));
-        System.out.println("✓ Sorry notification flag set");
+        System.out.println("Sorry notification flag set");
         
-        System.out.println("\n✓ Notification flag management test passed!\n");
+        System.out.println("\nNotification flag management test passed!\n");
     }
     
     // Helper methods
