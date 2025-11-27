@@ -188,13 +188,20 @@ public class EventNotificationService extends FirebaseMessagingService {
         Intent intent = new Intent(this, MainActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
         
+        String eventId = null;
         if (data != null && data.containsKey("eventId")) {
-            intent.putExtra("eventId", data.get("eventId"));
+            eventId = data.get("eventId");
+            intent.putExtra("eventId", eventId);
+            Log.d(TAG, "Added eventId to intent: " + eventId);
         }
+        
+        // CRITICAL: Use unique request code for each notification (based on eventId hash)
+        // If we use 0 for all, Android will reuse the same PendingIntent and lose eventId!
+        int requestCode = eventId != null ? eventId.hashCode() : (int) System.currentTimeMillis();
         
         PendingIntent pendingIntent = PendingIntent.getActivity(
                 this,
-                0,
+                requestCode, // UNIQUE request code to prevent intent extras from being overwritten
                 intent,
                 PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT
         );

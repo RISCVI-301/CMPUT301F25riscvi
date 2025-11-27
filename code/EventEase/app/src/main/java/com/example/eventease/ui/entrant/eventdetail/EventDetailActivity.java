@@ -60,6 +60,7 @@ public class EventDetailActivity extends AppCompatActivity {
     private TextView tvWaitlistCount;
     private Button btnRegister;
     private Button btnDecline;
+    private Button btnOptOut;
     private Button btnGuidelines;
     private ImageButton btnBack;
     private ImageButton btnShare;
@@ -118,6 +119,7 @@ public class EventDetailActivity extends AppCompatActivity {
         tvWaitlistCount = findViewById(R.id.tvWaitlistCount);
         btnRegister = findViewById(R.id.btnRegister);
         btnDecline = findViewById(R.id.btnDecline);
+        btnOptOut = findViewById(R.id.btnOptOut);
         btnGuidelines = findViewById(R.id.btnGuidelines);
         btnBack = findViewById(R.id.btnBack);
         btnShare = findViewById(R.id.btnShare);
@@ -140,26 +142,27 @@ public class EventDetailActivity extends AppCompatActivity {
             showGuidelinesDialog();
         });
 
-        // Set up register button
+        // Set up register button (Accept invitation)
         btnRegister.setOnClickListener(v -> {
-            showAcceptDialog();
-            // TODO: Update invitation status to ACCEPTED
+            android.util.Log.d("EventDetailActivity", "Accept button clicked");
+            acceptInvitation();
         });
 
         // Set up decline button
         btnDecline.setOnClickListener(v -> {
-            showDeclineDialog();
-            // TODO: Update invitation status to DECLINED
+            android.util.Log.d("EventDetailActivity", "Decline button clicked");
+            declineInvitation();
         });
 
-        // Show/hide buttons based on invitation status
-        if (hasInvitation) {
-            btnRegister.setVisibility(View.VISIBLE);
-            btnDecline.setVisibility(View.VISIBLE);
-        } else {
-            btnRegister.setVisibility(View.GONE);
-            btnDecline.setVisibility(View.GONE);
+        // Set up opt-out button
+        if (btnOptOut != null) {
+            btnOptOut.setOnClickListener(v -> {
+                showOptOutDialog();
+            });
         }
+
+        // Check for invitation in real-time (in case it wasn't passed in Intent)
+        checkForPendingInvitation();
 
         // Load event data (placeholder for now)
         loadEventData();
@@ -180,6 +183,54 @@ public class EventDetailActivity extends AppCompatActivity {
     }
 
     private void loadEventData() {
+        // If event title is missing, fetch from Firestore
+        if (eventId != null && (eventTitle == null || eventTitle.isEmpty())) {
+            android.util.Log.d("EventDetailActivity", "Fetching event data from Firestore...");
+            com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    .collection("events")
+                    .document(eventId)
+                    .get()
+                    .addOnSuccessListener(eventDoc -> {
+                        if (eventDoc.exists()) {
+                            // Update all event fields from Firestore
+                            eventTitle = eventDoc.getString("title");
+                            eventLocation = eventDoc.getString("location");
+                            eventNotes = eventDoc.getString("description");
+                            eventGuidelines = eventDoc.getString("guidelines");
+                            eventPosterUrl = eventDoc.getString("posterUrl");
+                            
+                            Long startsAt = eventDoc.getLong("startsAtEpochMs");
+                            if (startsAt != null) eventStartTime = startsAt;
+                            
+                            Integer capacity = eventDoc.getLong("capacity") != null ? 
+                                eventDoc.getLong("capacity").intValue() : 0;
+                            eventCapacity = capacity;
+                            
+                            Integer waitlist = eventDoc.getLong("waitlistCount") != null ?
+                                eventDoc.getLong("waitlistCount").intValue() : 0;
+                            eventWaitlistCount = waitlist;
+                            
+                            android.util.Log.d("EventDetailActivity", "✅ Event data loaded from Firestore");
+                            android.util.Log.d("EventDetailActivity", "Title: " + eventTitle);
+                            
+                            // Display the data
+                            displayEventData();
+                        } else {
+                            android.util.Log.e("EventDetailActivity", "Event document not found in Firestore!");
+                            displayEventData(); // Show with placeholder data
+                        }
+                    })
+                    .addOnFailureListener(e -> {
+                        android.util.Log.e("EventDetailActivity", "Failed to fetch event data", e);
+                        displayEventData(); // Show with placeholder data
+                    });
+        } else {
+            // Data already provided in Intent
+            displayEventData();
+        }
+    }
+    
+    private void displayEventData() {
         // Display event name
         tvEventName.setText(eventTitle != null ? eventTitle : "Event Name");
         
@@ -191,7 +242,7 @@ public class EventDetailActivity extends AppCompatActivity {
         }
         
         // Waitlist count will be updated by the listener
-        tvWaitlistCount.setText("Loading...");
+        tvWaitlistCount.setText(String.valueOf(eventWaitlistCount));
         
         // Load event image using Glide
         if (eventPosterUrl != null && !eventPosterUrl.isEmpty()) {
@@ -211,7 +262,7 @@ public class EventDetailActivity extends AppCompatActivity {
         String dateStr = eventStartTime > 0 ? sdf.format(new Date(eventStartTime)) : "TBD";
         
         // You can show more event details in a toast or update UI as needed
-        String detailMsg = "Event at " + eventLocation + " on " + dateStr;
+        String detailMsg = "Event at " + (eventLocation != null ? eventLocation : "location TBD") + " on " + dateStr;
         long eventDeadline = getIntent().getLongExtra("eventDeadline", 0);
         if (eventDeadline > 0) {
             detailMsg += " (Deadline: " + sdf.format(new Date(eventDeadline)) + ")";
@@ -511,6 +562,112 @@ public class EventDetailActivity extends AppCompatActivity {
     }
 
     /**
+     * Checks for pending invitations for this event and updates UI accordingly.
+     */
+    private void checkForPendingInvitation() {
+        String uid = authManager.getUid();
+        if (uid == null || eventId == null) {
+            android.util.Log.w("EventDetailActivity", "Cannot check invitation - uid or eventId is null");
+            updateButtonVisibility(false, null);
+            return;
+        }
+        
+        android.util.Log.d("EventDetailActivity", "═══ Checking for pending invitation ═══");
+        android.util.Log.d("EventDetailActivity", "EventId: " + eventId);
+        android.util.Log.d("EventDetailActivity", "UserId: " + uid);
+        
+        // Query invitations collection for this event + user
+        com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                .collection("invitations")
+                .whereEqualTo("eventId", eventId)
+                .whereEqualTo("uid", uid)
+                .whereEqualTo("status", "PENDING")
+                .limit(1)
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    android.util.Log.d("EventDetailActivity", "Query completed - documents found: " + 
+                        (querySnapshot != null ? querySnapshot.size() : 0));
+                    
+                    if (querySnapshot != null && !querySnapshot.isEmpty()) {
+                        // Found pending invitation
+                        com.google.firebase.firestore.DocumentSnapshot invDoc = querySnapshot.getDocuments().get(0);
+                        String foundInvitationId = invDoc.getId();
+                        android.util.Log.d("EventDetailActivity", "✅ FOUND PENDING INVITATION!");
+                        android.util.Log.d("EventDetailActivity", "Invitation ID: " + foundInvitationId);
+                        android.util.Log.d("EventDetailActivity", "Status: " + invDoc.getString("status"));
+                        android.util.Log.d("EventDetailActivity", "IssuedAt: " + invDoc.getLong("issuedAt"));
+                        android.util.Log.d("EventDetailActivity", "ExpiresAt: " + invDoc.getLong("expiresAt"));
+                        
+                        hasInvitation = true;
+                        invitationId = foundInvitationId;
+                        updateButtonVisibility(true, foundInvitationId);
+                    } else {
+                        // No pending invitation
+                        android.util.Log.d("EventDetailActivity", "❌ No pending invitation found");
+                        android.util.Log.d("EventDetailActivity", "User might not be selected yet, or invitation already processed");
+                        hasInvitation = false;
+                        invitationId = null;
+                        updateButtonVisibility(false, null);
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    android.util.Log.e("EventDetailActivity", "❌ Failed to check for invitation", e);
+                    android.util.Log.e("EventDetailActivity", "Error: " + e.getMessage());
+                    // Default to no invitation if check fails
+                    updateButtonVisibility(false, null);
+                });
+    }
+    
+    /**
+     * Updates button visibility based on invitation status.
+     */
+    private void updateButtonVisibility(boolean hasInvite, String inviteId) {
+        android.util.Log.d("EventDetailActivity", "═══ Updating Button Visibility ═══");
+        android.util.Log.d("EventDetailActivity", "Has Invite: " + hasInvite);
+        android.util.Log.d("EventDetailActivity", "Invite ID: " + inviteId);
+        
+        if (hasInvite && inviteId != null) {
+            // Has invitation - show accept/decline, hide opt-out
+            android.util.Log.d("EventDetailActivity", "✅ SHOWING ACCEPT/DECLINE BUTTONS");
+            btnRegister.setVisibility(View.VISIBLE);
+            btnRegister.setText("Accept");
+            btnRegister.setEnabled(true);
+            
+            btnDecline.setVisibility(View.VISIBLE);
+            btnDecline.setText("Decline");
+            btnDecline.setEnabled(true);
+            
+            if (btnOptOut != null) {
+                btnOptOut.setVisibility(View.GONE);
+            }
+            
+            // Update invitation ID for accept/decline actions
+            this.invitationId = inviteId;
+            this.hasInvitation = true;
+            
+            android.util.Log.d("EventDetailActivity", "Button states:");
+            android.util.Log.d("EventDetailActivity", "  - btnRegister: VISIBLE, text=" + btnRegister.getText());
+            android.util.Log.d("EventDetailActivity", "  - btnDecline: VISIBLE, text=" + btnDecline.getText());
+        } else {
+            // No invitation - show opt-out, hide accept/decline
+            android.util.Log.d("EventDetailActivity", "⚠️ SHOWING OPT-OUT BUTTON (no invitation)");
+            btnRegister.setVisibility(View.GONE);
+            btnDecline.setVisibility(View.GONE);
+            if (btnOptOut != null) {
+                btnOptOut.setVisibility(View.VISIBLE);
+            }
+            
+            this.invitationId = null;
+            this.hasInvitation = false;
+            
+            android.util.Log.d("EventDetailActivity", "Button states:");
+            android.util.Log.d("EventDetailActivity", "  - btnRegister: GONE");
+            android.util.Log.d("EventDetailActivity", "  - btnDecline: GONE");
+            android.util.Log.d("EventDetailActivity", "  - btnOptOut: VISIBLE");
+        }
+    }
+    
+    /**
      * Decline the invitation (keeps user in waitlist for future rerolls)
      */
     private void declineInvitation() {
@@ -528,11 +685,12 @@ public class EventDetailActivity extends AppCompatActivity {
         btnDecline.setEnabled(false);
         btnDecline.setText("Processing...");
         
-        // Decline the invitation (but keep user in waitlist)
+        // Decline the invitation (moves user to CancelledEntrants)
         invitationRepo.decline(invitationId, eventId, uid)
                 .addOnSuccessListener(aVoid -> {
-                    android.util.Log.d("EventDetailActivity", "Invitation declined successfully (user remains in waitlist)");
-                    Toast.makeText(this, "Invitation declined. You remain on the waitlist.", Toast.LENGTH_LONG).show();
+                    android.util.Log.d("EventDetailActivity", "✅ Invitation declined successfully!");
+                    android.util.Log.d("EventDetailActivity", "User moved to CancelledEntrants");
+                    Toast.makeText(this, "Invitation declined. You've been moved to cancelled.", Toast.LENGTH_LONG).show();
                     // Hide the buttons since invitation is now declined
                     btnRegister.setVisibility(View.GONE);
                     btnDecline.setVisibility(View.GONE);
@@ -540,12 +698,124 @@ public class EventDetailActivity extends AppCompatActivity {
                     finish();
                 })
                 .addOnFailureListener(e -> {
-                    android.util.Log.e("EventDetailActivity", "Failed to decline invitation", e);
+                    android.util.Log.e("EventDetailActivity", "❌ Failed to decline invitation!", e);
+                    android.util.Log.e("EventDetailActivity", "Error: " + e.getMessage());
                     Toast.makeText(this, "Failed to decline invitation: " + e.getMessage(), Toast.LENGTH_LONG).show();
                     // Restore buttons
                     btnRegister.setEnabled(true);
                     btnDecline.setEnabled(true);
                     btnDecline.setText("Decline");
+                });
+    }
+
+    /**
+     * Show dialog to confirm opt-out from waitlist
+     */
+    private void showOptOutDialog() {
+        // Capture screenshot and blur it
+        Bitmap screenshot = captureScreenshot();
+        Bitmap blurredBitmap = blurBitmap(screenshot, 25f);
+        
+        // Create custom dialog
+        android.app.Dialog dialog = new android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        android.view.LayoutInflater inflater = getLayoutInflater();
+        android.view.View dialogView = inflater.inflate(R.layout.entrant_dialog_opt_out, null);
+        dialog.setContentView(dialogView);
+        
+        // Set window properties
+        android.view.Window window = dialog.getWindow();
+        if (window != null) {
+            window.setLayout(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT
+            );
+            window.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+            
+            // Disable dim since we have our own blur background
+            android.view.WindowManager.LayoutParams layoutParams = window.getAttributes();
+            layoutParams.dimAmount = 0f;
+            window.setAttributes(layoutParams);
+            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+        }
+        
+        // Apply blurred background
+        android.view.View blurBackground = dialogView.findViewById(R.id.dialogOptOutBlurBackground);
+        if (blurredBitmap != null && blurBackground != null) {
+            blurBackground.setBackground(new BitmapDrawable(getResources(), blurredBitmap));
+        }
+        
+        // Make the background clickable to dismiss
+        if (blurBackground != null) {
+            blurBackground.setOnClickListener(v -> dialog.dismiss());
+        }
+        
+        // Get the CardView for animation
+        androidx.cardview.widget.CardView cardView = dialogView.findViewById(R.id.dialogCard);
+        
+        // Set up dialog views
+        android.widget.Button btnConfirmOptOut = dialogView.findViewById(R.id.btnConfirmOptOut);
+        android.widget.Button btnCancelOptOut = dialogView.findViewById(R.id.btnCancelOptOut);
+        
+        // Set Cancel button click listener
+        if (btnCancelOptOut != null) {
+            btnCancelOptOut.setOnClickListener(v -> dialog.dismiss());
+        }
+        
+        // Set Confirm button click listener - opt out of waitlist
+        if (btnConfirmOptOut != null) {
+            btnConfirmOptOut.setOnClickListener(v -> {
+                dialog.dismiss();
+                performOptOut();
+            });
+        }
+        
+        dialog.show();
+        
+        // Apply animations after dialog is shown
+        if (blurBackground != null && cardView != null) {
+            android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_fade_in);
+            android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_zoom_in);
+            
+            blurBackground.startAnimation(fadeIn);
+            cardView.startAnimation(zoomIn);
+        }
+    }
+    
+    /**
+     * Opt out from the event waitlist
+     */
+    private void performOptOut() {
+        if (eventId == null || eventId.isEmpty()) {
+            android.util.Log.e("EventDetailActivity", "Event ID is null or empty");
+            Toast.makeText(this, "Cannot opt out at this time", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        String uid = authManager.getUid();
+        android.util.Log.d("EventDetailActivity", "Opting out from event: " + eventId + " by user: " + uid);
+        
+        // Show loading state
+        if (btnOptOut != null) {
+            btnOptOut.setEnabled(false);
+            btnOptOut.setText("Processing...");
+        }
+        
+        // Opt out from waitlist
+        waitlistRepo.leave(eventId, uid)
+                .addOnSuccessListener(aVoid -> {
+                    android.util.Log.d("EventDetailActivity", "Successfully opted out from waitlist");
+                    Toast.makeText(this, "You have opted out from the waitlist", Toast.LENGTH_LONG).show();
+                    // Finish the activity to return to previous screen
+                    finish();
+                })
+                .addOnFailureListener(e -> {
+                    android.util.Log.e("EventDetailActivity", "Failed to opt out from waitlist", e);
+                    Toast.makeText(this, "Failed to opt out: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    // Restore button
+                    if (btnOptOut != null) {
+                        btnOptOut.setEnabled(true);
+                        btnOptOut.setText("Opt Out");
+                    }
                 });
     }
 

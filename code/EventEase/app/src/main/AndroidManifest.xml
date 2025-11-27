@@ -39,6 +39,13 @@
             </intent-filter>
         </activity>
 
+        <!-- Admin Activity -->
+        <activity
+            android:name="com.example.eventease.admin.AdminMainActivity"
+            android:exported="false"
+            android:label="Admin Dashboard"
+            android:theme="@style/Theme.EventEase" />
+
         <meta-data
             android:name="preloaded_fonts"
             android:resource="@array/preloaded_fonts" />
@@ -79,6 +86,13 @@
         <activity
             android:name=".ui.organizer.OrganizerEntrantLocationsActivity"
             android:exported="false" />
+
+        <!-- Test Activity for Visual Workflow Testing -->
+        <activity
+            android:name=".test.WorkflowTestActivity"
+            android:exported="false"
+            android:label="Workflow Test"
+            android:theme="@style/Theme.EventEase" />
 
         <service
             android:name="com.example.eventease.notifications.EventNotificationService"

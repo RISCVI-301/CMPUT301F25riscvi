@@ -238,7 +238,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="16dp"
                 android:layout_marginEnd="16dp"
-                android:layout_marginBottom="80dp"
+                android:layout_marginBottom="12dp"
                 app:cardBackgroundColor="#7FDBDA"
                 app:cardCornerRadius="12dp"
                 app:cardElevation="0dp">
@@ -253,6 +253,31 @@
                     android:text="Decline"
                     android:textAllCaps="false"
                     android:textColor="#2C4A6E"
+                    android:textSize="20sp"/>
+
+            </androidx.cardview.widget.CardView>
+
+            <!-- Opt Out Button -->
+            <androidx.cardview.widget.CardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp"
+                android:layout_marginBottom="80dp"
+                app:cardBackgroundColor="#FF6B6B"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="0dp">
+
+                <Button
+                    android:id="@+id/btnOptOut"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@android:color/transparent"
+                    android:fontFamily="@font/entrant_fredoka_one"
+                    android:padding="14dp"
+                    android:text="Opt Out"
+                    android:textAllCaps="false"
+                    android:textColor="@android:color/white"
                     android:textSize="20sp"/>
 
             </androidx.cardview.widget.CardView>

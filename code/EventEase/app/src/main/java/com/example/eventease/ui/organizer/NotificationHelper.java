@@ -293,29 +293,69 @@ public class NotificationHelper {
                     return;
                 }
                 
-                // Get current user (organizer)
-                FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
-                if (currentUser == null) {
-                    if (callback != null) {
-                        callback.onError("User not authenticated");
-                    }
-                    return;
-                }
-                String organizerId = currentUser.getUid();
-                
-                sendNotificationsToFilteredUsers(filteredUserIds, title, message, eventId, eventTitle, organizerId, callback);
+                // Get organizerId from event document (more reliable than current user)
+                db.collection("events").document(eventId).get()
+                        .addOnSuccessListener(eventDoc -> {
+                            String organizerId = null;
+                            if (eventDoc.exists()) {
+                                organizerId = eventDoc.getString("organizerId");
+                            }
+                            
+                            // Fallback to current user if not in event doc
+                            if (organizerId == null || organizerId.isEmpty()) {
+                                FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+                                if (currentUser == null) {
+                                    Log.e(TAG, "No organizerId in event and no current user");
+                                    if (callback != null) {
+                                        callback.onError("User not authenticated and no organizer in event");
+                                    }
+                                    return;
+                                }
+                                organizerId = currentUser.getUid();
+                            }
+                            
+                            Log.d(TAG, "Sending notifications (filtered) with organizerId: " + organizerId);
+                            sendNotificationsToFilteredUsers(filteredUserIds, title, message, eventId, eventTitle, organizerId, callback);
+                        })
+                        .addOnFailureListener(e -> {
+                            Log.e(TAG, "Failed to get event document for organizerId", e);
+                            if (callback != null) {
+                                callback.onError("Failed to get event details");
+                            }
+                        });
             });
         } else {
-            // Don't filter - send to all (e.g., for selection notifications before anyone has declined)
-            FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
-            if (currentUser == null) {
-                if (callback != null) {
-                    callback.onError("User not authenticated");
-                }
-                return;
-            }
-            String organizerId = currentUser.getUid();
-            sendNotificationsToFilteredUsers(userIds, title, message, eventId, eventTitle, organizerId, callback);
+            // Don't filter - send to all (e.g., for selection/replacement notifications before anyone has declined)
+            // Get organizerId from event document (more reliable than current user)
+            db.collection("events").document(eventId).get()
+                    .addOnSuccessListener(eventDoc -> {
+                        String organizerId = null;
+                        if (eventDoc.exists()) {
+                            organizerId = eventDoc.getString("organizerId");
+                        }
+                        
+                        // Fallback to current user if not in event doc
+                        if (organizerId == null || organizerId.isEmpty()) {
+                            FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+                            if (currentUser == null) {
+                                Log.e(TAG, "No organizerId in event and no current user");
+                                if (callback != null) {
+                                    callback.onError("User not authenticated and no organizer in event");
+                                }
+                                return;
+                            }
+                            organizerId = currentUser.getUid();
+                        }
+                        
+                        Log.d(TAG, "Sending notifications with organizerId: " + organizerId);
+                        sendNotificationsToFilteredUsers(userIds, title, message, eventId, eventTitle, organizerId, callback);
+                    })
+                    .addOnFailureListener(e -> {
+                        Log.e(TAG, "Failed to get event document for organizerId", e);
+                        if (callback != null) {
+                            callback.onError("Failed to get event details");
+                        }
+                    });
         }
     }
     
@@ -393,7 +433,17 @@ public class NotificationHelper {
     private void sendNotificationsToFilteredUsers(List<String> userIds, String title, String message,
                                                  String eventId, String eventTitle, String organizerId,
                                                  NotificationCallback callback) {
-        // Check for recent duplicate notification requests (within last 5 minutes)
+        // Skip duplicate check for replacement/selection notifications (each is for different users)
+        boolean isReplacementOrSelection = title != null && 
+            (title.toLowerCase().contains("replacement") || title.toLowerCase().contains("selected"));
+        
+        if (isReplacementOrSelection) {
+            Log.d(TAG, "Replacement/Selection notification - skipping duplicate check");
+            createNotificationRequest(userIds, title, message, eventId, eventTitle, organizerId, callback);
+            return;
+        }
+        
+        // Check for recent duplicate notification requests (within last 5 minutes) for non-replacement
         long fiveMinutesAgo = System.currentTimeMillis() - (5 * 60 * 1000);
         db.collection("notificationRequests")
                 .whereEqualTo("eventId", eventId)

@@ -330,11 +330,12 @@ public class EventSelectionHelper {
             }
             
             DocumentReference selectedRef = eventRef.collection("SelectedEntrants").document(userId);
-            DocumentReference waitlistRef = eventRef.collection("WaitlistedEntrants").document(userId);
+            // Keep users in WaitlistedEntrants collection (don't delete)
+            // DocumentReference waitlistRef = eventRef.collection("WaitlistedEntrants").document(userId);
             
             batch.set(selectedRef, data);
-            batch.delete(waitlistRef);
-            batchCount += 2;
+            // batch.delete(waitlistRef); // Keep in waitlist
+            batchCount += 1; // Only 1 operation now
             
             if (batchCount >= MAX_BATCH_SIZE) {
                 final WriteBatch currentBatch = batch;
@@ -344,9 +345,10 @@ public class EventSelectionHelper {
             }
         }
         
-            batch.update(eventRef, "waitlistCount", 
-            com.google.firebase.firestore.FieldValue.increment(-finalSelectedDocs.size()));
-        batchCount++;
+        // DON'T decrement waitlistCount - users stay in WaitlistedEntrants
+        // batch.update(eventRef, "waitlistCount", 
+        //     com.google.firebase.firestore.FieldValue.increment(-finalSelectedDocs.size()));
+        // batchCount++;
         
         if (batchCount > 0) {
             batchTasks.add(batch.commit());
@@ -774,76 +776,113 @@ public class EventSelectionHelper {
                                                       SelectionCallback callback) {
         Log.d(TAG, "=== Moving remaining waitlisted entrants to NonSelectedEntrants ===");
         
-        eventRef.collection("WaitlistedEntrants").get()
-                .addOnSuccessListener(waitlistSnapshot -> {
-                    if (waitlistSnapshot == null || waitlistSnapshot.isEmpty()) {
-                        Log.d(TAG, "No remaining waitlisted entrants to move");
-                        if (callback != null) {
-                            callback.onComplete(0);
-                        }
-                        return;
-                    }
-                    
-                    List<DocumentSnapshot> waitlistedDocs = waitlistSnapshot.getDocuments();
-                    Log.d(TAG, "Moving " + waitlistedDocs.size() + " remaining waitlisted entrants to NonSelectedEntrants");
-                    
-                    WriteBatch batch = db.batch();
-                    int batchCount = 0;
-                    final int MAX_BATCH_SIZE = 499;
-                    List<Task<Void>> batchTasks = new ArrayList<>();
-                    
-                    for (DocumentSnapshot doc : waitlistedDocs) {
-                        String userId = doc.getId();
-                        Map<String, Object> data = doc.getData();
-                        
-                        if (data == null) {
-                            continue;
-                        }
-                        
-                        DocumentReference nonSelectedRef = eventRef.collection("NonSelectedEntrants").document(userId);
-                        DocumentReference waitlistRef = eventRef.collection("WaitlistedEntrants").document(userId);
-                        
-                        batch.set(nonSelectedRef, data);
-                        batch.delete(waitlistRef);
-                        batchCount += 2;
-                        
-                        if (batchCount >= MAX_BATCH_SIZE) {
-                            final WriteBatch currentBatch = batch;
-                            batchTasks.add(currentBatch.commit());
-                            batch = db.batch();
-                            batchCount = 0;
+        // First, get the list of selected entrants to exclude them
+        eventRef.collection("SelectedEntrants").get()
+                .addOnSuccessListener(selectedSnapshot -> {
+                    // Build a set of selected user IDs
+                    java.util.Set<String> selectedUserIds = new java.util.HashSet<>();
+                    if (selectedSnapshot != null && !selectedSnapshot.isEmpty()) {
+                        for (DocumentSnapshot doc : selectedSnapshot.getDocuments()) {
+                            selectedUserIds.add(doc.getId());
                         }
                     }
+                    Log.d(TAG, "Found " + selectedUserIds.size() + " selected entrants to exclude");
                     
-                    if (batchCount > 0) {
-                        batchTasks.add(batch.commit());
-                    }
-                    
-                    if (!batchTasks.isEmpty()) {
-                        Tasks.whenAll(batchTasks)
-                                .addOnSuccessListener(aVoid -> {
-                                    Log.d(TAG, "✓ Successfully moved " + waitlistedDocs.size() + 
-                                        " waitlisted entrants to NonSelectedEntrants");
+                    // Now get waitlisted entrants
+                    eventRef.collection("WaitlistedEntrants").get()
+                            .addOnSuccessListener(waitlistSnapshot -> {
+                                if (waitlistSnapshot == null || waitlistSnapshot.isEmpty()) {
+                                    Log.d(TAG, "No remaining waitlisted entrants to move");
                                     if (callback != null) {
                                         callback.onComplete(0);
                                     }
-                                })
-                                .addOnFailureListener(e -> {
-                                    Log.e(TAG, "Failed to move waitlisted to NonSelectedEntrants", e);
-                                    if (callback != null) {
-                                        callback.onError("Failed to move entrants: " + e.getMessage());
+                                    return;
+                                }
+                                
+                                List<DocumentSnapshot> waitlistedDocs = waitlistSnapshot.getDocuments();
+                                List<DocumentSnapshot> toMove = new ArrayList<>();
+                                
+                                // Filter out selected entrants
+                                for (DocumentSnapshot doc : waitlistedDocs) {
+                                    if (!selectedUserIds.contains(doc.getId())) {
+                                        toMove.add(doc);
                                     }
-                                });
-                    } else {
-                        if (callback != null) {
-                            callback.onComplete(0);
-                        }
-                    }
+                                }
+                                
+                                Log.d(TAG, "Moving " + toMove.size() + " remaining waitlisted entrants to NonSelectedEntrants (excluding " + selectedUserIds.size() + " selected)");
+                                
+                                if (toMove.isEmpty()) {
+                                    Log.d(TAG, "No entrants to move after filtering");
+                                    if (callback != null) {
+                                        callback.onComplete(0);
+                                    }
+                                    return;
+                                }
+                                
+                                WriteBatch batch = db.batch();
+                                int batchCount = 0;
+                                final int MAX_BATCH_SIZE = 499;
+                                List<Task<Void>> batchTasks = new ArrayList<>();
+                                
+                                for (DocumentSnapshot doc : toMove) {
+                                    String userId = doc.getId();
+                                    Map<String, Object> data = doc.getData();
+                                    
+                                    if (data == null) {
+                                        continue;
+                                    }
+                                    
+                                    DocumentReference nonSelectedRef = eventRef.collection("NonSelectedEntrants").document(userId);
+                                    // Keep users in WaitlistedEntrants collection (don't delete)
+                                    
+                                    batch.set(nonSelectedRef, data);
+                                    // batch.delete(waitlistRef); // Keep in waitlist
+                                    batchCount += 1; // Only 1 operation now
+                                    
+                                    if (batchCount >= MAX_BATCH_SIZE) {
+                                        final WriteBatch currentBatch = batch;
+                                        batchTasks.add(currentBatch.commit());
+                                        batch = db.batch();
+                                        batchCount = 0;
+                                    }
+                                }
+                                
+                                if (batchCount > 0) {
+                                    batchTasks.add(batch.commit());
+                                }
+                                
+                                if (!batchTasks.isEmpty()) {
+                                    Tasks.whenAll(batchTasks)
+                                            .addOnSuccessListener(aVoid -> {
+                                                Log.d(TAG, "✓ Successfully moved " + toMove.size() + 
+                                                    " waitlisted entrants to NonSelectedEntrants");
+                                                if (callback != null) {
+                                                    callback.onComplete(0);
+                                                }
+                                            })
+                                            .addOnFailureListener(e -> {
+                                                Log.e(TAG, "Failed to move waitlisted to NonSelectedEntrants", e);
+                                                if (callback != null) {
+                                                    callback.onError("Failed to move entrants: " + e.getMessage());
+                                                }
+                                            });
+                                } else {
+                                    if (callback != null) {
+                                        callback.onComplete(0);
+                                    }
+                                }
+                            })
+                            .addOnFailureListener(e -> {
+                                Log.e(TAG, "Failed to load waitlisted entrants", e);
+                                if (callback != null) {
+                                    callback.onError("Failed to load waitlisted entrants: " + e.getMessage());
+                                }
+                            });
                 })
                 .addOnFailureListener(e -> {
-                    Log.e(TAG, "Failed to load waitlisted entrants", e);
+                    Log.e(TAG, "Failed to load selected entrants", e);
                     if (callback != null) {
-                        callback.onError("Failed to load waitlisted entrants: " + e.getMessage());
+                        callback.onError("Failed to load selected entrants: " + e.getMessage());
                     }
                 });
     }

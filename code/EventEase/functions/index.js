@@ -242,7 +242,7 @@ exports.sendNotification = functions.firestore
  * Automatically processes entrant selection for these events.
  */
 exports.processAutomaticEntrantSelection = functions.pubsub
-    .schedule('every 5 minutes')
+    .schedule('every 1 minutes')
     .onRun(async (context) => {
         console.log('=== Checking for events that need automatic entrant selection ===');
         const now = Date.now();
@@ -373,12 +373,12 @@ exports.processAutomaticEntrantSelection = functions.pubsub
                     // Add to SelectedEntrants
                     batch.set(selectedEntrantsRef.doc(userId), userData);
                     
-                    // Remove from WaitlistedEntrants
-                    batch.delete(waitlistedEntrantsRef.doc(userId));
+                    // Keep users in WaitlistedEntrants (don't delete)
+                    // batch.delete(waitlistedEntrantsRef.doc(userId));
                 }
                 
-                // Update waitlistCount
-                batch.update(eventDoc.ref, 'waitlistCount', admin.firestore.FieldValue.increment(-selectedUserIds.length));
+                // Don't update waitlistCount - users stay in waitlist
+                // batch.update(eventDoc.ref, 'waitlistCount', admin.firestore.FieldValue.increment(-selectedUserIds.length));
                 
                 // Mark as selection processed
                 batch.update(eventDoc.ref, 'selectionProcessed', true);
@@ -431,35 +431,41 @@ exports.processAutomaticEntrantSelection = functions.pubsub
                 
                 console.log(`✓ Created selection notification request for ${selectedUserIds.length} users for event ${eventId}`);
                 
-                // Move remaining waitlisted entrants to NonSelectedEntrants
+                // Move remaining waitlisted entrants to NonSelectedEntrants (excluding selected ones)
                 const remainingWaitlistSnapshot = await admin.firestore()
                     .collection('events').doc(eventId)
                     .collection('WaitlistedEntrants')
                     .get();
                 
                 if (!remainingWaitlistSnapshot.empty) {
-                    console.log(`Moving ${remainingWaitlistSnapshot.size} remaining waitlisted entrants to NonSelectedEntrants`);
+                    // Filter out selected users - only move non-selected users
+                    const toMove = remainingWaitlistSnapshot.docs.filter(doc => !selectedUserIds.includes(doc.id));
                     
-                    const nonSelectedBatch = admin.firestore().batch();
-                    const nonSelectedRef = admin.firestore().collection('events').doc(eventId).collection('NonSelectedEntrants');
-                    const remainingWaitlistRef = admin.firestore().collection('events').doc(eventId).collection('WaitlistedEntrants');
+                    console.log(`Moving ${toMove.length} remaining waitlisted entrants to NonSelectedEntrants (excluding ${selectedUserIds.length} selected)`);
                     
-                    for (const remainingDoc of remainingWaitlistSnapshot.docs) {
-                        const userId = remainingDoc.id;
-                        const userData = remainingDoc.data();
+                    if (toMove.length > 0) {
+                        const nonSelectedBatch = admin.firestore().batch();
+                        const nonSelectedRef = admin.firestore().collection('events').doc(eventId).collection('NonSelectedEntrants');
                         
-                        // Add to NonSelectedEntrants
-                        nonSelectedBatch.set(nonSelectedRef.doc(userId), userData);
+                        for (const remainingDoc of toMove) {
+                            const userId = remainingDoc.id;
+                            const userData = remainingDoc.data();
+                            
+                            // Add to NonSelectedEntrants
+                            nonSelectedBatch.set(nonSelectedRef.doc(userId), userData);
+                            
+                            // Keep users in WaitlistedEntrants (don't delete)
+                            // nonSelectedBatch.delete(remainingWaitlistRef.doc(userId));
+                        }
                         
-                        // Remove from WaitlistedEntrants
-                        nonSelectedBatch.delete(remainingWaitlistRef.doc(userId));
+                        // Don't update waitlistCount - users stay in waitlist
+                        // nonSelectedBatch.update(eventDoc.ref, 'waitlistCount', 0);
+                        
+                        await nonSelectedBatch.commit();
+                        console.log(`✓ Moved ${toMove.length} remaining entrants to NonSelectedEntrants`);
+                    } else {
+                        console.log('No entrants to move after filtering out selected users');
                     }
-                    
-                    // Update waitlistCount to 0 (all remaining moved to NonSelectedEntrants)
-                    nonSelectedBatch.update(eventDoc.ref, 'waitlistCount', 0);
-                    
-                    await nonSelectedBatch.commit();
-                    console.log(`✓ Moved ${remainingWaitlistSnapshot.size} remaining entrants to NonSelectedEntrants`);
                 } else {
                     console.log('No remaining waitlisted entrants to move');
                 }

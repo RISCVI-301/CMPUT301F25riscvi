@@ -271,11 +271,12 @@ public class MyEventsFragment extends Fragment {
                         int admittedCount = allMyEvents.size();
                         
                         // Process waitlisted/selected events
-                        // Events should show in waitlisted until 48 hours before event start
+                        // Show events if user is in waitlist OR selected (regardless of time)
                         long currentTime = System.currentTimeMillis();
-                        long fortyEightHoursMs = 48L * 60 * 60 * 1000; // 48 hours in milliseconds
                         
                         List<Event> waitlistedSelected = new ArrayList<>();
+                        List<Event> acceptedNotYetShown = new ArrayList<>();
+                        
                         for (Event e : finalOpenEvents) {
                             try {
                                 // Skip if already added as admitted event
@@ -286,24 +287,19 @@ public class MyEventsFragment extends Fragment {
                                 Boolean joined = Tasks.await(waitlistRepo.isJoined(e.getId(), uid));
                                 Boolean inSelected = Tasks.await(isInSelectedEntrants(e.getId(), uid));
                                 Boolean admitted = Tasks.await(admittedRepo.isAdmitted(e.getId(), uid));
+                                Boolean hasAcceptedInvitation = Tasks.await(hasAcceptedInvitation(e.getId(), uid));
                                 
-                                android.util.Log.d("MyEventsFragment", "Event " + e.getTitle() + " - Joined: " + joined + ", Selected: " + inSelected + ", Admitted: " + admitted);
+                                android.util.Log.d("MyEventsFragment", "Event " + e.getTitle() + " - Joined: " + joined + ", Selected: " + inSelected + ", Admitted: " + admitted + ", Accepted: " + hasAcceptedInvitation);
                                 
-                                // Show if in waitlist OR selected, AND NOT admitted
-                                // (admitted events are already added from getUpcomingEvents)
-                                if ((Boolean.TRUE.equals(joined) || Boolean.TRUE.equals(inSelected)) && !Boolean.TRUE.equals(admitted)) {
-                                    // Check if event is more than 48 hours away
-                                    // If event start is less than 48 hours away, don't show in waitlisted
-                                    long eventStartMs = e.getStartsAtEpochMs();
-                                    if (eventStartMs > 0) {
-                                        long timeUntilEvent = eventStartMs - currentTime;
-                                        if (timeUntilEvent <= fortyEightHoursMs) {
-                                            // Event is 48 hours or less away, don't show in waitlisted
-                                            android.util.Log.d("MyEventsFragment", "Event " + e.getTitle() + " is " + (timeUntilEvent / (60 * 60 * 1000)) + " hours away, hiding from waitlisted");
-                                            continue;
-                                        }
-                                    }
-                                    
+                                // If user has accepted invitation, show in "Upcoming" section
+                                if (Boolean.TRUE.equals(hasAcceptedInvitation)) {
+                                    acceptedNotYetShown.add(e);
+                                    eventIds.add(e.getId());
+                                }
+                                // Otherwise, show if in waitlist OR selected, AND NOT admitted
+                                else if ((Boolean.TRUE.equals(joined) || Boolean.TRUE.equals(inSelected)) && !Boolean.TRUE.equals(admitted)) {
+                                    // Don't hide events based on time - show all waitlisted/selected events
+                                    // Users need to see their invitations regardless of how soon the event is
                                     waitlistedSelected.add(e);
                                     eventIds.add(e.getId());
                                 }
@@ -311,6 +307,9 @@ public class MyEventsFragment extends Fragment {
                                 android.util.Log.e("MyEventsFragment", "Error checking waitlist for event " + e.getId(), ex);
                             }
                         }
+                        
+                        // Add accepted events to upcoming section (after admitted events)
+                        allMyEvents.addAll(acceptedNotYetShown);
                         
                         // Add waitlisted/selected events
                         allMyEvents.addAll(waitlistedSelected);
@@ -324,7 +323,11 @@ public class MyEventsFragment extends Fragment {
                             }
                         }
                         
-                        android.util.Log.d("MyEventsFragment", "Total events for user: " + allMyEvents.size() + " (upcoming admitted: " + admittedCount + ", waitlisted/selected: " + waitlistedSelected.size() + ", previous: " + finalPreviousEvents.size() + ")");
+                        android.util.Log.d("MyEventsFragment", "Total events for user: " + allMyEvents.size() + 
+                                " (upcoming admitted: " + admittedCount + 
+                                ", accepted invitations: " + acceptedNotYetShown.size() + 
+                                ", waitlisted/selected: " + waitlistedSelected.size() + 
+                                ", previous: " + finalPreviousEvents.size() + ")");
                         
                         if (!isAdded()) return;
                         
@@ -354,6 +357,22 @@ public class MyEventsFragment extends Fragment {
                 .get()
                 .continueWith(task -> {
                     return task.isSuccessful() && task.getResult() != null && task.getResult().exists();
+                });
+    }
+    
+    private Task<Boolean> hasAcceptedInvitation(String eventId, String uid) {
+        com.google.firebase.firestore.FirebaseFirestore db = com.google.firebase.firestore.FirebaseFirestore.getInstance();
+        return db.collection("invitations")
+                .whereEqualTo("eventId", eventId)
+                .whereEqualTo("uid", uid)
+                .whereEqualTo("status", "ACCEPTED")
+                .limit(1)
+                .get()
+                .continueWith(task -> {
+                    if (task.isSuccessful() && task.getResult() != null) {
+                        return !task.getResult().isEmpty();
+                    }
+                    return false;
                 });
     }
 

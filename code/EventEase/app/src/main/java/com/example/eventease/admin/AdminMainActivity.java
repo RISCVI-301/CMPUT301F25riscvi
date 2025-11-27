@@ -79,7 +79,7 @@ public class AdminMainActivity extends AppCompatActivity {
         
         // Initialize notification permission launcher
         notificationPermissionLauncher = registerForActivityResult(
-                new ActivityResultContracts.RequestPermission(),
+                new ActivityResultContracts.Requeimage.pngstPermission(),
                 isGranted -> {
                     if (isGranted) {
                         Log.d("AdminMainActivity", "Notification permission granted");
