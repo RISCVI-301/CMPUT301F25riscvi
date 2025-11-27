@@ -80,6 +80,13 @@
             android:name=".ui.organizer.OrganizerEntrantLocationsActivity"
             android:exported="false" />
 
+        <!-- Test Activity for Visual Workflow Testing -->
+        <activity
+            android:name=".test.WorkflowTestActivity"
+            android:exported="false"
+            android:label="Workflow Test"
+            android:theme="@style/Theme.EventEase" />
+
         <service
             android:name="com.example.eventease.notifications.EventNotificationService"
             android:exported="false">

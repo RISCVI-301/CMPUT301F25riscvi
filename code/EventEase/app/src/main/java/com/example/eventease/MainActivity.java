@@ -196,7 +196,53 @@ public class MainActivity extends AppCompatActivity {
 
         // Handle external navigation intents (from detail activities)
         handleExternalNav(getIntent());
+        
+        // ============================================================
+        // TEMPORARY: Debug button for workflow testing
+        // TODO: REMOVE BEFORE PRODUCTION
+        // ============================================================
+        addDebugTestButton();
     }
+
+    /**
+     * TEMPORARY: Adds a floating debug button to launch workflow test.
+     * Remove this method before production deployment.
+     */
+    private void addDebugTestButton() {
+        android.widget.Button testBtn = new android.widget.Button(this);
+        testBtn.setText("🧪 Test");
+        testBtn.setTextSize(10);
+        testBtn.setPadding(16, 8, 16, 8);
+        
+        // Position in top-right corner
+        android.widget.FrameLayout.LayoutParams params = new android.widget.FrameLayout.LayoutParams(
+            android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+            android.widget.FrameLayout.LayoutParams.WRAP_CONTENT
+        );
+        params.gravity = android.view.Gravity.TOP | android.view.Gravity.END;
+        params.topMargin = 100;
+        params.rightMargin = 16;
+        testBtn.setLayoutParams(params);
+        
+        // Style
+        testBtn.setBackgroundColor(0xFF4CAF50); // Green
+        testBtn.setTextColor(0xFFFFFFFF); // White
+        testBtn.setAlpha(0.8f);
+        
+        // Click handler
+        testBtn.setOnClickListener(v -> {
+            Intent intent = new Intent(this, com.example.eventease.test.WorkflowTestActivity.class);
+            startActivity(intent);
+        });
+        
+        // Add to root view
+        ((android.view.ViewGroup) findViewById(android.R.id.content)).addView(testBtn);
+        
+        Log.d("MainActivity", "🧪 Debug test button added - REMOVE BEFORE PRODUCTION");
+    }
+    // ============================================================
+    // END TEMPORARY CODE
+    // ============================================================
 
     private void setupEntrantNavigation() {
         // Single unified listener that handles visibility and selection for all navigation
@@ -350,14 +396,14 @@ public class MainActivity extends AppCompatActivity {
     private void handleExternalNav(android.content.Intent intent) {
         if (intent == null) return;
         
-        // Check if notification contains eventId - open event detail page
+        // Check if notification contains eventId - open EventDetailActivity directly
         String eventId = intent.getStringExtra("eventId");
         if (eventId != null && !eventId.isEmpty()) {
-            Log.d("MainActivity", "Opening event detail page for eventId: " + eventId);
-            Intent eventDetailIntent = new Intent(this, com.example.eventease.ui.entrant.discover.EventDetailsDiscoverActivity.class);
-            eventDetailIntent.putExtra(com.example.eventease.ui.entrant.discover.EventDetailsDiscoverActivity.EXTRA_EVENT_ID, eventId);
-            eventDetailIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
-            startActivity(eventDetailIntent);
+            Log.d("MainActivity", "Opening EventDetailActivity for invitation - eventId: " + eventId);
+            // Open EventDetailActivity directly where user can accept/decline
+            Intent detailIntent = new Intent(this, com.example.eventease.ui.entrant.eventdetail.EventDetailActivity.class);
+            detailIntent.putExtra("eventId", eventId);
+            startActivity(detailIntent);
             return;
         }
         

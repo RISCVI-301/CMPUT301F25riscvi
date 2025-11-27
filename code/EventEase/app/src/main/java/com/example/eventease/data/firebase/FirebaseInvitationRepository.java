@@ -257,22 +257,19 @@ public class FirebaseInvitationRepository implements InvitationRepository {
                         inv.setStatus(Status.ACCEPTED);
                     }
                     
-                    if (admittedRepo != null) {
-                        Log.d(TAG, "Calling admittedRepo.admit() for eventId: " + eventId + ", uid: " + uid);
-                        return admittedRepo.admit(eventId, uid);
-                    } else {
-                        Log.e(TAG, "admittedRepo is NULL! Cannot admit user to event.");
-                        return Tasks.forResult(null);
-                    }
-                })
-                .continueWithTask(task -> {
-                    if (task.isSuccessful()) {
-                        Log.d(TAG, "Successfully completed admit task");
-                        notifyUid(uid);
-                    } else {
-                        Log.e(TAG, "Admit task failed", task.getException());
-                    }
-                    return task.isSuccessful() ? Tasks.forResult(null) : Tasks.forException(task.getException());
+                    // DON'T move to AdmittedEntrants - users stay in SelectedEntrants after accepting
+                    // This prevents replacement logic from breaking (empty SelectedEntrants = wrong count)
+                    // if (admittedRepo != null) {
+                    //     Log.d(TAG, "Calling admittedRepo.admit() for eventId: " + eventId + ", uid: " + uid);
+                    //     return admittedRepo.admit(eventId, uid);
+                    // } else {
+                    //     Log.e(TAG, "admittedRepo is NULL! Cannot admit user to event.");
+                    //     return Tasks.forResult(null);
+                    // }
+                    
+                    Log.d(TAG, "User " + uid + " accepted invitation for event " + eventId + " - staying in SelectedEntrants");
+                    notifyUid(uid);
+                    return Tasks.forResult(null);
                 });
     }
 
