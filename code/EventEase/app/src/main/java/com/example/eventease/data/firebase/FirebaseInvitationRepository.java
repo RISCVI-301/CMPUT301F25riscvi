@@ -257,19 +257,27 @@ public class FirebaseInvitationRepository implements InvitationRepository {
                         inv.setStatus(Status.ACCEPTED);
                     }
                     
-                    // DON'T move to AdmittedEntrants - users stay in SelectedEntrants after accepting
-                    // This prevents replacement logic from breaking (empty SelectedEntrants = wrong count)
-                    // if (admittedRepo != null) {
-                    //     Log.d(TAG, "Calling admittedRepo.admit() for eventId: " + eventId + ", uid: " + uid);
-                    //     return admittedRepo.admit(eventId, uid);
-                    // } else {
-                    //     Log.e(TAG, "admittedRepo is NULL! Cannot admit user to event.");
-                    //     return Tasks.forResult(null);
-                    // }
-                    
-                    Log.d(TAG, "User " + uid + " accepted invitation for event " + eventId + " - staying in SelectedEntrants");
-                    notifyUid(uid);
-                    return Tasks.forResult(null);
+                    // Move user to AdmittedEntrants so event appears in "upcoming events" immediately
+                    if (admittedRepo != null) {
+                        Log.d(TAG, "Calling admittedRepo.admit() for eventId: " + eventId + ", uid: " + uid);
+                        return admittedRepo.admit(eventId, uid)
+                                .continueWithTask(admitTask -> {
+                                    if (admitTask.isSuccessful()) {
+                                        Log.d(TAG, "✅ User " + uid + " accepted invitation and moved to AdmittedEntrants - event will appear in upcoming events");
+                                        // Check if we should send not-selected notifications after this acceptance
+                                        checkAndSendNotSelectedNotifications(eventId);
+                                    } else {
+                                        Log.e(TAG, "Failed to admit user to event", admitTask.getException());
+                                        // Still notify and continue even if admit fails
+                                    }
+                                    notifyUid(uid);
+                                    return Tasks.forResult(null);
+                                });
+                    } else {
+                        Log.e(TAG, "admittedRepo is NULL! Cannot admit user to event.");
+                        notifyUid(uid);
+                        return Tasks.forResult(null);
+                    }
                 });
     }
 
@@ -369,6 +377,171 @@ public class FirebaseInvitationRepository implements InvitationRepository {
         if (value != null && !value.trim().isEmpty()) {
             target.put(key, value);
         }
+    }
+    
+    /**
+     * Checks if event capacity is full and all selected entrants have accepted,
+     * then sends not-selected notifications to remaining non-selected entrants.
+     */
+    private void checkAndSendNotSelectedNotifications(String eventId) {
+        if (eventId == null || eventId.isEmpty()) {
+            return;
+        }
+        
+        Log.d(TAG, "Checking if should send not-selected notifications for event: " + eventId);
+        
+        DocumentReference eventRef = db.collection("events").document(eventId);
+        eventRef.get().addOnSuccessListener(eventDoc -> {
+            if (eventDoc == null || !eventDoc.exists()) {
+                Log.w(TAG, "Event not found when checking for not-selected notifications");
+                return;
+            }
+            
+            // Check if sorry notification already sent
+            Boolean sorryNotificationSent = eventDoc.getBoolean("sorryNotificationSent");
+            if (Boolean.TRUE.equals(sorryNotificationSent)) {
+                Log.d(TAG, "Sorry notification already sent for event " + eventId);
+                return;
+            }
+            
+            // Get event capacity
+            Object capacityObj = eventDoc.get("capacity");
+            int capacity = capacityObj != null ? ((Number) capacityObj).intValue() : -1;
+            
+            if (capacity <= 0) {
+                Log.d(TAG, "Event has no capacity limit, skipping not-selected notification check");
+                return;
+            }
+            
+            // Check AdmittedEntrants count (these are users who accepted)
+            eventRef.collection("AdmittedEntrants").get()
+                    .addOnSuccessListener(admittedSnapshot -> {
+                        int admittedCount = admittedSnapshot != null ? admittedSnapshot.size() : 0;
+                        
+                        Log.d(TAG, "Event capacity: " + capacity + ", Admitted count: " + admittedCount);
+                        
+                        // Check if capacity is full
+                        if (admittedCount >= capacity) {
+                            Log.d(TAG, "✅ Capacity is full! Checking if all selected have accepted...");
+                            
+                            // Check SelectedEntrants - if empty or all have accepted invitations, send notifications
+                            eventRef.collection("SelectedEntrants").get()
+                                    .addOnSuccessListener(selectedSnapshot -> {
+                                        int selectedCount = selectedSnapshot != null ? selectedSnapshot.size() : 0;
+                                        
+                                        // Check if there are any pending invitations for this event
+                                        db.collection("invitations")
+                                                .whereEqualTo("eventId", eventId)
+                                                .whereEqualTo("status", "PENDING")
+                                                .get()
+                                                .addOnSuccessListener(invitationSnapshot -> {
+                                                    int pendingInvitations = invitationSnapshot != null ? invitationSnapshot.size() : 0;
+                                                    
+                                                    Log.d(TAG, "Selected count: " + selectedCount + ", Pending invitations: " + pendingInvitations);
+                                                    
+                                                    // If no pending invitations, all selected have responded
+                                                    // Send not-selected notifications
+                                                    if (pendingInvitations == 0 && selectedCount == 0) {
+                                                        Log.d(TAG, "✅ All selected entrants have accepted! Sending not-selected notifications...");
+                                                        sendNotSelectedNotifications(eventId, eventDoc);
+                                                    } else {
+                                                        Log.d(TAG, "Still waiting for " + pendingInvitations + " pending invitations");
+                                                    }
+                                                })
+                                                .addOnFailureListener(e -> {
+                                                    Log.e(TAG, "Failed to check pending invitations", e);
+                                                });
+                                    })
+                                    .addOnFailureListener(e -> {
+                                        Log.e(TAG, "Failed to check SelectedEntrants", e);
+                                    });
+                        } else {
+                            Log.d(TAG, "Capacity not full yet (" + admittedCount + "/" + capacity + ")");
+                        }
+                    })
+                    .addOnFailureListener(e -> {
+                        Log.e(TAG, "Failed to check AdmittedEntrants", e);
+                    });
+        })
+        .addOnFailureListener(e -> {
+            Log.e(TAG, "Failed to load event for not-selected notification check", e);
+        });
+    }
+    
+    /**
+     * Sends not-selected notifications to all non-selected entrants.
+     */
+    private void sendNotSelectedNotifications(String eventId, DocumentSnapshot eventDoc) {
+        String eventTitle = eventDoc.getString("title");
+        if (eventTitle == null || eventTitle.isEmpty()) {
+            eventTitle = "this event";
+        }
+        
+        Log.d(TAG, "Sending not-selected notifications for event: " + eventId);
+        
+        DocumentReference eventRef = db.collection("events").document(eventId);
+        String finalEventTitle = eventTitle;
+        eventRef.collection("NonSelectedEntrants").get()
+                .addOnSuccessListener(nonSelectedSnapshot -> {
+                    if (nonSelectedSnapshot == null || nonSelectedSnapshot.isEmpty()) {
+                        Log.d(TAG, "No non-selected entrants to notify for event " + eventId);
+                        // Mark as sent even if no entrants
+                        markSorryNotificationSent(eventId);
+                        return;
+                    }
+                    
+                    List<String> userIds = new ArrayList<>();
+                    for (DocumentSnapshot doc : nonSelectedSnapshot.getDocuments()) {
+                        userIds.add(doc.getId());
+                    }
+                    
+                    if (userIds.isEmpty()) {
+                        Log.d(TAG, "No user IDs found in NonSelectedEntrants");
+                        markSorryNotificationSent(eventId);
+                        return;
+                    }
+                    
+                    Log.d(TAG, "Sending not-selected notifications to " + userIds.size() + " users");
+                    
+                    // Create notification request
+                    Map<String, Object> notificationRequest = new HashMap<>();
+                    notificationRequest.put("eventId", eventId);
+                    notificationRequest.put("eventTitle", finalEventTitle);
+                    notificationRequest.put("userIds", userIds);
+                    notificationRequest.put("groupType", "sorry");
+                    notificationRequest.put("title", "Selection Complete: " + finalEventTitle);
+                    notificationRequest.put("message", "Thank you for your interest in \"" + finalEventTitle + "\". The selection process has been completed. We appreciate your participation and hope to see you at future events!");
+                    notificationRequest.put("status", "PENDING");
+                    notificationRequest.put("createdAt", System.currentTimeMillis());
+                    notificationRequest.put("processed", false);
+                    
+                    // Write to notificationRequests collection - Cloud Functions will handle sending
+                    db.collection("notificationRequests").add(notificationRequest)
+                            .addOnSuccessListener(docRef -> {
+                                Log.d(TAG, "✓ Created not-selected notification request for " + userIds.size() + " users");
+                                markSorryNotificationSent(eventId);
+                            })
+                            .addOnFailureListener(e -> {
+                                Log.e(TAG, "Failed to create not-selected notification request", e);
+                            });
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to load NonSelectedEntrants for event " + eventId, e);
+                });
+    }
+    
+    /**
+     * Marks the event as having sent the sorry notification.
+     */
+    private void markSorryNotificationSent(String eventId) {
+        db.collection("events").document(eventId)
+                .update("sorryNotificationSent", true)
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "Marked event as having sent sorry notification");
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to mark sorry notification as sent", e);
+                });
     }
 
     private List<Invitation> activeFor(String uid) {

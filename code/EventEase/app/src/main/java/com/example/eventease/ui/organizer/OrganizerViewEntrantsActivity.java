@@ -1036,36 +1036,54 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
         
         SimpleDateFormat sdf = new SimpleDateFormat("MMM d, yyyy 'at' h:mm a", Locale.getDefault());
         String deadlineStr = sdf.format(new Date(deadlineMs));
-        String message = String.format(
-                "You've been manually selected for \"%s\"! Please accept or decline by %s",
+        String notificationTitle = "You've been selected! 🎉";
+        String notificationMessage = String.format(
+                "Congratulations! You've been selected for \"%s\". Please check your invitations to accept or decline. Deadline to respond: %s",
                 eventTitle, deadlineStr
         );
 
-        // Use NotificationHelper for push notifications (works when app is closed via Cloud Functions)
-        NotificationHelper notificationHelper = new NotificationHelper();
-        notificationHelper.sendNotificationsToUsers(
-                userIds,
-                "Replacement Invitation",
-                message,
-                eventId,
-                eventTitle != null ? eventTitle : "the event",
-                false, // filterDeclined = false (they're new replacements, haven't declined yet)
-                new NotificationHelper.NotificationCallback() {
-                    @Override
-                    public void onComplete(int sentCount) {
-                        Log.d(TAG, "✓ Successfully sent " + sentCount + " replacement push notifications");
-                        Toast.makeText(OrganizerViewEntrantsActivity.this, 
-                                "Sent " + sentCount + " notification(s)", Toast.LENGTH_SHORT).show();
+        // Get organizer ID from event
+        db.collection("events").document(eventId).get()
+                .addOnSuccessListener(eventDoc -> {
+                    if (eventDoc == null || !eventDoc.exists()) {
+                        Log.e(TAG, "Event not found when sending replacement notifications");
+                        return;
                     }
                     
-                    @Override
-                    public void onError(String error) {
-                        Log.e(TAG, "✗ Failed to send replacement notifications: " + error);
-                        Toast.makeText(OrganizerViewEntrantsActivity.this, 
-                                "Failed to send notifications: " + error, Toast.LENGTH_LONG).show();
+                    String organizerId = eventDoc.getString("organizerId");
+                    if (organizerId == null || organizerId.isEmpty()) {
+                        organizerId = "system";
                     }
-                }
-        );
+                    
+                    // Create notification request (same format as initial selection)
+                    Map<String, Object> notificationRequest = new HashMap<>();
+                    notificationRequest.put("eventId", eventId);
+                    notificationRequest.put("eventTitle", eventTitle != null ? eventTitle : "Event");
+                    notificationRequest.put("organizerId", organizerId);
+                    notificationRequest.put("userIds", userIds);
+                    notificationRequest.put("groupType", "selection");
+                    notificationRequest.put("message", notificationMessage);
+                    notificationRequest.put("title", notificationTitle);
+                    notificationRequest.put("status", "PENDING");
+                    notificationRequest.put("createdAt", System.currentTimeMillis());
+                    notificationRequest.put("processed", false);
+                    
+                    // Write to notificationRequests collection - Cloud Functions will handle sending
+                    db.collection("notificationRequests").add(notificationRequest)
+                            .addOnSuccessListener(docRef -> {
+                                Log.d(TAG, "✓ Created replacement selection notification request for " + userIds.size() + " users");
+                                Toast.makeText(OrganizerViewEntrantsActivity.this, 
+                                        "Sent " + userIds.size() + " notification(s)", Toast.LENGTH_SHORT).show();
+                            })
+                            .addOnFailureListener(e -> {
+                                Log.e(TAG, "Failed to create replacement notification request", e);
+                                Toast.makeText(OrganizerViewEntrantsActivity.this, 
+                                        "Failed to send notifications: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                            });
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to load event for replacement notifications", e);
+                });
     }
 
     /**
