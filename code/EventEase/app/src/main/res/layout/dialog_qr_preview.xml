@@ -83,12 +83,33 @@
                 app:backgroundTint="@color/ee_navy_dark"/>
         </LinearLayout>
 
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="8dp"
+            android:gravity="center"
+            android:text="If scanning doesn't work, use a QR scanner app or copy the link"
+            android:textColor="@color/ee_text_light"
+            android:textSize="12sp"
+            android:padding="8dp"/>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnCopyLink"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginTop="8dp"
+            android:text="Copy Link"
+            android:textStyle="bold"
+            android:textColor="@color/ee_navy_dark"
+            app:backgroundTint="@android:color/white"/>
+
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnViewEvents"
             android:layout_width="match_parent"
             android:layout_height="52dp"
-            android:layout_marginTop="16dp"
-            android:text="View My Events"
+            android:layout_marginTop="12dp"
+            android:text="Close"
             android:textStyle="bold"
             android:textColor="@color/ee_navy_dark"
             app:backgroundTint="@android:color/white"/>

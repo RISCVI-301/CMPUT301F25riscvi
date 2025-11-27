@@ -166,8 +166,8 @@ public class EventDetailActivity extends AppCompatActivity {
         if (storedQrPayload != null && !storedQrPayload.isEmpty()) {
             qrPayload = storedQrPayload;
         } else {
-            // Generate QR payload - use HTTP URL format for better QR scanner compatibility
-            qrPayload = "https://eventease.app/event/" + eventId;
+            // Generate QR payload - use custom scheme format
+            qrPayload = "eventease://event/" + eventId;
         }
 
         final String eventTitleText = event.getTitle() != null ? event.getTitle() : "Event";
@@ -178,6 +178,7 @@ public class EventDetailActivity extends AppCompatActivity {
         ImageView imgQr = dialog.findViewById(R.id.imgQr);
         MaterialButton btnShare = dialog.findViewById(R.id.btnShare);
         MaterialButton btnSave = dialog.findViewById(R.id.btnSave);
+        MaterialButton btnCopyLink = dialog.findViewById(R.id.btnCopyLink);
         MaterialButton btnViewEvents = dialog.findViewById(R.id.btnViewEvents);
 
         if (titleView != null) {
@@ -213,6 +214,15 @@ public class EventDetailActivity extends AppCompatActivity {
                 } else {
                     Toast.makeText(this, "QR not ready yet.", Toast.LENGTH_SHORT).show();
                 }
+            });
+        }
+
+        if (btnCopyLink != null) {
+            btnCopyLink.setOnClickListener(v -> {
+                android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                android.content.ClipData clip = android.content.ClipData.newPlainText("Event Link", qrPayload);
+                clipboard.setPrimaryClip(clip);
+                Toast.makeText(this, "Link copied to clipboard!", Toast.LENGTH_SHORT).show();
             });
         }
 

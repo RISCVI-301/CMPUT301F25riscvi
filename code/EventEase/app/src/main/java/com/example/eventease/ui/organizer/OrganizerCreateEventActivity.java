@@ -4,6 +4,7 @@ import android.app.DatePickerDialog;
 import android.app.Dialog;
 import android.app.TimePickerDialog;
 import android.content.ContentValues;
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Color;
@@ -715,8 +716,8 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         doc.put("organizerId", organizerId);
         doc.put("createdAt", System.currentTimeMillis());
         doc.put("createdAtEpochMs", System.currentTimeMillis());
-        // Use HTTP URL format for better QR scanner compatibility
-        doc.put("qrPayload", generateQr ? ("https://eventease.app/event/" + id) : null);
+        // Use custom scheme format that works better with QR scanners
+        doc.put("qrPayload", generateQr ? ("eventease://event/" + id) : null);
         FirebaseFirestore.getInstance()
                 .collection("events")
                 .document(id)
@@ -724,7 +725,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                 .addOnSuccessListener(v -> {
                     btnSave.setEnabled(true);
                     btnSave.setText("SAVE CHANGES");
-                    showSuccessDialog(id, title, generateQr ? ("https://eventease.app/event/" + id) : null);
+                    showSuccessDialog(id, title, generateQr ? ("eventease://event/" + id) : null);
                 })
                 .addOnFailureListener(e -> {
                     Log.e(TAG, "Firestore write failed", e);
@@ -789,6 +790,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         ImageView imgQr = dialog.findViewById(R.id.imgQr);
         MaterialButton btnShare = dialog.findViewById(R.id.btnShare);
         MaterialButton btnSave = dialog.findViewById(R.id.btnSave);
+        MaterialButton btnCopyLink = dialog.findViewById(R.id.btnCopyLink);
         MaterialButton btnViewEvents = dialog.findViewById(R.id.btnViewEvents);
 
         if (titleView != null) {
@@ -827,10 +829,18 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
             });
         }
 
+        if (btnCopyLink != null) {
+            btnCopyLink.setOnClickListener(v -> {
+                android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                android.content.ClipData clip = android.content.ClipData.newPlainText("Event Link", qrPayload);
+                clipboard.setPrimaryClip(clip);
+                toast("Link copied to clipboard!");
+            });
+        }
+
         if (btnViewEvents != null) {
             btnViewEvents.setOnClickListener(v -> {
                 dialog.dismiss();
-                goToMyEvents();
             });
         }
 
