@@ -16,7 +16,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
-import com.example.eventease.auth.AuthManager;
 import com.example.eventease.data.WaitlistRepository;
 import com.example.eventease.model.Event;
 import com.bumptech.glide.Glide;
@@ -59,7 +58,6 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
     private FirebaseFirestore firestore;
     
     private WaitlistRepository waitlistRepo;
-    private AuthManager authManager;
 
     private Event currentEvent;
     private String eventId;
@@ -76,7 +74,6 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
 
         // Initialize repositories
         waitlistRepo = App.graph().waitlists;
-        authManager = App.graph().auth;
 
         bindViews();
 
@@ -454,11 +451,11 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
      * Check if the current user is already in the waitlist
      */
     private void checkWaitlistStatus() {
-        if (authManager == null || waitlistRepo == null || TextUtils.isEmpty(eventId)) {
+        if (waitlistRepo == null || TextUtils.isEmpty(eventId)) {
             return;
         }
 
-        String uid = authManager.getUid();
+        String uid = com.example.eventease.auth.AuthHelper.getUid(this);
         waitlistRepo.isJoined(eventId, uid)
                 .addOnSuccessListener(joined -> {
                     isUserInWaitlist = joined != null && joined;
@@ -483,8 +480,8 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
             return;
         }
 
-        if (authManager == null || waitlistRepo == null || TextUtils.isEmpty(eventId)) {
-            android.util.Log.e("EventDetailsDiscover", "Cannot join: authManager=" + authManager + ", waitlistRepo=" + waitlistRepo + ", eventId=" + eventId);
+        if (waitlistRepo == null || TextUtils.isEmpty(eventId)) {
+            android.util.Log.e("EventDetailsDiscover", "Cannot join: waitlistRepo=" + waitlistRepo + ", eventId=" + eventId);
             Toast.makeText(this, "Unable to join waitlist. Please try again.", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -509,9 +506,10 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
 
         // Disable button to prevent multiple clicks
         waitlistButton.setEnabled(false);
-        android.util.Log.d("EventDetailsDiscover", "Calling waitlistRepo.join for eventId=" + eventId + ", uid=" + authManager.getUid());
+        String currentUid = com.example.eventease.auth.AuthHelper.getUid(this);
+        android.util.Log.d("EventDetailsDiscover", "Calling waitlistRepo.join for eventId=" + eventId + ", uid=" + currentUid);
 
-        String uid = authManager.getUid();
+        String uid = com.example.eventease.auth.AuthHelper.getUid(this);
         waitlistRepo.join(eventId, uid)
                 .addOnSuccessListener(aVoid -> {
                     android.util.Log.d("EventDetailsDiscover", "Successfully joined waitlist");
@@ -537,7 +535,7 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
      * Handle opt out from waitlist
      */
     private void handleOptOut() {
-        if (authManager == null || waitlistRepo == null || TextUtils.isEmpty(eventId)) {
+        if (waitlistRepo == null || TextUtils.isEmpty(eventId)) {
             Toast.makeText(this, "Unable to leave waitlist. Please try again.", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -545,7 +543,7 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
         // Disable button to prevent multiple clicks
         waitlistButton.setEnabled(false);
 
-        String uid = authManager.getUid();
+        String uid = com.example.eventease.auth.AuthHelper.getUid(this);
         waitlistRepo.leave(eventId, uid)
                 .addOnSuccessListener(aVoid -> {
                     isUserInWaitlist = false;

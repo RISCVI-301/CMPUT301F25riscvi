@@ -25,7 +25,6 @@ import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions;
 import androidx.navigation.Navigation;
 
-import com.example.eventease.auth.AuthManager;
 import com.example.eventease.data.EventRepository;
 import com.example.eventease.data.InvitationListener;
 import com.example.eventease.data.InvitationRepository;
@@ -72,7 +71,6 @@ public class MyEventsFragment extends Fragment {
     private EventRepository eventRepo;
     private WaitlistRepository waitlistRepo;
     private InvitationRepository invitationRepo;
-    private AuthManager auth;
     private com.example.eventease.data.AdmittedRepository admittedRepo;
 
     private RecyclerView list;
@@ -132,13 +130,13 @@ public class MyEventsFragment extends Fragment {
         eventRepo      = App.graph().events;
         waitlistRepo   = App.graph().waitlists;
         invitationRepo = App.graph().invitations;
-        auth           = App.graph().auth;
         admittedRepo   = App.graph().admitted;
 
         setLoading(true);
         loadMyEvents();
 
-        inviteReg = invitationRepo.listenActive(auth.getUid(), new InvitationListener() {
+        String uid = com.example.eventease.auth.AuthHelper.getUid(requireContext());
+        inviteReg = invitationRepo.listenActive(uid, new InvitationListener() {
             @Override
             public void onChanged(List<Invitation> activeInvites) {
                 invitedEventIds.clear();
@@ -158,7 +156,7 @@ public class MyEventsFragment extends Fragment {
     public void onResume() {
         super.onResume();
         // Refresh event list when returning to fragment (e.g., after accepting invitation)
-        if (eventRepo != null && waitlistRepo != null && auth != null) {
+        if (eventRepo != null && waitlistRepo != null) {
             setLoading(true);
             loadMyEvents();
         }
@@ -186,7 +184,7 @@ public class MyEventsFragment extends Fragment {
     }
 
     private void loadMyEvents() {
-        String uid = auth.getUid();
+        String uid = com.example.eventease.auth.AuthHelper.getUid(requireContext());
         if (uid == null || uid.isEmpty()) {
             android.util.Log.e("MyEventsFragment", "User UID is null or empty");
             adapter.submit(new ArrayList<>());

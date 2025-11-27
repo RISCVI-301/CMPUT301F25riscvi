@@ -39,6 +39,13 @@
             </intent-filter>
         </activity>
 
+        <!-- Profile Setup Activity (First-time user) -->
+        <activity
+            android:name="com.example.eventease.auth.ProfileSetupActivity"
+            android:exported="false"
+            android:label="Setup Profile"
+            android:theme="@style/Theme.EventEase" />
+
         <!-- Admin Activity -->
         <activity
             android:name="com.example.eventease.admin.AdminMainActivity"

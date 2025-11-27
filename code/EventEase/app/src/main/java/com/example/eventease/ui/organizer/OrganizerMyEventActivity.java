@@ -13,8 +13,6 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.eventease.R;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentChange;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
@@ -122,20 +120,23 @@ public class OrganizerMyEventActivity extends AppCompatActivity {
         if (isResolvingOrganizerId) {
             return;
         }
-        FirebaseUser current = FirebaseAuth.getInstance().getCurrentUser();
-        if (current == null) {
+        // Get device ID as organizer ID
+        com.example.eventease.auth.DeviceAuthManager authManager = 
+            new com.example.eventease.auth.DeviceAuthManager(this);
+        String deviceId = authManager.getUid();
+        
+        if (deviceId == null || deviceId.isEmpty()) {
             return;
         }
+        
         isResolvingOrganizerId = true;
+        organizerId = deviceId; // Use device ID directly
+        
         FirebaseFirestore.getInstance()
                 .collection("users")
-                .document(current.getUid())
+                .document(deviceId)
                 .get()
                 .addOnSuccessListener(doc -> {
-                    organizerId = doc != null ? doc.getString("organizerId") : null;
-                    if (organizerId == null || organizerId.trim().isEmpty()) {
-                        organizerId = current.getUid();
-                    }
                     isResolvingOrganizerId = false;
                     if (organizerId == null || organizerId.trim().isEmpty()) {
                         Toast.makeText(this, "Organizer ID not set for this account", Toast.LENGTH_LONG).show();
@@ -152,8 +153,11 @@ public class OrganizerMyEventActivity extends AppCompatActivity {
     @Override
     protected void onStart() {
         super.onStart();
-        if (FirebaseAuth.getInstance().getCurrentUser() == null) {
-            Toast.makeText(this, "Please sign in to view your events", Toast.LENGTH_LONG).show();
+        // Device auth - always have profile by this point
+        com.example.eventease.auth.DeviceAuthManager authManager = 
+            new com.example.eventease.auth.DeviceAuthManager(this);
+        if (!authManager.hasCachedProfile()) {
+            Toast.makeText(this, "Please complete your profile setup", Toast.LENGTH_LONG).show();
             finish();
             return;
         }

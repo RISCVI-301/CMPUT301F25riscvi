@@ -18,8 +18,6 @@ import com.bumptech.glide.Glide;
 import com.example.eventease.R;
 import com.example.eventease.ui.entrant.profile.ProfileDeletionHelper;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -78,16 +76,18 @@ public class OrganizerAccountActivity extends AppCompatActivity {
 
         tvFullName.setText("Loading...");
         Glide.with(this).load(R.drawable.entrant_icon).circleCrop().into(ivAvatar);
-        final FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        if (user == null) {
-            Toast.makeText(this, "Please sign in to view your account", Toast.LENGTH_LONG).show();
+        
+        // Get device ID
+        String userId = com.example.eventease.auth.AuthHelper.getUid(this);
+        if (userId == null || userId.isEmpty()) {
+            Toast.makeText(this, "Please complete your profile", Toast.LENGTH_LONG).show();
             finish();
             return;
         }
         
-        updateUserIdLabel(user.getUid());
-        loadProfile(user.getUid());
-        resolveOrganizerId(() -> updateUserIdLabel(user.getUid()));
+        updateUserIdLabel(userId);
+        loadProfile(userId);
+        resolveOrganizerId(() -> updateUserIdLabel(userId));
 
         ivAvatar.setOnClickListener(v -> pickImage.launch("image/*"));
 
@@ -123,8 +123,8 @@ public class OrganizerAccountActivity extends AppCompatActivity {
 
     private void resolveOrganizerId(@Nullable Runnable onReady) {
         if (organizerId != null && !organizerId.trim().isEmpty()) {
-            FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-            updateUserIdLabel(user != null ? user.getUid() : "");
+            String userId = com.example.eventease.auth.AuthHelper.getUid(this);
+            updateUserIdLabel(userId != null ? userId : "");
             if (onReady != null) {
                 onReady.run();
             }
@@ -133,23 +133,21 @@ public class OrganizerAccountActivity extends AppCompatActivity {
         if (isResolvingOrganizerId) {
             return;
         }
-        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        if (user == null) {
+        String userId = com.example.eventease.auth.AuthHelper.getUid(this);
+        if (userId == null || userId.isEmpty()) {
             Toast.makeText(this, "Please sign in again", Toast.LENGTH_LONG).show();
             return;
         }
         isResolvingOrganizerId = true;
+        organizerId = userId; // Use device ID as organizer ID
+        
         FirebaseFirestore.getInstance()
                 .collection("users")
-                .document(user.getUid())
+                .document(userId)
                 .get()
                 .addOnSuccessListener(doc -> {
-                    organizerId = doc != null ? doc.getString("organizerId") : null;
-                    if (organizerId == null || organizerId.trim().isEmpty()) {
-                        organizerId = doc != null ? doc.getId() : user.getUid();
-                    }
                     isResolvingOrganizerId = false;
-                    updateUserIdLabel(user.getUid());
+                    updateUserIdLabel(userId);
                     if (organizerId == null || organizerId.trim().isEmpty()) {
                         Toast.makeText(this, "Organizer profile not configured yet.", Toast.LENGTH_LONG).show();
                     } else if (onReady != null) {
@@ -225,8 +223,8 @@ public class OrganizerAccountActivity extends AppCompatActivity {
      */
     private void loadProfile(String documentId) {
         if (documentId == null || documentId.trim().isEmpty()) {
-            FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-            documentId = user != null ? user.getUid() : "";
+            String userId = com.example.eventease.auth.AuthHelper.getUid(this);
+            documentId = userId != null ? userId : "";
         }
         final String docId = documentId;
         FirebaseFirestore.getInstance()
@@ -273,9 +271,9 @@ public class OrganizerAccountActivity extends AppCompatActivity {
             Glide.with(this).load(R.drawable.entrant_icon).circleCrop().into(ivAvatar);
         }
 
-        FirebaseUser authUser = FirebaseAuth.getInstance().getCurrentUser();
-        if (authUser != null) {
-            updateUserIdLabel(authUser.getUid());
+        String authUserId = com.example.eventease.auth.AuthHelper.getUid(this);
+        if (authUserId != null && !authUserId.isEmpty()) {
+            updateUserIdLabel(authUserId);
         }
     }
     /**
@@ -285,8 +283,8 @@ public class OrganizerAccountActivity extends AppCompatActivity {
      * @param uri The local URI of the image to be uploaded.
      */
     private void uploadNewAvatar(Uri uri) {
-        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        if (user == null) {
+        String userId = com.example.eventease.auth.AuthHelper.getUid(this);
+        if (userId == null || userId.isEmpty()) {
             Toast.makeText(this, "Not signed in", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -324,13 +322,11 @@ public class OrganizerAccountActivity extends AppCompatActivity {
     }
 
     private void deleteProfile() {
-        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
-        if (currentUser == null) {
-            Toast.makeText(this, "Not signed in", Toast.LENGTH_SHORT).show();
+        String uid = com.example.eventease.auth.AuthHelper.getUid(this);
+        if (uid == null || uid.isEmpty()) {
+            Toast.makeText(this, "No profile found", Toast.LENGTH_SHORT).show();
             return;
         }
-
-        String uid = currentUser.getUid();
         
         Toast.makeText(this, "Deleting profile...", Toast.LENGTH_SHORT).show();
 
@@ -353,24 +349,10 @@ public class OrganizerAccountActivity extends AppCompatActivity {
         DocumentReference userRef = FirebaseFirestore.getInstance().collection("users").document(uid);
         userRef.delete()
             .addOnSuccessListener(aVoid -> {
-                FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
-                if (currentUser != null) {
-                    currentUser.delete()
-                        .addOnSuccessListener(aVoid1 -> {
-                            FirebaseAuth.getInstance().signOut();
-                            Toast.makeText(this, "Profile deleted successfully", Toast.LENGTH_SHORT).show();
-                            finish();
-                        })
-                        .addOnFailureListener(e -> {
-                            Log.e(TAG, "Failed to delete auth account", e);
-                            FirebaseAuth.getInstance().signOut();
-                            Toast.makeText(this, "Profile deleted (some cleanup may be pending)", Toast.LENGTH_SHORT).show();
-                            finish();
-                        });
-                } else {
-                    Toast.makeText(this, "Profile deleted successfully", Toast.LENGTH_SHORT).show();
-                    finish();
-                }
+                // Device auth - clear cache to trigger profile setup on next launch
+                new com.example.eventease.auth.DeviceAuthManager(OrganizerAccountActivity.this).clearCache();
+                Toast.makeText(this, "Profile deleted successfully", Toast.LENGTH_SHORT).show();
+                finish();
             })
             .addOnFailureListener(e -> {
                 Log.e(TAG, "Failed to delete user document", e);

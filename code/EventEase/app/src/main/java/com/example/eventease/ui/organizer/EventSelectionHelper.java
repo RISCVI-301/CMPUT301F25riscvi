@@ -4,8 +4,6 @@ import android.util.Log;
 
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -522,17 +520,11 @@ public class EventSelectionHelper {
                 return;
             }
             
-            // FIX: Get organizer ID from event document instead of requiring authentication
+            // Get organizer ID from event document (should always be there)
             String organizerId = eventDoc.getString("organizerId");
             if (organizerId == null || organizerId.isEmpty()) {
-                // Fallback to current user if available
-                FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
-                if (currentUser != null) {
-                    organizerId = currentUser.getUid();
-                } else {
-                    Log.w(TAG, "No organizer ID in event, but proceeding with notification anyway");
-                    organizerId = "system"; // Use a placeholder
-                }
+                Log.w(TAG, "No organizer ID in event, using placeholder");
+                organizerId = "system"; // Use a placeholder
             }
             
             final String finalOrganizerId = organizerId;
@@ -584,11 +576,7 @@ public class EventSelectionHelper {
             Log.e(TAG, "Failed to check selection notification status", e);
             // FIX: Even on error, try to send notification to ensure it's sent
             Log.w(TAG, "Attempting to send notification despite error checking status");
-            String organizerId = "system";
-            FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
-            if (currentUser != null) {
-                organizerId = currentUser.getUid();
-            }
+            String organizerId = "system"; // Use placeholder if event fetch fails
             // Use the existing eventRef variable that was declared at the start of the method
             sendSelectionNotification(eventId, eventTitle, userIds, deadlineEpochMs, eventRef, organizerId, callback);
         });
@@ -688,17 +676,11 @@ public class EventSelectionHelper {
             
             String organizerId = eventDoc.getString("organizerId");
             if (organizerId == null || organizerId.isEmpty()) {
-                // Fallback to current user if available
-                FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
-                if (currentUser != null) {
-                    organizerId = currentUser.getUid();
-                } else {
-                    Log.e(TAG, "No organizer ID found in event and user not authenticated");
-                    if (callback != null) {
-                        callback.onError("No organizer ID available");
-                    }
-                    return;
+                Log.e(TAG, "No organizer ID found in event");
+                if (callback != null) {
+                    callback.onError("No organizer ID available");
                 }
+                return;
             }
             
             final String finalOrganizerId = organizerId;

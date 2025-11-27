@@ -160,12 +160,7 @@ public class ReplacementHelper {
                                         invitation.put("expiresAt", deadlineToAccept);
                                         invitation.put("isReplacement", true);
                                         
-                                        // Get organizer ID for consistency
-                                        com.google.firebase.auth.FirebaseAuth auth = com.google.firebase.auth.FirebaseAuth.getInstance();
-                                        com.google.firebase.auth.FirebaseUser currentUser = auth.getCurrentUser();
-                                        if (currentUser != null) {
-                                            invitation.put("organizerId", currentUser.getUid());
-                                        }
+                                        // Get organizer ID from event document (should already be there)
                                         
                                         batch.set(db.collection("invitations").document(invitationId), invitation);
                                     }

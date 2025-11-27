@@ -8,7 +8,6 @@ import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.eventease.R;
-import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 
@@ -24,6 +23,14 @@ import java.util.UUID;
 /**
  * Visual test activity for the complete workflow.
  * Shows real-time progress as the test runs.
+ * 
+ * ⚠️ IMPORTANT: With Device ID authentication, this test now requires:
+ * - 4 Android emulators (1 organizer + 3 entrants)
+ * - Manual testing by switching between emulators
+ * - Each emulator will have a unique device ID
+ * 
+ * The automated email-based testing is NO LONGER SUPPORTED.
+ * See MIGRATION_FINAL_SUMMARY.md for emulator setup instructions.
  */
 public class WorkflowTestActivity extends AppCompatActivity {
     private static final String TAG = "WorkflowTest";
@@ -32,7 +39,6 @@ public class WorkflowTestActivity extends AppCompatActivity {
     private ScrollView scrollView;
     private StringBuilder logBuilder;
     private FirebaseFirestore db;
-    private FirebaseAuth auth;
     private Button btnOpenOrganizerView;
     
     private String testEventId;
@@ -53,9 +59,9 @@ public class WorkflowTestActivity extends AppCompatActivity {
         
         logBuilder = new StringBuilder();
         db = FirebaseFirestore.getInstance();
-        auth = FirebaseAuth.getInstance();
         
-        organizerId = auth.getCurrentUser() != null ? auth.getCurrentUser().getUid() : null;
+        // Get device ID as organizer ID
+        organizerId = com.example.eventease.auth.AuthHelper.getUid(this);
         
         btnStart.setOnClickListener(v -> runWorkflowTest());
         btnCheckState.setOnClickListener(v -> checkCurrentState());
@@ -67,14 +73,14 @@ public class WorkflowTestActivity extends AppCompatActivity {
             btnOpenOrganizerView.setEnabled(true);
         }
         
-        log("🎬 Workflow Test Ready! (⚡ FAST MODE)");
-        log("📱 Organizer ID: " + organizerId);
+        log("🎬 Workflow Test Ready!");
+        log("📱 Organizer Device ID: " + organizerId);
         log("");
-        log("📝 Test Users:");
-        log("   1. shinchan@gmail.com (pwd: shinchan)");
-        log("   2. himawari@gmail.com (pwd: himawari)");
-        log("   3. sanika1234@gmail.com (pwd: sanika@123)");
-        log("   4. chotabheem@gmail.com (pwd: chotabheem)");
+        log("⚠️ DEVICE ID AUTHENTICATION MODE");
+        log("════════════════════════════════");
+        log("This test NOW REQUIRES 4 emulators!");
+        log("Each emulator = unique device ID");
+        log("No email/password login needed!");
         log("");
         log("═══════════════════════════════════════");
         log("⚡ MULTI-ACCOUNT TESTING WORKFLOW");
@@ -85,16 +91,14 @@ public class WorkflowTestActivity extends AppCompatActivity {
         log("  2. Wait 15 seconds → selection happens");
         log("  3. Click 'Check State' → see who's selected");
         log("");
-        log("PHASE 2: Accept/Decline (as Entrant)");
-        log("  1. Log out");
-        log("  2. Log in as selected user");
-        log("  3. Check notification → accept or decline");
-        log("  4. Test stays active - don't worry!");
+        log("PHASE 2: Accept/Decline (Switch to Entrant Emulator)");
+        log("  1. Switch to selected user's emulator");
+        log("  2. Check notification → accept or decline");
+        log("  3. Test stays active - persistent!");
         log("");
-        log("PHASE 3: Replacement (back to Organizer)");
-        log("  1. Log out from entrant");
-        log("  2. Log back in as organizer");
-        log("  3. Click '🎯 Open Organizer View' button");
+        log("PHASE 3: Replacement (Switch to Organizer Emulator)");
+        log("  1. Switch back to organizer emulator");
+        log("  2. Click '🎯 Open Organizer View' button");
         log("  4. Click 'Replacement' → select from NonSelected");
         log("  5. Provide deadline → send invitation");
         log("");

@@ -4,8 +4,6 @@ import android.util.Log;
 
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -115,20 +113,28 @@ public class NotificationHelper {
             return;
         }
         
-        // Get current user (organizer)
-        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
-        if (currentUser == null) {
-            if (callback != null) {
-                callback.onError("User not authenticated");
-            }
-            return;
-        }
-        String organizerId = currentUser.getUid();
-        
         DocumentReference eventRef = db.collection("events").document(eventId);
         
-        // Get all entrants from the specified subcollection
-        eventRef.collection(subcollectionName).get()
+        // Get organizerId from event document (already stored there)
+        eventRef.get().addOnSuccessListener(eventDoc -> {
+            if (!eventDoc.exists()) {
+                Log.e(TAG, "Event not found: " + eventId);
+                if (callback != null) {
+                    callback.onError("Event not found");
+                }
+                return;
+            }
+            
+            String organizerId = eventDoc.getString("organizerId");
+            if (organizerId == null || organizerId.isEmpty()) {
+                Log.w(TAG, "No organizerId in event document, this should not happen");
+                organizerId = "unknown";
+            }
+            
+            String finalOrganizerId = organizerId;
+            
+            // Get all entrants from the specified subcollection
+            eventRef.collection(subcollectionName).get()
                 .addOnSuccessListener(snapshot -> {
                     if (snapshot == null || snapshot.isEmpty()) {
                         Log.d(TAG, "No entrants in " + subcollectionName + " to send notifications to");
@@ -165,7 +171,7 @@ public class NotificationHelper {
                     Map<String, Object> notificationRequest = new HashMap<>();
                     notificationRequest.put("eventId", eventId);
                     notificationRequest.put("eventTitle", eventTitle != null ? eventTitle : "Event");
-                    notificationRequest.put("organizerId", organizerId);
+                    notificationRequest.put("organizerId", finalOrganizerId);
                     notificationRequest.put("userIds", userIds);
                     notificationRequest.put("groupType", groupType);
                     notificationRequest.put("message", notificationMessage);
@@ -198,6 +204,12 @@ public class NotificationHelper {
                         callback.onError("Failed to load entrants: " + e.getMessage());
                     }
                 });
+        }).addOnFailureListener(e -> {
+            Log.e(TAG, "Failed to load event document", e);
+            if (callback != null) {
+                callback.onError("Failed to load event: " + e.getMessage());
+            }
+        });
     }
     
     /**
@@ -301,17 +313,13 @@ public class NotificationHelper {
                                 organizerId = eventDoc.getString("organizerId");
                             }
                             
-                            // Fallback to current user if not in event doc
+                            // Event should always have organizerId stored when created
                             if (organizerId == null || organizerId.isEmpty()) {
-                                FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
-                                if (currentUser == null) {
-                                    Log.e(TAG, "No organizerId in event and no current user");
-                                    if (callback != null) {
-                                        callback.onError("User not authenticated and no organizer in event");
-                                    }
-                                    return;
+                                Log.e(TAG, "No organizerId in event document");
+                                if (callback != null) {
+                                    callback.onError("Event has no organizer ID");
                                 }
-                                organizerId = currentUser.getUid();
+                                return;
                             }
                             
                             Log.d(TAG, "Sending notifications (filtered) with organizerId: " + organizerId);
@@ -334,17 +342,13 @@ public class NotificationHelper {
                             organizerId = eventDoc.getString("organizerId");
                         }
                         
-                        // Fallback to current user if not in event doc
+                        // Event should always have organizerId stored when created
                         if (organizerId == null || organizerId.isEmpty()) {
-                            FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
-                            if (currentUser == null) {
-                                Log.e(TAG, "No organizerId in event and no current user");
-                                if (callback != null) {
-                                    callback.onError("User not authenticated and no organizer in event");
-                                }
-                                return;
+                            Log.e(TAG, "No organizerId in event document");
+                            if (callback != null) {
+                                callback.onError("Event has no organizer ID");
                             }
-                            organizerId = currentUser.getUid();
+                            return;
                         }
                         
                         Log.d(TAG, "Sending notifications with organizerId: " + organizerId);

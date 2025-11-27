@@ -34,14 +34,13 @@ import com.bumptech.glide.Glide;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
 import com.google.android.material.imageview.ShapeableImageView;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.google.firebase.firestore.QuerySnapshot;
 import com.example.eventease.R;
+import com.example.eventease.auth.ProfileSetupActivity;
 import com.example.eventease.notifications.FCMTokenManager;
 import com.example.eventease.util.ToastUtil;
 import com.example.eventease.ui.organizer.OrganizerMyEventActivity;
@@ -62,7 +61,6 @@ public class AccountFragment extends Fragment {
     private TextView fullNameText;
     private ShapeableImageView profileImage;
     private FirebaseFirestore db;
-    private FirebaseAuth mAuth;
     private CardView organizerSwitchCard;
     private String organizerIdForSwitch;
     private ActivityResultLauncher<String> notificationPermissionLauncher;
@@ -84,9 +82,9 @@ public class AccountFragment extends Fragment {
                         // Enable device notifications
                         enableDeviceNotifications();
                         // Save preference
-                        FirebaseUser currentUser = mAuth.getCurrentUser();
-                        if (currentUser != null) {
-                            saveNotificationPreference(currentUser.getUid(), true);
+                        String uid = com.example.eventease.auth.AuthHelper.getUid(requireContext());
+                        if (uid != null && !uid.isEmpty()) {
+                            saveNotificationPreference(uid, true);
                         }
                     } else {
                         Log.w(TAG, "Notification permission denied from account page");
@@ -113,7 +111,6 @@ public class AccountFragment extends Fragment {
         View root = inflater.inflate(R.layout.entrant_fragment_account, container, false);
         
         // Initialize Firebase instances
-        mAuth = FirebaseAuth.getInstance();
         db = FirebaseFirestore.getInstance();
         
         // Initialize views
@@ -160,8 +157,6 @@ public class AccountFragment extends Fragment {
             });
         }
 
-        root.findViewById(R.id.logoutButton).setOnClickListener(v -> logout());
-
         root.findViewById(R.id.deleteProfileButton).setOnClickListener(v -> showDeleteConfirmationDialog());
 
         root.findViewById(R.id.settingsButton).setOnClickListener(v -> 
@@ -205,12 +200,12 @@ public class AccountFragment extends Fragment {
      * Loads the user's notification preference from Firestore.
      */
     private void loadNotificationPreference() {
-        FirebaseUser currentUser = mAuth.getCurrentUser();
-        if (currentUser == null || notificationToggle == null) {
+        String currentUserId = com.example.eventease.auth.AuthHelper.getUid(requireContext());
+        if (currentUserId == null || currentUserId.isEmpty() || notificationToggle == null) {
             return;
         }
         
-        db.collection("users").document(currentUser.getUid())
+        db.collection("users").document(currentUserId)
                 .get()
                 .addOnSuccessListener(documentSnapshot -> {
                     if (documentSnapshot != null && documentSnapshot.exists()) {
@@ -246,12 +241,12 @@ public class AccountFragment extends Fragment {
      * This actually controls device notification settings for the app.
      */
     private void handleNotificationToggle(boolean isEnabled) {
-        FirebaseUser currentUser = mAuth.getCurrentUser();
-        if (currentUser == null) {
+        String currentUserId = com.example.eventease.auth.AuthHelper.getUid(requireContext());
+        if (currentUserId == null || currentUserId.isEmpty()) {
             if (notificationToggle != null) {
                 notificationToggle.setChecked(false);
             }
-            ToastUtil.showShort(getContext(), "Please log in to change notification settings");
+            ToastUtil.showShort(getContext(), "Profile not set up");
             return;
         }
         
@@ -271,13 +266,13 @@ public class AccountFragment extends Fragment {
             enableDeviceNotifications();
             
             // Save preference to Firestore
-            saveNotificationPreference(currentUser.getUid(), true);
+            saveNotificationPreference(currentUserId, true);
         } else {
             // Disable notifications at device level
             disableDeviceNotifications();
             
             // Save preference to Firestore
-            saveNotificationPreference(currentUser.getUid(), false);
+            saveNotificationPreference(currentUserId, false);
         }
     }
     
@@ -314,7 +309,9 @@ public class AccountFragment extends Fragment {
         }
         
         ToastUtil.showShort(getContext(), "Notifications enabled ✓");
-        FCMTokenManager.getInstance().initialize();
+        if (getContext() != null) {
+            FCMTokenManager.getInstance().initialize(getContext());
+        }
     }
     
     /**
@@ -428,10 +425,10 @@ public class AccountFragment extends Fragment {
     }
     
     private void loadUserData() {
-        FirebaseUser currentUser = mAuth.getCurrentUser();
-        if (currentUser != null) {
+        String currentUserId = com.example.eventease.auth.AuthHelper.getUid(requireContext());
+        if (currentUserId != null && !currentUserId.isEmpty()) {
             // Get the current user's document in the users collection
-            DocumentReference userRef = db.collection("users").document(currentUser.getUid());
+            DocumentReference userRef = db.collection("users").document(currentUserId);
             
             // Listen for real-time updates
             userRef.addSnapshotListener((documentSnapshot, e) -> {
@@ -498,46 +495,6 @@ public class AccountFragment extends Fragment {
         }
 
         return false;
-    }
-
-    private void logout() {
-        if (getContext() == null) return;
-
-        // Sign out from Firebase
-        mAuth.signOut();
-
-        // Clear Remember Me preferences
-        SharedPreferences prefs = getContext().getSharedPreferences("EventEasePrefs", Context.MODE_PRIVATE);
-        prefs.edit()
-            .putBoolean("rememberMe", false)
-            .remove("savedUid")
-            .remove("savedEmail")
-            .remove("savedPassword")
-            .apply();
-
-        ToastUtil.showShort(getContext(), "Logged out successfully");
-
-        // Hide bottom nav and top bar before navigating
-        if (getActivity() != null) {
-            View bottomNav = getActivity().findViewById(R.id.include_bottom);
-            View topBar = getActivity().findViewById(R.id.include_top);
-            if (bottomNav != null) {
-                bottomNav.setVisibility(View.GONE);
-            }
-            if (topBar != null) {
-                topBar.setVisibility(View.GONE);
-            }
-        }
-
-        // Navigate to welcome screen
-        try {
-            if (isAdded() && getView() != null) {
-                Navigation.findNavController(getView()).navigate(R.id.action_accountFragment_to_welcomeFragment);
-            }
-        } catch (Exception e) {
-            ToastUtil.showLong(getContext(), "Navigation error: " + e.getMessage());
-            e.printStackTrace();
-        }
     }
 
     private void showDeleteConfirmationDialog() {
@@ -652,13 +609,13 @@ public class AccountFragment extends Fragment {
     private void deleteProfile() {
         if (getContext() == null) return;
 
-        FirebaseUser currentUser = mAuth.getCurrentUser();
-        if (currentUser == null) {
-            ToastUtil.showLong(getContext(), "Not signed in");
+        String currentUserId = com.example.eventease.auth.AuthHelper.getUid(requireContext());
+        if (currentUserId == null || currentUserId.isEmpty()) {
+            ToastUtil.showLong(getContext(), "Profile not set up");
             return;
         }
 
-        String uid = currentUser.getUid();
+        String uid = currentUserId;
         
         ToastUtil.showShort(getContext(), "Deleting profile...");
 
@@ -682,31 +639,13 @@ public class AccountFragment extends Fragment {
         DocumentReference userRef = db.collection("users").document(uid);
         userRef.delete()
             .addOnSuccessListener(aVoid -> {
-                // Delete Firebase Auth account
-                FirebaseUser currentUser = mAuth.getCurrentUser();
-                if (currentUser != null) {
-                    currentUser.delete()
-                        .addOnSuccessListener(aVoid1 -> {
-                            // Sign out and clear preferences
-                            mAuth.signOut();
-                            clearPreferences();
-                            ToastUtil.showShort(getContext(), "Profile deleted successfully");
-                            navigateToWelcome();
-                        })
-                        .addOnFailureListener(e -> {
-                            // Even if auth deletion fails, sign out and clear preferences
-                            android.util.Log.e("AccountFragment", "Failed to delete auth account", e);
-                            mAuth.signOut();
-                            clearPreferences();
-                            ToastUtil.showShort(getContext(), "Profile deleted (some cleanup may be pending)");
-                            navigateToWelcome();
-                        });
-                } else {
-                    // User already signed out, just clear preferences
-                    clearPreferences();
-                    ToastUtil.showShort(getContext(), "Profile deleted successfully");
-                    navigateToWelcome();
-                }
+                // Device auth - clear cache to trigger profile setup on next launch
+                com.example.eventease.auth.DeviceAuthManager authManager = 
+                    new com.example.eventease.auth.DeviceAuthManager(requireContext());
+                authManager.clearCache();
+                clearPreferences();
+                ToastUtil.showShort(getContext(), "Profile deleted successfully");
+                launchProfileSetupScreen();
             })
             .addOnFailureListener(e -> {
                 android.util.Log.e("AccountFragment", "Failed to delete user document", e);
@@ -725,26 +664,13 @@ public class AccountFragment extends Fragment {
             .apply();
     }
 
-    private void navigateToWelcome() {
-        try {
-            // Hide bottom nav and top bar before navigating
-            if (getActivity() != null) {
-                View bottomNav = getActivity().findViewById(R.id.include_bottom);
-                View topBar = getActivity().findViewById(R.id.include_top);
-                if (bottomNav != null) {
-                    bottomNav.setVisibility(View.GONE);
-                }
-                if (topBar != null) {
-                    topBar.setVisibility(View.GONE);
-                }
-            }
-            
-            if (isAdded() && getView() != null) {
-                Navigation.findNavController(getView()).navigate(R.id.action_accountFragment_to_welcomeFragment);
-            }
-        } catch (Exception e) {
-            ToastUtil.showLong(getContext(), "Navigation error: " + e.getMessage());
-            e.printStackTrace();
+    private void launchProfileSetupScreen() {
+        if (getContext() == null) return;
+        Intent intent = new Intent(requireContext(), ProfileSetupActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        if (getActivity() != null) {
+            getActivity().finish();
         }
     }
 }

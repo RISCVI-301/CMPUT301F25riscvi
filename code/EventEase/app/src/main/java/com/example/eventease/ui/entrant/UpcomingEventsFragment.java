@@ -23,7 +23,6 @@ import androidx.navigation.Navigation;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.example.eventease.auth.AuthManager;
 import com.example.eventease.data.AdmittedRepository;
 import com.example.eventease.model.Event;
 import com.example.eventease.ui.entrant.eventdetail.EventDetailActivity;
@@ -48,7 +47,6 @@ public class UpcomingEventsFragment extends Fragment {
     private TextView emptyView;
     private UpcomingEventsAdapter adapter;
     private AdmittedRepository admittedRepo;
-    private AuthManager authManager;
 
     @Nullable
     @Override
@@ -63,7 +61,6 @@ public class UpcomingEventsFragment extends Fragment {
 
         // Initialize repositories
         admittedRepo = App.graph().admitted;
-        authManager = App.graph().auth;
 
         // Set up back button
         View btnBack = root.findViewById(R.id.btnBackUpcoming);
@@ -98,9 +95,6 @@ public class UpcomingEventsFragment extends Fragment {
         if (admittedRepo == null) {
             admittedRepo = App.graph().admitted;
         }
-        if (authManager == null) {
-            authManager = App.graph().auth;
-        }
         loadUpcomingEvents();
     }
 
@@ -109,19 +103,19 @@ public class UpcomingEventsFragment extends Fragment {
         super.onResume();
         // Refresh events when fragment becomes visible (e.g., after accepting invitation)
         // Only refresh if repositories are already initialized (to avoid double-loading on first start)
-        if (admittedRepo != null && authManager != null) {
+        if (admittedRepo != null) {
             loadUpcomingEvents();
         }
     }
 
     private void loadUpcomingEvents() {
-        if (admittedRepo == null || authManager == null) {
+        if (admittedRepo == null) {
             android.util.Log.w("UpcomingEventsFragment", "Repositories not initialized");
             return;
         }
         
         setLoading(true);
-        String uid = authManager.getUid();
+        String uid = com.example.eventease.auth.AuthHelper.getUid(requireContext());
         android.util.Log.d("UpcomingEventsFragment", "Loading upcoming events for uid: " + uid);
         
         admittedRepo.getUpcomingEvents(uid)

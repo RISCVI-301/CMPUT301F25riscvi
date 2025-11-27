@@ -18,8 +18,6 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.eventease.model.Event;
 import com.example.eventease.R;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.FirebaseFirestoreException;
@@ -96,11 +94,10 @@ public class DiscoverFragment extends Fragment {
     private void ensureBottomNavVisible() {
         if (getActivity() == null) return;
         
-        // Check if user is authenticated - simply check if Firebase Auth has a current user
-        // "Remember Me" only affects persistence across app restarts, not current authentication state
-        FirebaseAuth auth = FirebaseAuth.getInstance();
-        FirebaseUser currentUser = auth.getCurrentUser();
-        boolean isAuthenticated = currentUser != null;
+        // Check if device has profile
+        com.example.eventease.auth.DeviceAuthManager authManager = 
+            new com.example.eventease.auth.DeviceAuthManager(requireContext());
+        boolean isAuthenticated = authManager.hasCachedProfile();
         
         if (isAuthenticated) {
             View bottomNav = getActivity().findViewById(R.id.include_bottom);

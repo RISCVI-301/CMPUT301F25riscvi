@@ -18,8 +18,6 @@ import com.bumptech.glide.Glide;
 import com.example.eventease.R;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -52,7 +50,6 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
     private MaterialButton entrantDetailsButton;
     private MaterialButton changeDeadlinesButton;
 
-    private FirebaseAuth mAuth;
     private FirebaseFirestore db;
     private FirebaseStorage storage;
 
@@ -74,7 +71,6 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_organizer_waitlist);
 
-        mAuth = FirebaseAuth.getInstance();
         db = FirebaseFirestore.getInstance();
         storage = FirebaseStorage.getInstance();
 
@@ -141,18 +137,9 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
     }
 
     private void signInAndLoadData() {
-        FirebaseUser currentUser = mAuth.getCurrentUser();
-        if (currentUser != null) {
-            checkAndProcessSelection();
-            loadEventDataFromFirestore(currentEventId);
-        } else {
-            mAuth.signInAnonymously()
-                    .addOnSuccessListener(r -> {
-                        checkAndProcessSelection();
-                        loadEventDataFromFirestore(currentEventId);
-                    })
-                    .addOnFailureListener(e -> Toast.makeText(this, "Auth failed", Toast.LENGTH_SHORT).show());
-        }
+        // Device auth - no sign in needed, just load data
+        checkAndProcessSelection();
+        loadEventDataFromFirestore(currentEventId);
     }
     
     private void checkAndProcessSelection() {

@@ -80,6 +80,7 @@ exports.sendNotification = functions.firestore
             
             // Prepare user data with tokens and personalized messages
             const userNotifications = [];
+            const usersWithoutTokens = [];
             
             userDocs.forEach((doc, index) => {
                 if (doc.exists) {
@@ -119,26 +120,26 @@ exports.sendNotification = functions.firestore
                         
                         console.log(`✓ Added token for user ${userIds[index]} (firstName: ${firstName || 'N/A'}, token preview: ${fcmToken.substring(0, 20)}...)`);
                     } else {
-                        const reason = !fcmToken ? 'no token' : 'notifications disabled in Firestore';
+                        const reason = !fcmToken ? 'no FCM token' : 'notifications disabled in Firestore';
                         console.log(`✗ User ${userIds[index]}: ${reason}`);
+                        
+                        if (!fcmToken && notificationsEnabled) {
+                            usersWithoutTokens.push({
+                                userId: userIds[index],
+                                deviceId: userIds[index]
+                            });
+                        }
                     }
                 } else {
                     console.log(`✗ User ${userIds[index]} not found in Firestore`);
                 }
             });
             
-            if (userNotifications.length === 0) {
-                console.log(`No valid FCM tokens found for request ${requestId}`);
-                await snap.ref.update({ 
-                    processed: true, 
-                    error: 'No valid FCM tokens found',
-                    sentCount: 0
-                });
-                return null;
-            }
+            // Send FCM notifications if we have tokens
+            let fcmSuccessCount = 0;
+            let fcmFailureCount = 0;
             
-            // Send personalized notifications
-            // Use sendEach for individual messages (allows personalization per user)
+            if (userNotifications.length > 0) {
             const messages = userNotifications.map(userNotif => {
                 return {
                     token: userNotif.token,
@@ -173,12 +174,9 @@ exports.sendNotification = functions.firestore
                 };
             });
             
-            // Send notifications in batches (FCM allows up to 500 messages per batch)
             const batchSize = 500;
-            let successCount = 0;
-            let failureCount = 0;
             
-            console.log(`Sending personalized notifications to ${userNotifications.length} users`);
+                console.log(`Sending personalized FCM notifications to ${userNotifications.length} users`);
             for (let i = 0; i < messages.length; i += batchSize) {
                 const batch = messages.slice(i, i + batchSize);
                 
@@ -188,8 +186,8 @@ exports.sendNotification = functions.firestore
                     
                     console.log(`Batch ${Math.floor(i / batchSize) + 1} result: ${response.successCount} sent, ${response.failureCount} failed`);
                     
-                    successCount += response.successCount;
-                    failureCount += response.failureCount;
+                        fcmSuccessCount += response.successCount;
+                        fcmFailureCount += response.failureCount;
                     
                     // Log failures
                     if (response.failureCount > 0) {
@@ -211,21 +209,33 @@ exports.sendNotification = functions.firestore
                     }
                 } catch (error) {
                     console.error(`Error sending batch ${Math.floor(i / batchSize) + 1}:`, error);
-                    failureCount += batch.length;
+                        fcmFailureCount += batch.length;
                 }
+                }
+            }
+            
+            // Log users without FCM tokens (they won't receive notifications until FCM is set up)
+            if (usersWithoutTokens.length > 0) {
+                console.warn(`⚠ WARNING: ${usersWithoutTokens.length} users do not have FCM tokens and will NOT receive notifications:`);
+                usersWithoutTokens.forEach(user => {
+                    console.warn(`  - User ${user.userId} (deviceId: ${user.deviceId})`);
+                });
+                console.warn(`  These users need to open the app to generate FCM tokens.`);
+                console.warn(`  FCM tokens are required for notifications when the app is closed.`);
             }
             
             // Mark request as processed
             await snap.ref.update({
                 processed: true,
-                sentCount: successCount,
-                failureCount: failureCount,
+                sentCount: fcmSuccessCount,
+                failureCount: fcmFailureCount,
+                usersWithoutTokens: usersWithoutTokens.length,
                 processedAt: admin.firestore.FieldValue.serverTimestamp(),
             });
             
-            console.log(`Request ${requestId} processed: ${successCount} sent, ${failureCount} failed`);
+            console.log(`Request ${requestId} processed: ${fcmSuccessCount} sent via FCM, ${fcmFailureCount} failed, ${usersWithoutTokens.length} users without tokens`);
             
-            return { successCount, failureCount };
+            return { successCount: fcmSuccessCount, failureCount: fcmFailureCount, usersWithoutTokens: usersWithoutTokens.length };
         } catch (error) {
             console.error(`Error processing notification request ${requestId}:`, error);
             await snap.ref.update({

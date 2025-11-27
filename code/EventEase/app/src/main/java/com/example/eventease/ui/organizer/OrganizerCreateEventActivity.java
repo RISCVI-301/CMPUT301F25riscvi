@@ -33,8 +33,6 @@ import com.bumptech.glide.Glide;
 import com.example.eventease.R;
 import com.google.android.material.button.MaterialButton;
 import com.google.firebase.FirebaseApp;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageMetadata;
@@ -369,21 +367,8 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
      * signing in anonymously if necessary, before proceeding to validation.
      */
     private void beginSaveEvent() {
-        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        if (user == null) {
-            btnSave.setEnabled(false);
-            btnSave.setText("Signing in…");
-            FirebaseAuth.getInstance().signInAnonymously()
-                    .addOnSuccessListener(r -> doValidateAndSave())
-                    .addOnFailureListener(e -> {
-                        btnSave.setEnabled(true);
-                        btnSave.setText("SAVE CHANGES");
-                        toast("Sign-in failed: " + e.getMessage());
-                        Log.e(TAG, "Anon sign-in failed", e);
-                    });
-        } else {
-            doValidateAndSave();
-        }
+        // Device auth - no need to sign in, just save
+        doValidateAndSave();
     }
 
     private void resolveOrganizerId(@Nullable Runnable onReady) {
@@ -396,24 +381,30 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         if (isResolvingOrganizerId) {
             return;
         }
-        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        if (user == null) {
-            toast("Please sign in again.");
+        
+        // Get device ID as organizer ID
+        com.example.eventease.auth.DeviceAuthManager authManager = 
+            new com.example.eventease.auth.DeviceAuthManager(this);
+        String deviceId = authManager.getUid();
+        
+        if (deviceId == null || deviceId.isEmpty()) {
+            toast("Could not get device ID");
             return;
         }
+        
         isResolvingOrganizerId = true;
         FirebaseFirestore.getInstance()
                 .collection("users")
-                .document(user.getUid())
+                .document(deviceId)
                 .get()
                 .addOnSuccessListener(doc -> {
-                    organizerId = doc != null ? doc.getString("organizerId") : null;
-                    if (organizerId == null || organizerId.trim().isEmpty()) {
-                        organizerId = doc != null ? doc.getId() : user.getUid();
-                    }
+                    // Use device ID as organizer ID
+                    organizerId = deviceId;
                     isResolvingOrganizerId = false;
-                    if (organizerId == null || organizerId.trim().isEmpty()) {
-                        toast("Organizer profile not configured yet.");
+                    
+                    if (!doc.exists()) {
+                        Log.w(TAG, "User document doesn't exist for device: " + deviceId);
+                        toast("Please complete your profile setup first");
                     } else if (onReady != null) {
                         onReady.run();
                     }

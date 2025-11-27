@@ -126,9 +126,11 @@ public class AdminProfilesFragment extends Fragment {
     }
 
     private void deleteProfileAndRefresh(@NonNull UserProfile profile) {
-        // Check if trying to delete current admin user
-        com.google.firebase.auth.FirebaseUser currentUser = com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser();
-        if (currentUser != null && profile.getUid() != null && profile.getUid().equals(currentUser.getUid())) {
+        // Check if trying to delete current device's profile
+        com.example.eventease.auth.DeviceAuthManager authManager = 
+            new com.example.eventease.auth.DeviceAuthManager(requireContext());
+        String deviceId = authManager.getUid();
+        if (deviceId != null && profile.getUid() != null && profile.getUid().equals(deviceId)) {
             Toast.makeText(requireContext(), "You cannot delete your own profile", Toast.LENGTH_LONG).show();
             return;
         }

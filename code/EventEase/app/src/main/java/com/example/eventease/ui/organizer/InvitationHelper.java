@@ -54,20 +54,27 @@ public class InvitationHelper {
             return;
         }
         
-        // Get current user (organizer)
-        com.google.firebase.auth.FirebaseAuth auth = com.google.firebase.auth.FirebaseAuth.getInstance();
-        com.google.firebase.auth.FirebaseUser currentUser = auth.getCurrentUser();
-        if (currentUser == null) {
-            if (callback != null) {
-                callback.onError("User not authenticated");
-            }
-            return;
-        }
-        String organizerId = currentUser.getUid();
-        
         DocumentReference eventRef = db.collection("events").document(eventId);
         
-        eventRef.collection("SelectedEntrants").get()
+        // Get organizerId from event document
+        eventRef.get().addOnSuccessListener(eventDoc -> {
+            if (!eventDoc.exists()) {
+                if (callback != null) {
+                    callback.onError("Event not found");
+                }
+                return;
+            }
+            
+            String organizerId = eventDoc.getString("organizerId");
+            if (organizerId == null || organizerId.isEmpty()) {
+                if (callback != null) {
+                    callback.onError("Event has no organizer ID");
+                }
+                return;
+            }
+            
+            // Get selected entrants and create invitations
+            eventRef.collection("SelectedEntrants").get()
                 .addOnSuccessListener(selectedSnapshot -> {
                     if (selectedSnapshot == null || selectedSnapshot.isEmpty()) {
                         Log.d(TAG, "No selected entrants to send invitations to");
@@ -177,6 +184,11 @@ public class InvitationHelper {
                         callback.onError("Failed to load selected entrants: " + e.getMessage());
                     }
                 });
+        }).addOnFailureListener(e -> {
+            if (callback != null) {
+                callback.onError("Failed to load event: " + e.getMessage());
+            }
+        });
     }
 }
 

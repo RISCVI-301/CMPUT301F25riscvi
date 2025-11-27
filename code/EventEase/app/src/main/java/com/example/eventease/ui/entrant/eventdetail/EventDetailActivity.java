@@ -11,7 +11,6 @@ import android.widget.Toast;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
-import com.example.eventease.auth.AuthManager;
 import com.example.eventease.data.InvitationRepository;
 import com.example.eventease.data.WaitlistRepository;
 import com.example.eventease.App;
@@ -85,7 +84,6 @@ public class EventDetailActivity extends AppCompatActivity {
     
     private InvitationRepository invitationRepo;
     private WaitlistRepository waitlistRepo;
-    private AuthManager authManager;
     private com.example.eventease.data.EventRepository eventRepo;
     private com.example.eventease.data.ListenerRegistration waitlistCountReg;
 
@@ -110,7 +108,6 @@ public class EventDetailActivity extends AppCompatActivity {
         // Initialize repositories
         invitationRepo = App.graph().invitations;
         waitlistRepo = App.graph().waitlists;
-        authManager = App.graph().auth;
         eventRepo = App.graph().events;
 
         // Initialize views
@@ -520,7 +517,7 @@ public class EventDetailActivity extends AppCompatActivity {
             return;
         }
         
-        String uid = authManager.getUid();
+        String uid = com.example.eventease.auth.AuthHelper.getUid(this);
         android.util.Log.d("EventDetailActivity", "Accepting invitation: " + invitationId + " for event: " + eventId + " by user: " + uid);
         
         // Show loading state
@@ -565,7 +562,7 @@ public class EventDetailActivity extends AppCompatActivity {
      * Checks for pending invitations for this event and updates UI accordingly.
      */
     private void checkForPendingInvitation() {
-        String uid = authManager.getUid();
+        String uid = com.example.eventease.auth.AuthHelper.getUid(this);
         if (uid == null || eventId == null) {
             android.util.Log.w("EventDetailActivity", "Cannot check invitation - uid or eventId is null");
             updateButtonVisibility(false, null);
@@ -677,7 +674,7 @@ public class EventDetailActivity extends AppCompatActivity {
             return;
         }
         
-        String uid = authManager.getUid();
+        String uid = com.example.eventease.auth.AuthHelper.getUid(this);
         android.util.Log.d("EventDetailActivity", "Declining invitation: " + invitationId + " for event: " + eventId + " by user: " + uid);
         
         // Show loading state
@@ -791,7 +788,7 @@ public class EventDetailActivity extends AppCompatActivity {
             return;
         }
         
-        String uid = authManager.getUid();
+        String uid = com.example.eventease.auth.AuthHelper.getUid(this);
         android.util.Log.d("EventDetailActivity", "Opting out from event: " + eventId + " by user: " + uid);
         
         // Show loading state

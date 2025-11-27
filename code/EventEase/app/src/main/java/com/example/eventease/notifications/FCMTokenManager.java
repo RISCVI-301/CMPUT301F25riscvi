@@ -1,9 +1,9 @@
 package com.example.eventease.notifications;
 
+import android.content.Context;
 import android.util.Log;
 
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
+import com.example.eventease.auth.DeviceAuthManager;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.messaging.FirebaseMessaging;
 
@@ -13,6 +13,7 @@ import java.util.Map;
 public class FCMTokenManager {
     private static final String TAG = "FCMTokenManager";
     private static FCMTokenManager instance;
+    private Context appContext;
     
     private FCMTokenManager() {}
     
@@ -24,6 +25,13 @@ public class FCMTokenManager {
     }
     
     public void initialize() {
+        initialize(null);
+    }
+    
+    public void initialize(Context context) {
+        if (context != null) {
+            this.appContext = context.getApplicationContext();
+        }
         Log.d(TAG, "Initializing FCM token...");
         FirebaseMessaging.getInstance().getToken()
                 .addOnCompleteListener(task -> {
@@ -52,17 +60,22 @@ public class FCMTokenManager {
     }
     
     public void saveTokenToFirestore(String token) {
-        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        if (user == null) {
-            Log.w(TAG, "No user logged in, skipping token save");
+        if (appContext == null) {
+            Log.w(TAG, "No context available, skipping token save");
             return;
         }
         
-        String uid = user.getUid();
-        String email = user.getEmail();
+        DeviceAuthManager authManager = new DeviceAuthManager(appContext);
+        String uid = authManager.getUid();
+        
+        if (uid == null || uid.isEmpty()) {
+            Log.w(TAG, "No device ID found, skipping token save");
+            return;
+        }
+        
         FirebaseFirestore db = FirebaseFirestore.getInstance();
         
-        Log.d(TAG, "Saving FCM token for user: " + uid + " (" + (email != null ? email : "no email") + ")");
+        Log.d(TAG, "Saving FCM token for device: " + uid);
         Log.d(TAG, "Token length: " + (token != null ? token.length() : 0));
         
         db.collection("users").document(uid)
@@ -93,17 +106,23 @@ public class FCMTokenManager {
     }
     
     /**
-     * Verifies that the FCM token is saved in Firestore for the current user.
+     * Verifies that the FCM token is saved in Firestore for the current device.
      * Useful for debugging notification issues.
      */
     public void verifyTokenInFirestore() {
-        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        if (user == null) {
-            Log.w(TAG, "No user logged in, cannot verify token");
+        if (appContext == null) {
+            Log.w(TAG, "No context available, cannot verify token");
             return;
         }
         
-        String uid = user.getUid();
+        DeviceAuthManager authManager = new DeviceAuthManager(appContext);
+        String uid = authManager.getUid();
+        
+        if (uid == null || uid.isEmpty()) {
+            Log.w(TAG, "No device ID found, cannot verify token");
+            return;
+        }
+        
         FirebaseFirestore db = FirebaseFirestore.getInstance();
         
         db.collection("users").document(uid).get()

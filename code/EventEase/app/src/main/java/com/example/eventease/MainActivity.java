@@ -22,7 +22,6 @@ import androidx.navigation.NavDestination;
 import androidx.navigation.fragment.NavHostFragment;
 
 import com.google.firebase.FirebaseApp;
-import com.google.firebase.auth.FirebaseAuth;
 import com.example.eventease.R;
 import com.example.eventease.auth.UserRoleChecker;
 import com.example.eventease.notifications.FCMTokenManager;
@@ -68,6 +67,12 @@ public class MainActivity extends AppCompatActivity {
         Log.d("FirebaseTest", "FirebaseApp initialized: " + (FirebaseApp.getApps(this).size() > 0));
 
         setContentView(R.layout.entrant_activity_mainfragments);
+        
+        // Hide content initially until profile check completes
+        final View rootView = findViewById(R.id.main_root);
+        if (rootView != null) {
+            rootView.setVisibility(View.GONE);
+        }
 
         // Initialize notification permission launcher
         notificationPermissionLauncher = registerForActivityResult(
@@ -150,49 +155,51 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // Check if user is already logged in AND Remember Me is enabled (using UID for persistence)
-        FirebaseAuth auth = FirebaseAuth.getInstance();
-        android.content.SharedPreferences prefs = getSharedPreferences("EventEasePrefs", MODE_PRIVATE);
-        boolean rememberMe = prefs.getBoolean("rememberMe", false);
-        String savedUid = prefs.getString("savedUid", null);
-        com.google.firebase.auth.FirebaseUser currentUser = auth.getCurrentUser();
-
-        // Check if Remember Me is enabled and UID matches (this persists even if email/password changes)
-        boolean isLoggedIn = rememberMe && savedUid != null && currentUser != null && savedUid.equals(currentUser.getUid());
-
-        // If user is logged in but Remember Me is off or UID doesn't match, sign them out
-        if (currentUser != null && (!rememberMe || savedUid == null || !savedUid.equals(currentUser.getUid()))) {
-            auth.signOut();
-            // Clear Remember Me if UID doesn't match
-            if (savedUid != null && !savedUid.equals(currentUser.getUid())) {
-                prefs.edit().putBoolean("rememberMe", false).remove("savedUid").apply();
-            }
-        }
-
-        // Setup custom navigation button click listeners
-        setupCustomNavigation();
+        // === DEVICE ID AUTHENTICATION (NO PASSWORDS) ===
+        // Check if device has a profile
+        com.example.eventease.auth.DeviceAuthManager authManager = new com.example.eventease.auth.DeviceAuthManager(this);
         
-        // Setup navigation listener (always needed for entrant flow)
-        setupEntrantNavigation();
-        
-        // If logged in, check if user is admin and redirect accordingly
-        if (isLoggedIn && currentUser != null) {
-            UserRoleChecker.isAdmin().addOnCompleteListener(task -> {
-                if (task.isSuccessful() && Boolean.TRUE.equals(task.getResult())) {
-                    // User is admin - redirect to admin flow
-                    Intent adminIntent = new Intent(MainActivity.this, com.example.eventease.admin.AdminMainActivity.class);
-                    startActivity(adminIntent);
-                    finish();
-                    return;
+        authManager.hasProfile().addOnCompleteListener(task -> {
+            if (task.isSuccessful() && Boolean.TRUE.equals(task.getResult())) {
+                // Profile exists - user is "logged in"
+                Log.d("MainActivity", "Device has profile, proceeding to main app");
+                
+                // Show content now that profile check passed
+                if (rootView != null) {
+                    rootView.setVisibility(View.VISIBLE);
                 }
-                // User is not admin - navigate to discover
-                navigateToDiscover();
-            });
-        } else {
-            // User not logged in - hide bars initially
-            bottomNav.setVisibility(View.GONE);
-            topBar.setVisibility(View.GONE);
-        }
+                
+                // Update last seen
+                authManager.updateLastSeen();
+                
+                // Setup navigation
+                setupCustomNavigation();
+                setupEntrantNavigation();
+                
+                // Check if user is admin and redirect accordingly
+                authManager.isAdmin().addOnCompleteListener(adminTask -> {
+                    if (adminTask.isSuccessful() && Boolean.TRUE.equals(adminTask.getResult())) {
+                        // User is admin - redirect to admin flow
+                        Log.d("MainActivity", "User is admin, redirecting to AdminMainActivity");
+                        Intent adminIntent = new Intent(MainActivity.this, com.example.eventease.admin.AdminMainActivity.class);
+                        startActivity(adminIntent);
+                        finish();
+                        return;
+                    }
+                    
+                    // User is not admin - navigate to discover (entrant/organizer flow)
+                    Log.d("MainActivity", "User is entrant/organizer, showing main app");
+                    navigateToDiscover();
+                });
+                
+            } else {
+                // No profile exists - first time user, redirect to profile setup
+                Log.d("MainActivity", "No profile found, redirecting to ProfileSetupActivity");
+                Intent setupIntent = new Intent(MainActivity.this, com.example.eventease.auth.ProfileSetupActivity.class);
+                startActivity(setupIntent);
+                finish();
+            }
+        });
 
         // Handle external navigation intents (from detail activities)
         handleExternalNav(getIntent());
@@ -251,11 +258,9 @@ public class MainActivity extends AppCompatActivity {
 
             int id = destination.getId();
 
-            // Check if user is authenticated - simply check if Firebase Auth has a current user
-            // "Remember Me" only affects persistence across app restarts, not current authentication state
-            FirebaseAuth authCheck = FirebaseAuth.getInstance();
-            com.google.firebase.auth.FirebaseUser currentUserCheck = authCheck.getCurrentUser();
-            boolean isAuthenticated = currentUserCheck != null;
+            // Check if user is authenticated - check if device has profile
+            com.example.eventease.auth.DeviceAuthManager authCheck = new com.example.eventease.auth.DeviceAuthManager(MainActivity.this);
+            boolean isAuthenticated = authCheck.hasCachedProfile();
 
             // Main app screens (discover, my events, account) - show bars if authenticated
             if (id == R.id.discoverFragment || id == R.id.myEventsFragment || id == R.id.accountFragment
@@ -270,7 +275,7 @@ public class MainActivity extends AppCompatActivity {
                     if (!listenersInitialized) {
                         // Initialize FCM token manager and invitation listener
                         if (invitationListener == null) {
-                            FCMTokenManager.getInstance().initialize();
+                            FCMTokenManager.getInstance().initialize(MainActivity.this);
                             invitationListener = new InvitationNotificationListener(this);
                             invitationListener.startListening();
                         }
@@ -351,7 +356,7 @@ public class MainActivity extends AppCompatActivity {
             initializeNotifications();
         }
     }
-    
+
     /**
      * Initializes FCM token manager and invitation listener.
      * Should be called after notification permission is granted (or on older Android versions).
@@ -374,9 +379,14 @@ public class MainActivity extends AppCompatActivity {
         // This will create the channel with HIGH importance (after our fix)
         com.example.eventease.notifications.NotificationChannelManager.createNotificationChannel(this);
         
-        FCMTokenManager.getInstance().initialize();
+        FCMTokenManager.getInstance().initialize(this);
+        
+        // Only create invitation listener if it doesn't already exist
+        // (It may already be created in the navigation listener)
+        if (invitationListener == null) {
         invitationListener = new InvitationNotificationListener(this);
         invitationListener.startListening();
+        }
     }
 
     @Override

@@ -4,7 +4,6 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 
-import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QuerySnapshot;
@@ -16,7 +15,6 @@ public class AdminEventDatabaseController {
 
     private static final String TAG = "AdminEventDB";
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
-    private final FirebaseAuth auth = FirebaseAuth.getInstance();
 
     public interface EventsCallback {
         void onLoaded(@NonNull List<Event> events);
@@ -25,11 +23,7 @@ public class AdminEventDatabaseController {
 
 
     public void fetchEvents(@NonNull final EventsCallback cb) {
-        // If you need auth, ensure user exists; otherwise you can omit this check.
-        if (auth.getCurrentUser() == null) {
-            cb.onError(new IllegalStateException("Not authenticated"));
-            return;
-        }
+        // Device auth - profile check not needed here
 
         db.collection("events")
                 .get()

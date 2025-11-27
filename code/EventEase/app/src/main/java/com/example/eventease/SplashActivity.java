@@ -11,8 +11,6 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.firebase.FirebaseApp;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
 import com.example.eventease.auth.UserRoleChecker;
 
 /**
@@ -45,44 +43,32 @@ public class SplashActivity extends AppCompatActivity {
     }
 
     private void checkAuthAndNavigate() {
-        FirebaseAuth auth = FirebaseAuth.getInstance();
-        SharedPreferences prefs = getSharedPreferences("EventEasePrefs", MODE_PRIVATE);
-        boolean rememberMe = prefs.getBoolean("rememberMe", false);
-        String savedUid = prefs.getString("savedUid", null);
-        FirebaseUser currentUser = auth.getCurrentUser();
-
-        // Check if Remember Me is enabled and UID matches
-        boolean isLoggedIn = rememberMe && savedUid != null && currentUser != null 
-                && savedUid.equals(currentUser.getUid());
-
-        // If user is logged in but Remember Me is off or UID doesn't match, sign them out
-        if (currentUser != null && (!rememberMe || savedUid == null || !savedUid.equals(currentUser.getUid()))) {
-            auth.signOut();
-            if (savedUid != null && !savedUid.equals(currentUser.getUid())) {
-                prefs.edit().putBoolean("rememberMe", false).remove("savedUid").apply();
-            }
-        }
-
-        if (isLoggedIn && currentUser != null) {
-            // User is logged in - check if admin
-            UserRoleChecker.isAdmin().addOnCompleteListener(task -> {
-                Intent intent;
-                if (task.isSuccessful() && Boolean.TRUE.equals(task.getResult())) {
-                    // User is admin
-                    intent = new Intent(SplashActivity.this, com.example.eventease.admin.AdminMainActivity.class);
-                } else {
-                    // User is not admin - go to entrant MainActivity
-                    intent = new Intent(SplashActivity.this, MainActivity.class);
-                }
+        // Device auth - check if profile exists
+        com.example.eventease.auth.DeviceAuthManager authManager = 
+            new com.example.eventease.auth.DeviceAuthManager(this);
+        
+        authManager.hasProfile().addOnCompleteListener(task -> {
+            if (task.isSuccessful() && Boolean.TRUE.equals(task.getResult())) {
+                // Profile exists - check if admin
+                UserRoleChecker.isAdmin(this).addOnCompleteListener(adminTask -> {
+                    Intent intent;
+                    if (adminTask.isSuccessful() && Boolean.TRUE.equals(adminTask.getResult())) {
+                        // User is admin
+                        intent = new Intent(SplashActivity.this, com.example.eventease.admin.AdminMainActivity.class);
+                    } else {
+                        // User is entrant/organizer - go to MainActivity
+                        intent = new Intent(SplashActivity.this, MainActivity.class);
+                    }
+                    startActivity(intent);
+                    finish();
+                });
+            } else {
+                // No profile - redirect directly to ProfileSetupActivity
+                Intent intent = new Intent(SplashActivity.this, com.example.eventease.auth.ProfileSetupActivity.class);
                 startActivity(intent);
                 finish();
-            });
-        } else {
-            // User not logged in - go to MainActivity which will show login screen
-            Intent intent = new Intent(SplashActivity.this, MainActivity.class);
-            startActivity(intent);
-            finish();
-        }
+            }
+        });
     }
 }
 
