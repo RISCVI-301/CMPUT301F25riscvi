@@ -8,17 +8,18 @@ import android.graphics.Color;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
+import android.text.Editable;
 import android.text.TextUtils;
+import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.Button;
-import android.widget.CheckBox;
+import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ProgressBar;
 import android.widget.RadioButton;
-import android.widget.RadioGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.renderscript.Allocation;
@@ -49,10 +50,8 @@ import java.util.Calendar;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 
 /**
  * Fragment for discovering and browsing available events.
@@ -77,18 +76,20 @@ public class DiscoverFragment extends Fragment {
     private ListenerRegistration eventsRegistration;
     private ProgressBar progressView;
     private TextView emptyView;
+    private EditText searchInput;
+    private String searchQuery = "";
+    private String locationFilter = "";
     private final List<Event> allEvents = new ArrayList<>();
 
     private enum DateFilterOption {
         ANY_DATE,
         TODAY,
-        TOMORROW,
+        THIS_MONTH,
         CUSTOM
     }
 
     private DateFilterOption activeDateFilter = DateFilterOption.ANY_DATE;
     private long customDateFilterStartMs = 0L;
-    private final Set<String> selectedInterests = new HashSet<>();
     private final SimpleDateFormat filterDateFormat = new SimpleDateFormat("MMM d, yyyy", Locale.getDefault());
 
     @Nullable
@@ -121,6 +122,17 @@ public class DiscoverFragment extends Fragment {
         View filterButton = view.findViewById(R.id.discover_filter);
         if (filterButton != null) {
             filterButton.setOnClickListener(v -> showFilterDialog());
+        }
+
+        searchInput = view.findViewById(R.id.etDiscoverSearch);
+        if (searchInput != null) {
+            searchInput.addTextChangedListener(new TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+                @Override public void afterTextChanged(Editable s) {
+                    updateSearchQuery(s != null ? s.toString() : "");
+                }
+            });
         }
 
         listenForEvents();
@@ -204,26 +216,26 @@ public class DiscoverFragment extends Fragment {
 
         RadioButton radioAnyDate = dialog.findViewById(R.id.radioAnyDate);
         RadioButton radioToday = dialog.findViewById(R.id.radioToday);
-        RadioButton radioTomorrow = dialog.findViewById(R.id.radioTomorrow);
+        RadioButton radioThisMonth = dialog.findViewById(R.id.radioTomorrow);
         RadioButton radioCustom = dialog.findViewById(R.id.radioCustomDate);
         TextView chooseDateValue = dialog.findViewById(R.id.textChooseDateValue);
         View chooseDateRow = dialog.findViewById(R.id.chooseDateRow);
+        EditText etFilterLocation = dialog.findViewById(R.id.etFilterLocation);
+        if (etFilterLocation != null) {
+            etFilterLocation.setText(locationFilter);
+        }
 
-        restoreDateSelection(radioAnyDate, radioToday, radioTomorrow, radioCustom, chooseDateValue);
-        setDateSelectionHandlers(radioAnyDate, radioToday, radioTomorrow, radioCustom, chooseDateRow, chooseDateValue);
-
-        CheckBox cbOutdoor = dialog.findViewById(R.id.cbOutdoor);
-        CheckBox cbIndoor = dialog.findViewById(R.id.cbIndoor);
-        CheckBox cbFamily = dialog.findViewById(R.id.cbFamily);
-        CheckBox cbBusiness = dialog.findViewById(R.id.cbBusiness);
-        CheckBox cbMusic = dialog.findViewById(R.id.cbMusic);
-        CheckBox cbFood = dialog.findViewById(R.id.cbFood);
-        restoreInterestSelection(cbOutdoor, cbIndoor, cbFamily, cbBusiness, cbMusic, cbFood);
+        restoreDateSelection(radioAnyDate, radioToday, radioThisMonth, radioCustom, chooseDateValue);
+        setDateSelectionHandlers(radioAnyDate, radioToday, radioThisMonth, radioCustom, chooseDateRow, chooseDateValue);
 
         Button applyButton = dialog.findViewById(R.id.btnApplyFilters);
         if (applyButton != null) {
             applyButton.setOnClickListener(v -> {
-                persistInterestSelection(cbOutdoor, cbIndoor, cbFamily, cbBusiness, cbMusic, cbFood);
+                if (etFilterLocation != null) {
+                    locationFilter = etFilterLocation.getText() != null
+                            ? etFilterLocation.getText().toString().trim()
+                            : "";
+                }
                 applyFiltersAndUpdateUI();
                 dialog.dismiss();
             });
@@ -242,10 +254,10 @@ public class DiscoverFragment extends Fragment {
     }
 
     private void restoreDateSelection(@Nullable RadioButton any, @Nullable RadioButton today,
-                                      @Nullable RadioButton tomorrow, @Nullable RadioButton custom,
+                                      @Nullable RadioButton thisMonth, @Nullable RadioButton custom,
                                       @Nullable TextView chooseDateValue) {
-        clearDateChecks(any, today, tomorrow, custom);
-        if (any == null || today == null || tomorrow == null || custom == null) return;
+        clearDateChecks(any, today, thisMonth, custom);
+        if (any == null || today == null || thisMonth == null || custom == null) return;
 
         switch (activeDateFilter) {
             case ANY_DATE:
@@ -254,8 +266,8 @@ public class DiscoverFragment extends Fragment {
             case TODAY:
                 today.setChecked(true);
                 break;
-            case TOMORROW:
-                tomorrow.setChecked(true);
+            case THIS_MONTH:
+                thisMonth.setChecked(true);
                 break;
             case CUSTOM:
                 custom.setChecked(true);
@@ -297,16 +309,16 @@ public class DiscoverFragment extends Fragment {
     }
 
     private void setDateSelectionHandlers(@Nullable RadioButton any, @Nullable RadioButton today,
-                                          @Nullable RadioButton tomorrow, @Nullable RadioButton custom,
+                                          @Nullable RadioButton thisMonth, @Nullable RadioButton custom,
                                           @Nullable View chooseDateRow, @Nullable TextView chooseDateValue) {
-        View.OnClickListener anyHandler = v -> setDateChoice(DateFilterOption.ANY_DATE, any, today, tomorrow, custom, chooseDateValue, false);
-        View.OnClickListener todayHandler = v -> setDateChoice(DateFilterOption.TODAY, today, any, tomorrow, custom, chooseDateValue, false);
-        View.OnClickListener tomorrowHandler = v -> setDateChoice(DateFilterOption.TOMORROW, tomorrow, any, today, custom, chooseDateValue, false);
-        View.OnClickListener customHandler = v -> setDateChoice(DateFilterOption.CUSTOM, custom, any, today, tomorrow, chooseDateValue, true);
+        View.OnClickListener anyHandler = v -> setDateChoice(DateFilterOption.ANY_DATE, any, today, thisMonth, custom, chooseDateValue, false);
+        View.OnClickListener todayHandler = v -> setDateChoice(DateFilterOption.TODAY, today, any, thisMonth, custom, chooseDateValue, false);
+        View.OnClickListener thisMonthHandler = v -> setDateChoice(DateFilterOption.THIS_MONTH, thisMonth, any, today, custom, chooseDateValue, false);
+        View.OnClickListener customHandler = v -> setDateChoice(DateFilterOption.CUSTOM, custom, any, today, thisMonth, chooseDateValue, true);
 
         if (any != null) any.setOnClickListener(anyHandler);
         if (today != null) today.setOnClickListener(todayHandler);
-        if (tomorrow != null) tomorrow.setOnClickListener(tomorrowHandler);
+        if (thisMonth != null) thisMonth.setOnClickListener(thisMonthHandler);
         if (custom != null) custom.setOnClickListener(customHandler);
         if (chooseDateRow != null) chooseDateRow.setOnClickListener(customHandler);
     }
@@ -337,29 +349,6 @@ public class DiscoverFragment extends Fragment {
                 rb.setChecked(false);
             }
         }
-    }
-
-    private void restoreInterestSelection(@Nullable CheckBox outdoor, @Nullable CheckBox indoor,
-                                          @Nullable CheckBox family, @Nullable CheckBox business,
-                                          @Nullable CheckBox music, @Nullable CheckBox food) {
-        if (outdoor != null) outdoor.setChecked(selectedInterests.contains("Outdoor"));
-        if (indoor != null) indoor.setChecked(selectedInterests.contains("Indoor"));
-        if (family != null) family.setChecked(selectedInterests.contains("Family"));
-        if (business != null) business.setChecked(selectedInterests.contains("Business"));
-        if (music != null) music.setChecked(selectedInterests.contains("Music"));
-        if (food != null) food.setChecked(selectedInterests.contains("Food"));
-    }
-
-    private void persistInterestSelection(@Nullable CheckBox outdoor, @Nullable CheckBox indoor,
-                                          @Nullable CheckBox family, @Nullable CheckBox business,
-                                          @Nullable CheckBox music, @Nullable CheckBox food) {
-        selectedInterests.clear();
-        if (outdoor != null && outdoor.isChecked()) selectedInterests.add("Outdoor");
-        if (indoor != null && indoor.isChecked()) selectedInterests.add("Indoor");
-        if (family != null && family.isChecked()) selectedInterests.add("Family");
-        if (business != null && business.isChecked()) selectedInterests.add("Business");
-        if (music != null && music.isChecked()) selectedInterests.add("Music");
-        if (food != null && food.isChecked()) selectedInterests.add("Food");
     }
 
     private Bitmap captureScreenshot() {
@@ -475,7 +464,7 @@ public class DiscoverFragment extends Fragment {
 
         List<Event> filtered = new ArrayList<>();
         for (Event event : allEvents) {
-            if (passesDateFilter(event) && passesInterestFilter(event)) {
+            if (passesDateFilter(event) && passesLocationFilter(event) && passesSearchFilter(event)) {
                 filtered.add(event);
             }
         }
@@ -513,16 +502,33 @@ public class DiscoverFragment extends Fragment {
         }
     }
 
-    private boolean passesInterestFilter(@NonNull Event event) {
-        if (selectedInterests.isEmpty()) {
+    private boolean passesLocationFilter(@NonNull Event event) {
+        if (TextUtils.isEmpty(locationFilter)) {
+            return true;
+        }
+        String eventLocation = event.location;
+        if (TextUtils.isEmpty(eventLocation)) {
+            return false;
+        }
+        return eventLocation.toLowerCase(Locale.getDefault())
+                .contains(locationFilter.toLowerCase(Locale.getDefault()));
+    }
+
+    private boolean passesSearchFilter(@NonNull Event event) {
+        if (TextUtils.isEmpty(searchQuery)) {
+            return true;
+        }
+        String queryLower = searchQuery.toLowerCase(Locale.getDefault());
+        String title = event.getTitle();
+        if (!TextUtils.isEmpty(title) && title.toLowerCase(Locale.getDefault()).contains(queryLower)) {
             return true;
         }
         List<String> interests = event.getInterests();
         if (interests == null || interests.isEmpty()) {
             return false;
         }
-        for (String tag : interests) {
-            if (tag != null && selectedInterests.contains(tag)) {
+        for (String interest : interests) {
+            if (interest != null && interest.toLowerCase(Locale.getDefault()).contains(queryLower)) {
                 return true;
             }
         }
@@ -534,32 +540,29 @@ public class DiscoverFragment extends Fragment {
             return true;
         }
 
-        long registrationDate = getRegistrationDateForFilter(event);
-        if (registrationDate <= 0) {
-            // Unknown start dates only pass when no filter is applied.
+        long eventDate = getEventDateForFilter(event);
+        if (eventDate <= 0) {
             return false;
         }
 
         switch (activeDateFilter) {
             case TODAY:
-                return isSameDay(registrationDate, startOfDay(System.currentTimeMillis()));
-            case TOMORROW:
-                long tomorrowStart = startOfDay(System.currentTimeMillis()) + 24L * 60L * 60L * 1000L;
-                return isSameDay(registrationDate, tomorrowStart);
+                return isSameDay(eventDate, startOfDay(System.currentTimeMillis()));
+            case THIS_MONTH:
+                return isSameMonth(eventDate, System.currentTimeMillis());
             case CUSTOM:
                 if (customDateFilterStartMs <= 0) return true;
-                return isSameDay(registrationDate, customDateFilterStartMs);
+                return isSameDay(eventDate, customDateFilterStartMs);
             default:
                 return true;
         }
     }
 
-    private long getRegistrationDateForFilter(@NonNull Event event) {
-        if (event.registrationStart > 0) {
-            return event.registrationStart;
+    private long getEventDateForFilter(@NonNull Event event) {
+        if (event.getStartsAtEpochMs() > 0) {
+            return event.getStartsAtEpochMs();
         }
-        // Fallback to event start if registration start is missing.
-        return event.getStartsAtEpochMs();
+        return event.registrationStart > 0 ? event.registrationStart : 0;
     }
 
     private boolean isSameDay(long timestampMs, long dayStartMs) {
@@ -573,6 +576,15 @@ public class DiscoverFragment extends Fragment {
                 && day.get(Calendar.DAY_OF_YEAR) == target.get(Calendar.DAY_OF_YEAR);
     }
 
+    private boolean isSameMonth(long timestampMs, long referenceMs) {
+        Calendar ref = Calendar.getInstance();
+        ref.setTimeInMillis(referenceMs);
+        Calendar target = Calendar.getInstance();
+        target.setTimeInMillis(timestampMs);
+        return ref.get(Calendar.YEAR) == target.get(Calendar.YEAR)
+                && ref.get(Calendar.MONTH) == target.get(Calendar.MONTH);
+    }
+
     private long startOfDay(long timeMs) {
         Calendar cal = Calendar.getInstance();
         cal.setTimeInMillis(timeMs);
@@ -581,5 +593,14 @@ public class DiscoverFragment extends Fragment {
         cal.set(Calendar.SECOND, 0);
         cal.set(Calendar.MILLISECOND, 0);
         return cal.getTimeInMillis();
+    }
+
+    private void updateSearchQuery(@NonNull String query) {
+        String cleaned = query.trim();
+        if (cleaned.equals(searchQuery)) {
+            return;
+        }
+        searchQuery = cleaned;
+        applyFiltersAndUpdateUI();
     }
 }

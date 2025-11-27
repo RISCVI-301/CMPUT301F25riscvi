@@ -11,15 +11,15 @@
     <androidx.cardview.widget.CardView
         android:id="@+id/dialogCardView"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="wrap_content"
         android:layout_gravity="center"
-        android:layout_marginStart="16dp"
-        android:layout_marginEnd="16dp"
-        android:layout_marginTop="48dp"
-        android:layout_marginBottom="48dp"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp"
+        android:layout_marginTop="20dp"
+        android:layout_marginBottom="20dp"
         android:backgroundTint="#E9F2FF"
         app:cardCornerRadius="16dp"
-        app:cardElevation="16dp">
+        app:cardElevation="12dp">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -70,14 +70,16 @@
             <ScrollView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:fillViewport="true">
+                android:fillViewport="false">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="16dp"
-                    android:paddingBottom="20dp">
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:paddingTop="12dp"
+                    android:paddingBottom="16dp">
 
                     <TextView
                         android:id="@+id/labelDate"
@@ -162,7 +164,7 @@
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
                                 android:fontFamily="@font/entrant_fredoka_one"
-                                android:text="Tomorrow"
+                                android:text="This month"
                                 android:textColor="#223C65"
                                 android:textSize="16sp" />
 
@@ -230,7 +232,7 @@
                         android:background="#223C65" />
 
                     <TextView
-                        android:id="@+id/labelInterests"
+                        android:id="@+id/labelLocation"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:background="@drawable/entrant_filter_section_label"
@@ -239,7 +241,7 @@
                         android:paddingTop="6dp"
                         android:paddingEnd="12dp"
                         android:paddingBottom="6dp"
-                        android:text="Interests"
+                        android:text="Location"
                         android:textColor="#223C65"
                         android:textSize="18sp"
                         android:textStyle="bold" />
@@ -250,149 +252,19 @@
                         android:orientation="vertical"
                         android:paddingTop="12dp">
 
-                        <LinearLayout
+                        <EditText
+                            android:id="@+id/etFilterLocation"
                             android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
+                            android:layout_height="48dp"
                             android:background="@drawable/entrant_dialog_option_background"
-                            android:gravity="center_vertical"
-                            android:padding="12dp"
-                            android:layout_marginBottom="8dp">
-
-                            <TextView
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:fontFamily="@font/entrant_fredoka_one"
-                                android:text="Outdoor"
-                                android:textColor="#223C65"
-                                android:textSize="16sp" />
-
-                            <CheckBox
-                                android:id="@+id/cbOutdoor"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:buttonTint="#223C65" />
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:background="@drawable/entrant_dialog_option_background"
-                            android:gravity="center_vertical"
-                            android:padding="12dp"
-                            android:layout_marginBottom="8dp">
-
-                            <TextView
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:fontFamily="@font/entrant_fredoka_one"
-                                android:text="Indoor"
-                                android:textColor="#223C65"
-                                android:textSize="16sp" />
-
-                            <CheckBox
-                                android:id="@+id/cbIndoor"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:buttonTint="#223C65" />
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:background="@drawable/entrant_dialog_option_background"
-                            android:gravity="center_vertical"
-                            android:padding="12dp"
-                            android:layout_marginBottom="8dp">
-
-                            <TextView
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:fontFamily="@font/entrant_fredoka_one"
-                                android:text="Family"
-                                android:textColor="#223C65"
-                                android:textSize="16sp" />
-
-                            <CheckBox
-                                android:id="@+id/cbFamily"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:buttonTint="#223C65" />
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:background="@drawable/entrant_dialog_option_background"
-                            android:gravity="center_vertical"
-                            android:padding="12dp"
-                            android:layout_marginBottom="8dp">
-
-                            <TextView
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:fontFamily="@font/entrant_fredoka_one"
-                                android:text="Business"
-                                android:textColor="#223C65"
-                                android:textSize="16sp" />
-
-                            <CheckBox
-                                android:id="@+id/cbBusiness"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:buttonTint="#223C65" />
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:background="@drawable/entrant_dialog_option_background"
-                            android:gravity="center_vertical"
-                            android:padding="12dp"
-                            android:layout_marginBottom="8dp">
-
-                            <TextView
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:fontFamily="@font/entrant_fredoka_one"
-                                android:text="Music"
-                                android:textColor="#223C65"
-                                android:textSize="16sp" />
-
-                            <CheckBox
-                                android:id="@+id/cbMusic"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:buttonTint="#223C65" />
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:background="@drawable/entrant_dialog_option_background"
-                            android:gravity="center_vertical"
-                            android:padding="12dp">
-
-                            <TextView
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:fontFamily="@font/entrant_fredoka_one"
-                                android:text="Food"
-                                android:textColor="#223C65"
-                                android:textSize="16sp" />
-
-                            <CheckBox
-                                android:id="@+id/cbFood"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:buttonTint="#223C65" />
-                        </LinearLayout>
-
+                            android:hint="City, venue, or address"
+                            android:paddingStart="14dp"
+                            android:paddingEnd="14dp"
+                            android:textColor="#223C65"
+                            android:textColorHint="#80223C65"
+                            android:textSize="16sp"
+                            android:fontFamily="@font/entrant_fredoka_one"
+                            android:inputType="textCapWords|text" />
                     </LinearLayout>
 
                     <androidx.appcompat.widget.AppCompatButton
