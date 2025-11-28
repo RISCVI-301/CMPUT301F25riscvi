@@ -190,7 +190,10 @@ public class AdminProfileDatabaseController {
                                         Log.e(TAG, "deleteOrganizerEvents: Failed to delete event " +
                                                 eventId + " for organizer: " + uid, e));
                     }
-                });
+                })
+                .addOnFailureListener(e ->
+                        Log.e(TAG, "deleteOrganizerEvents: Failed to fetch events for organizer: "
+                                + uid, e));
 
 
     }
