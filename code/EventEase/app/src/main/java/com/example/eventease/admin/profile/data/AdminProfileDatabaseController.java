@@ -152,6 +152,7 @@ public class AdminProfileDatabaseController {
             return;
         }
 
+        DocumentReference userRef = db.collection("users").document(uid);
         
     }
 
