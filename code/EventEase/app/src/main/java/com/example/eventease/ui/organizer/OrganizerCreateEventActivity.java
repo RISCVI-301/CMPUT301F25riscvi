@@ -809,7 +809,8 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                 .addOnSuccessListener(v -> {
                     btnSave.setEnabled(true);
                     btnSave.setText("SAVE CHANGES");
-                    showSuccessDialog(id, title, generateQr ? ("eventease://event/" + id) : null);
+                    toast("Event created successfully!");
+                    goToMyEvents();
                 })
                 .addOnFailureListener(e -> {
                     Log.e(TAG, "Firestore write failed", e);
