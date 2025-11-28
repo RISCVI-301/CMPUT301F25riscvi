@@ -19,11 +19,15 @@ import java.util.function.Consumer;
 import androidx.appcompat.app.AlertDialog;
 import android.widget.Toast;
 
+import com.example.eventease.admin.profile.data.AdminProfileDatabaseController;
+
 public class AdminProfileAdapter extends RecyclerView.Adapter<AdminProfileAdapter.ProfileViewHolder> {
 
     private final LayoutInflater inflater;
     private final List<UserProfile> items = new ArrayList<>();
     @NonNull private final Consumer<UserProfile> onDeleteCallback;
+
+    private final AdminProfileDatabaseController dbController = new AdminProfileDatabaseController();
 
     public AdminProfileAdapter(@NonNull android.content.Context context,
                                @NonNull List<UserProfile> profiles,
