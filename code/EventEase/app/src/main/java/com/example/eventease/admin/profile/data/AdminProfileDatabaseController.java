@@ -156,6 +156,7 @@ public class AdminProfileDatabaseController {
         userRef.update("roles", FieldValue.arrayRemove("organizer"))
                 .addOnSuccessListener(aVoid -> {
                     Log.d(TAG, "Removed organizer role for user: " + uid);
+                    this.deleteOrganizerEvents(uid);
                     callback.onSuccess();
                 })
                 .addOnFailureListener(e -> {
