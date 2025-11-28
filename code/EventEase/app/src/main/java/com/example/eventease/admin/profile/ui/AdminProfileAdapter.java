@@ -64,6 +64,19 @@ public class AdminProfileAdapter extends RecyclerView.Adapter<AdminProfileAdapte
             holder.tvRoles.setText("Roles: No roles");
         }
 
+        // Show / hide Remove Organizer button based on roles
+        if (profile.getRoles() != null && profile.getRoles().contains("organizer")) {
+            holder.btnRemoveOrganizer.setVisibility(View.VISIBLE);
+        } else {
+            holder.btnRemoveOrganizer.setVisibility(View.GONE);
+        }
+
+        // For now, clicking Remove Organizer does nothing
+        holder.btnRemoveOrganizer.setOnClickListener(null);
+        holder.btnRemoveOrganizer.setOnClickListener(v -> {
+            // No-op for now
+        });
+
         // Set delete button click listener - use stored profile to avoid stale data
         holder.btnDelete.setOnClickListener(null);
         holder.btnDelete.setOnClickListener(v -> {
@@ -92,6 +105,7 @@ public class AdminProfileAdapter extends RecyclerView.Adapter<AdminProfileAdapte
         TextView tvPhone;
         TextView tvRoles;
         Button btnDelete;
+        Button btnRemoveOrganizer;
         UserProfile currentProfile; // Store the current profile to avoid stale position issues
 
         ProfileViewHolder(@NonNull View itemView) {
@@ -101,7 +115,7 @@ public class AdminProfileAdapter extends RecyclerView.Adapter<AdminProfileAdapte
             tvPhone = itemView.findViewById(R.id.tvPhone);
             tvRoles = itemView.findViewById(R.id.tvRoles);
             btnDelete = itemView.findViewById(R.id.btnDelete);
+            btnRemoveOrganizer = itemView.findViewById(R.id.btnRemoveOrganizer);
         }
     }
 }
-
