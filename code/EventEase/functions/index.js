@@ -380,11 +380,14 @@ exports.processAutomaticEntrantSelection = functions.pubsub
                     const userId = selectedDoc.id;
                     const userData = selectedDoc.data();
                     
+                    // CRITICAL: Ensure mutual exclusivity - user can only exist in ONE collection
                     // Add to SelectedEntrants
                     batch.set(selectedEntrantsRef.doc(userId), userData);
                     
-                    // Keep users in WaitlistedEntrants (don't delete)
-                    // batch.delete(waitlistedEntrantsRef.doc(userId));
+                    // Remove from ALL other collections
+                    batch.delete(waitlistedEntrantsRef.doc(userId));
+                    batch.delete(admin.firestore().collection('events').doc(eventId).collection('NonSelectedEntrants').doc(userId));
+                    batch.delete(admin.firestore().collection('events').doc(eventId).collection('CancelledEntrants').doc(userId));
                 }
                 
                 // Don't update waitlistCount - users stay in waitlist
@@ -461,11 +464,14 @@ exports.processAutomaticEntrantSelection = functions.pubsub
                             const userId = remainingDoc.id;
                             const userData = remainingDoc.data();
                             
+                            // CRITICAL: Ensure mutual exclusivity - user can only exist in ONE collection
                             // Add to NonSelectedEntrants
                             nonSelectedBatch.set(nonSelectedRef.doc(userId), userData);
                             
-                            // Keep users in WaitlistedEntrants (don't delete)
-                            // nonSelectedBatch.delete(remainingWaitlistRef.doc(userId));
+                            // Remove from ALL other collections
+                            nonSelectedBatch.delete(waitlistedEntrantsRef.doc(userId));
+                            nonSelectedBatch.delete(admin.firestore().collection('events').doc(eventId).collection('SelectedEntrants').doc(userId));
+                            nonSelectedBatch.delete(admin.firestore().collection('events').doc(eventId).collection('CancelledEntrants').doc(userId));
                         }
                         
                         // Don't update waitlistCount - users stay in waitlist

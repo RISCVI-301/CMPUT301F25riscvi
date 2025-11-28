@@ -200,12 +200,17 @@ public class InvitationDeadlineProcessor {
                         DocumentSnapshot userDoc = i < userDocs.size() ? (DocumentSnapshot) userDocs.get(i) : null;
                         
                         DocumentReference selectedRef = eventRef.collection("SelectedEntrants").document(userId);
+                        DocumentReference nonSelectedRef = eventRef.collection("NonSelectedEntrants").document(userId);
+                        DocumentReference waitlistRef = eventRef.collection("WaitlistedEntrants").document(userId);
                         DocumentReference cancelledRef = eventRef.collection("CancelledEntrants").document(userId);
                         
                         Map<String, Object> cancelledData = buildCancelledEntry(userId, userDoc);
                         batch.set(cancelledRef, cancelledData, SetOptions.merge());
+                        // CRITICAL: Remove from ALL other collections to ensure user exists in only ONE collection
                         batch.delete(selectedRef);
-                        batchCount += 2;
+                        batch.delete(nonSelectedRef);
+                        batch.delete(waitlistRef);
+                        batchCount += 4;
                         
                         // Update invitation status to DECLINED
                         if (i < invitationIds.size()) {

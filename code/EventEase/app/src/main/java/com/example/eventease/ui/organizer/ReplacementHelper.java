@@ -27,67 +27,18 @@ public class ReplacementHelper {
     }
 
     /**
-     * Automatically replaces cancelled entrants with waitlisted entrants.
-     * This is called when someone declines an invitation or when the View Entrants screen loads.
+     * AUTOMATIC REPLACEMENT IS DISABLED - Only manual replacement is allowed.
+     * Organizer must use the "Replace Cancelled Entrants" button to manually select replacements.
+     * 
+     * This method is kept for backward compatibility but does nothing.
      *
      * @param eventId The event ID
      * @param eventTitle The event title (for notifications)
      */
     public void autoReplaceCancelledEntrants(String eventId, String eventTitle) {
-        if (eventId == null || eventId.isEmpty()) {
-            return;
-        }
-
-        // Check if we're still before the deadline to accept/decline
-        db.collection("events").document(eventId).get()
-                .addOnSuccessListener(eventDoc -> {
-                    if (eventDoc == null || !eventDoc.exists()) {
-                        return;
-                    }
-
-                    Long deadlineEpochMs = eventDoc.getLong("deadlineEpochMs");
-                    long currentTime = System.currentTimeMillis();
-                    
-                    // Only auto-replace if we're still before the deadline
-                    if (deadlineEpochMs != null && currentTime >= deadlineEpochMs) {
-                        Log.d(TAG, "Deadline has passed, skipping auto-replacement");
-                        return;
-                    }
-
-                    // Count cancelled and waitlisted entrants
-                    db.collection("events").document(eventId).collection("CancelledEntrants").get()
-                            .addOnSuccessListener(cancelledSnapshot -> {
-                                int cancelledCount = cancelledSnapshot != null ? cancelledSnapshot.size() : 0;
-
-                                if (cancelledCount == 0) {
-                                    return; // No cancellations, nothing to replace
-                                }
-
-                                db.collection("events").document(eventId).collection("WaitlistedEntrants").get()
-                                        .addOnSuccessListener(waitlistSnapshot -> {
-                                            int waitlistCount = waitlistSnapshot != null ? waitlistSnapshot.size() : 0;
-
-                                            if (waitlistCount == 0) {
-                                                Log.d(TAG, "No waitlisted entrants available for replacement");
-                                                return; // No waitlisted entrants available
-                                            }
-
-                                            // Auto-replace: move from waitlisted to selected
-                                            int toReplace = Math.min(cancelledCount, waitlistCount);
-                                            Log.d(TAG, "Auto-replacing " + toReplace + " cancelled entrant(s)");
-                                            performReplacement(eventId, eventTitle, toReplace);
-                                        })
-                                        .addOnFailureListener(e -> {
-                                            Log.e(TAG, "Failed to check waitlisted entrants for auto-replace", e);
-                                        });
-                            })
-                            .addOnFailureListener(e -> {
-                                Log.e(TAG, "Failed to check cancelled entrants for auto-replace", e);
-                            });
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Failed to load event for auto-replace check", e);
-                });
+        // AUTOMATIC REPLACEMENT DISABLED - Organizer must manually replace via button
+        Log.d(TAG, "Auto-replacement is disabled. Organizer must manually replace cancelled entrants via the Replace button.");
+        return;
     }
 
     private void performReplacement(String eventId, String eventTitle, int count) {

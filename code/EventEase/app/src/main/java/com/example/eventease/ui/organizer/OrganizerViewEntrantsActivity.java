@@ -403,32 +403,58 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
         notSelectedList.clear();
         cancelledList.clear();
 
+        // Load all three collections simultaneously and filter duplicates
+        // A user should only appear in ONE collection (Selected, NonSelected, or Cancelled)
         db.collection("events").document(eventId).collection("SelectedEntrants").get()
-                .addOnSuccessListener(snap -> {
-                    for (DocumentSnapshot doc : snap.getDocuments()) {
+                .addOnSuccessListener(selectedSnap -> {
+                    // Store userIds to filter duplicates
+                    Set<String> selectedUserIds = new HashSet<>();
+                    for (DocumentSnapshot doc : selectedSnap.getDocuments()) {
+                        selectedUserIds.add(doc.getId());
                         selectedList.add(safeName(doc));
                     }
                     selectedAdapter.notifyDataSetChanged();
-                });
-
-        // Not Selected Entrants are in NonSelectedEntrants collection (moved there after deadline)
-        // Waitlisted entrants stay in WaitlistedEntrants until first random roll happens
-        db.collection("events").document(eventId).collection("NonSelectedEntrants").get()
-                .addOnSuccessListener(snap -> {
-                    for (DocumentSnapshot doc : snap.getDocuments()) {
-                        notSelectedList.add(safeName(doc));
-                    }
-                    notSelectedAdapter.notifyDataSetChanged();
-                });
-
-        db.collection("events").document(eventId).collection("CancelledEntrants").get()
-                .addOnSuccessListener(snap -> {
-                    for (DocumentSnapshot doc : snap.getDocuments()) {
-                        cancelledList.add(safeName(doc));
-                    }
-                    cancelledAdapter.notifyDataSetChanged();
                     
-                    // NOTE: Automatic replacement is disabled - organizer must manually replace via button
+                    // Now load NonSelectedEntrants and filter out duplicates
+                    db.collection("events").document(eventId).collection("NonSelectedEntrants").get()
+                            .addOnSuccessListener(nonSelectedSnap -> {
+                                Set<String> nonSelectedUserIds = new HashSet<>();
+                                for (DocumentSnapshot doc : nonSelectedSnap.getDocuments()) {
+                                    String userId = doc.getId();
+                                    // Only add if NOT already in SelectedEntrants
+                                    if (!selectedUserIds.contains(userId)) {
+                                        nonSelectedUserIds.add(userId);
+                                        notSelectedList.add(safeName(doc));
+                                    } else {
+                                        Log.w(TAG, "Filtered duplicate: " + userId + " appears in both SelectedEntrants and NonSelectedEntrants");
+                                    }
+                                }
+                                notSelectedAdapter.notifyDataSetChanged();
+                                
+                                // Now load CancelledEntrants and filter out duplicates
+                                db.collection("events").document(eventId).collection("CancelledEntrants").get()
+                                        .addOnSuccessListener(cancelledSnap -> {
+                                            for (DocumentSnapshot doc : cancelledSnap.getDocuments()) {
+                                                String userId = doc.getId();
+                                                // Only add if NOT already in SelectedEntrants or NonSelectedEntrants
+                                                if (!selectedUserIds.contains(userId) && !nonSelectedUserIds.contains(userId)) {
+                                                    cancelledList.add(safeName(doc));
+                                                } else {
+                                                    Log.w(TAG, "Filtered duplicate: " + userId + " appears in multiple collections");
+                                                }
+                                            }
+                                            cancelledAdapter.notifyDataSetChanged();
+                                        })
+                                        .addOnFailureListener(e -> {
+                                            Log.e(TAG, "Failed to load CancelledEntrants", e);
+                                        });
+                            })
+                            .addOnFailureListener(e -> {
+                                Log.e(TAG, "Failed to load NonSelectedEntrants", e);
+                            });
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to load SelectedEntrants", e);
                 });
     }
 
@@ -961,10 +987,13 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
 
                                                 if (data != null) {
                                                     Log.d(TAG, "Replacement: Moving user " + userId + " from NonSelected to Selected");
+                                                    // CRITICAL: Ensure mutual exclusivity - user can only exist in ONE collection
                                                     // Move to SelectedEntrants
                                                     batch.set(eventRef.collection("SelectedEntrants").document(userId), data);
-                                                    // Remove from NonSelectedEntrants
+                                                    // Remove from ALL other collections
                                                     batch.delete(eventRef.collection("NonSelectedEntrants").document(userId));
+                                                    batch.delete(eventRef.collection("WaitlistedEntrants").document(userId));
+                                                    batch.delete(eventRef.collection("CancelledEntrants").document(userId));
                             
                             // Create invitation for replacement
                             Map<String, Object> invitation = new HashMap<>();
@@ -1167,11 +1196,31 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
         DocumentReference eventRef = db.collection("events").document(eventId);
         DocumentReference fromRef = eventRef.collection(fromCollection).document(userId);
         DocumentReference toRef = eventRef.collection(toCollection).document(userId);
+        
+        // CRITICAL: Ensure mutual exclusivity - remove from ALL collections before adding to target
+        DocumentReference waitlistRef = eventRef.collection("WaitlistedEntrants").document(userId);
+        DocumentReference selectedRef = eventRef.collection("SelectedEntrants").document(userId);
+        DocumentReference nonSelectedRef = eventRef.collection("NonSelectedEntrants").document(userId);
+        DocumentReference cancelledRef = eventRef.collection("CancelledEntrants").document(userId);
 
         WriteBatch batch = db.batch();
         
         if (entrantData != null) {
             batch.set(toRef, entrantData);
+            // CRITICAL: Remove from ALL other collections to ensure user exists in only ONE collection
+            // But don't delete from the target collection (that's where we're moving TO)
+            if (!"WaitlistedEntrants".equals(toCollection)) {
+                batch.delete(waitlistRef);
+            }
+            if (!"SelectedEntrants".equals(toCollection)) {
+                batch.delete(selectedRef);
+            }
+            if (!"NonSelectedEntrants".equals(toCollection)) {
+                batch.delete(nonSelectedRef);
+            }
+            if (!"CancelledEntrants".equals(toCollection)) {
+                batch.delete(cancelledRef);
+            }
         } else {
             // If no data, fetch from users collection
             db.collection("users").document(userId).get()
@@ -1199,7 +1248,20 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
                         
                         WriteBatch moveBatch = db.batch();
                         moveBatch.set(toRef, userData);
-                        moveBatch.delete(fromRef);
+                        // CRITICAL: Remove from ALL other collections to ensure user exists in only ONE collection
+                        // But don't delete from the target collection (that's where we're moving TO)
+                        if (!"WaitlistedEntrants".equals(toCollection)) {
+                            moveBatch.delete(waitlistRef);
+                        }
+                        if (!"SelectedEntrants".equals(toCollection)) {
+                            moveBatch.delete(selectedRef);
+                        }
+                        if (!"NonSelectedEntrants".equals(toCollection)) {
+                            moveBatch.delete(nonSelectedRef);
+                        }
+                        if (!"CancelledEntrants".equals(toCollection)) {
+                            moveBatch.delete(cancelledRef);
+                        }
                         moveBatch.commit()
                                 .addOnSuccessListener(aVoid -> {
                                     Toast.makeText(this, "Entrant moved successfully", Toast.LENGTH_SHORT).show();
