@@ -172,7 +172,25 @@ public class AdminProfileDatabaseController {
 
         db.collection("events")
                 .whereEqualTo("organizerId", uid)
-                .get();
+                .get()
+                .addOnSuccessListener((QuerySnapshot qs) -> {
+                    if (qs == null || qs.isEmpty()) {
+                        Log.d(TAG, "deleteOrganizerEvents: No events found for organizer: " + uid);
+                        return;
+                    }
+
+                    for (DocumentSnapshot d : qs.getDocuments()) {
+                        final String eventId = d.getId();
+                        d.getReference()
+                                .delete()
+                                .addOnSuccessListener(aVoid ->
+                                        Log.d(TAG, "deleteOrganizerEvents: Deleted event " + eventId +
+                                                " for organizer: " + uid))
+                                .addOnFailureListener(e ->
+                                        Log.e(TAG, "deleteOrganizerEvents: Failed to delete event " +
+                                                eventId + " for organizer: " + uid, e));
+                    }
+                });
 
 
     }
