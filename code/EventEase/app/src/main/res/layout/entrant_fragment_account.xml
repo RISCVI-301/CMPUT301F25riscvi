@@ -100,6 +100,40 @@
         android:layout_weight="1"/>
 
     <androidx.cardview.widget.CardView
+        android:id="@+id/notificationsCard"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginVertical="8dp"
+        app:cardCornerRadius="16dp"
+        app:cardBackgroundColor="#536C8C"
+        android:elevation="8dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:padding="16dp"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Enable Notifications"
+                android:textSize="20sp"
+                android:textColor="#FFFFFF"
+                android:fontFamily="@font/entrant_fredoka_one"/>
+
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                android:id="@+id/notificationToggle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true"/>
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
+    <androidx.cardview.widget.CardView
         android:id="@+id/notificationPreferencesCard"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
