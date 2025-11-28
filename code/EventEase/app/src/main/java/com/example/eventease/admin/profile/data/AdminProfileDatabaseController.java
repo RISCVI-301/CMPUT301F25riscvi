@@ -146,6 +146,15 @@ public class AdminProfileDatabaseController {
                 });
     }
 
+    public void removeOrganizerRole(@NonNull String uid, @NonNull DeleteCallback callback) {
+        if (uid == null || uid.trim().isEmpty()) {
+            callback.onError(new IllegalArgumentException("UID is null or empty"));
+            return;
+        }
+
+        
+    }
+
 
 }
 
