@@ -16,6 +16,8 @@ public class AdminImageDatabaseController {
 
     private final StorageReference postersRef =
             FirebaseStorage.getInstance().getReference().child("posters/");
+    private final StorageReference profilePicturesRef =
+            FirebaseStorage.getInstance().getReference().child("profile_pictures");
 
     public List<String> getImageLinks() {
         try {
