@@ -72,6 +72,7 @@ public class EventDetailActivity extends AppCompatActivity {
     private Button btnRegister;
     private Button btnDecline;
     private Button btnOptOut;
+    private Button btnLeaveWaitlist;
     private Button btnGuidelines;
     private ImageButton btnBack;
     private ImageButton btnShare;
@@ -81,6 +82,9 @@ public class EventDetailActivity extends AppCompatActivity {
     private android.widget.LinearLayout navButtonDiscover;
     private android.widget.LinearLayout navButtonAccount;
     private BottomNavigationView bottomNavigation;
+    // Card views for visibility control
+    private android.view.View waitlistCountCard;
+    private android.view.View leaveWaitlistCard;
     
     private String eventId;
     private String eventTitle;
@@ -132,6 +136,7 @@ public class EventDetailActivity extends AppCompatActivity {
         btnRegister = findViewById(R.id.btnRegister);
         btnDecline = findViewById(R.id.btnDecline);
         btnOptOut = findViewById(R.id.btnOptOut);
+        btnLeaveWaitlist = findViewById(R.id.btnLeaveWaitlist);
         btnGuidelines = findViewById(R.id.btnGuidelines);
         btnBack = findViewById(R.id.btnBack);
         btnShare = findViewById(R.id.btnShare);
@@ -140,6 +145,9 @@ public class EventDetailActivity extends AppCompatActivity {
         navButtonMyEvents = findViewById(R.id.nav_button_my_events);
         navButtonDiscover = findViewById(R.id.nav_button_discover);
         navButtonAccount = findViewById(R.id.nav_button_account);
+        // Find card views
+        waitlistCountCard = findViewById(R.id.waitlistCountCard);
+        leaveWaitlistCard = findViewById(R.id.leaveWaitlistCard);
 
         // Set up back button
         btnBack.setOnClickListener(v -> finish());
@@ -168,6 +176,13 @@ public class EventDetailActivity extends AppCompatActivity {
         if (btnOptOut != null) {
             btnOptOut.setOnClickListener(v -> {
                 showOptOutDialog();
+            });
+        }
+
+        // Set up leave waitlist button
+        if (btnLeaveWaitlist != null) {
+            btnLeaveWaitlist.setOnClickListener(v -> {
+                performOptOut(); // Reuse the opt-out functionality
             });
         }
 
@@ -651,6 +666,10 @@ public class EventDetailActivity extends AppCompatActivity {
             if (btnOptOut != null) {
                 btnOptOut.setVisibility(View.GONE);
             }
+            if (btnLeaveWaitlist != null && leaveWaitlistCard != null) {
+                btnLeaveWaitlist.setVisibility(View.GONE);
+                leaveWaitlistCard.setVisibility(View.GONE);
+            }
             
             // Update invitation ID for accept/decline actions
             this.invitationId = inviteId;
@@ -666,6 +685,10 @@ public class EventDetailActivity extends AppCompatActivity {
             btnDecline.setVisibility(View.GONE);
             if (btnOptOut != null) {
                 btnOptOut.setVisibility(View.VISIBLE);
+            }
+            if (btnLeaveWaitlist != null && leaveWaitlistCard != null) {
+                btnLeaveWaitlist.setVisibility(View.VISIBLE);
+                leaveWaitlistCard.setVisibility(View.VISIBLE);
             }
             
             this.invitationId = null;

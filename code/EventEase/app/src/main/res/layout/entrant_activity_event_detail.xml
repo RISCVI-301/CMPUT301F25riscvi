@@ -79,7 +79,8 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:paddingBottom="104dp">
 
             <!-- Event Image Placeholder -->
             <androidx.cardview.widget.CardView
@@ -141,6 +142,7 @@
 
             <!-- Number of Entrants Section -->
             <androidx.cardview.widget.CardView
+                android:id="@+id/waitlistCountCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="16dp"
@@ -188,7 +190,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="16dp"
                 android:layout_marginEnd="16dp"
-                android:layout_marginBottom="12dp"
+                android:layout_marginBottom="16dp"
                 app:cardBackgroundColor="#4A6B99"
                 app:cardCornerRadius="12dp"
                 app:cardElevation="0dp">
@@ -225,7 +227,7 @@
                     android:background="@android:color/transparent"
                     android:fontFamily="@font/entrant_fredoka_one"
                     android:padding="14dp"
-                    android:text="Register/Sign up"
+                    android:text="Accept"
                     android:textAllCaps="false"
                     android:textColor="#2C4A6E"
                     android:textSize="20sp"/>
@@ -234,12 +236,13 @@
 
             <!-- Decline Button -->
             <androidx.cardview.widget.CardView
+                android:id="@+id/declineCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="16dp"
                 android:layout_marginEnd="16dp"
                 android:layout_marginBottom="12dp"
-                app:cardBackgroundColor="#7FDBDA"
+                app:cardBackgroundColor="#FF6B6B"
                 app:cardCornerRadius="12dp"
                 app:cardElevation="0dp">
 
@@ -252,7 +255,33 @@
                     android:padding="14dp"
                     android:text="Decline"
                     android:textAllCaps="false"
-                    android:textColor="#2C4A6E"
+                    android:textColor="@android:color/white"
+                    android:textSize="20sp"/>
+
+            </androidx.cardview.widget.CardView>
+
+            <!-- Leave Waitlist Button -->
+            <androidx.cardview.widget.CardView
+                android:id="@+id/leaveWaitlistCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginEnd="16dp"
+                android:layout_marginBottom="12dp"
+                app:cardBackgroundColor="#FF6B6B"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="0dp">
+
+                <Button
+                    android:id="@+id/btnLeaveWaitlist"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@android:color/transparent"
+                    android:fontFamily="@font/entrant_fredoka_one"
+                    android:padding="14dp"
+                    android:text="Leave Waitlist"
+                    android:textAllCaps="false"
+                    android:textColor="@android:color/white"
                     android:textSize="20sp"/>
 
             </androidx.cardview.widget.CardView>
