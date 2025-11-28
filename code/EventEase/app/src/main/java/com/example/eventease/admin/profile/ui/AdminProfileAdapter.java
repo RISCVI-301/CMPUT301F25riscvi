@@ -81,9 +81,31 @@ public class AdminProfileAdapter extends RecyclerView.Adapter<AdminProfileAdapte
         holder.btnRemoveOrganizer.setOnClickListener(v -> {
             new AlertDialog.Builder(v.getContext())
                     .setMessage("Do you want to remove organizer role?")
-                    .setPositiveButton("Yes", (dialog, which) ->
-                            Toast.makeText(v.getContext(),
-                                    "Remove organizer clicked", Toast.LENGTH_SHORT).show())
+                    .setPositiveButton("Yes", (dialog, which) -> {
+                        if (holder.currentProfile == null) return;
+                        String uid = holder.currentProfile.getUid();
+                        dbController.removeOrganizerRole(uid,
+                                new AdminProfileDatabaseController.DeleteCallback() {
+                                    @Override
+                                    public void onSuccess() {
+                                        if (holder.currentProfile.getRoles() != null) {
+                                            holder.currentProfile.getRoles().remove("organizer");
+                                        }
+                                        int pos = holder.getAdapterPosition();
+                                        if (pos != RecyclerView.NO_POSITION) {
+                                            notifyItemChanged(pos);
+                                        }
+                                        Toast.makeText(v.getContext(),
+                                                "Organizer role removed", Toast.LENGTH_SHORT).show();
+                                    }
+
+                                    @Override
+                                    public void onError(@NonNull Exception e) {
+                                        Toast.makeText(v.getContext(),
+                                                "Failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                                    }
+                                });
+                    })
                     .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss())
                     .show();
         });
