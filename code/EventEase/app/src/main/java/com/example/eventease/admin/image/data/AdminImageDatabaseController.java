@@ -22,6 +22,7 @@ public class AdminImageDatabaseController {
     public List<String> getImageLinks() {
         try {
             ListResult res = Tasks.await(postersRef.listAll());
+            ListResult profiles = Tasks.await(profilePicturesRef.listAll());
             List<Task<Uri>> urlTasks = new ArrayList<>();
             for (StorageReference item : res.getItems()) urlTasks.add(item.getDownloadUrl());
             List<?> uris = Tasks.await(Tasks.whenAllSuccess(urlTasks));
