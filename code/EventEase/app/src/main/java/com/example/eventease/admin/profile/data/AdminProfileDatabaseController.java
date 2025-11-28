@@ -164,6 +164,10 @@ public class AdminProfileDatabaseController {
                 });
     }
 
+    private void deleteOrganizerEvents(@NonNull String uid) {
+        
+    }
+
 
 }
 
