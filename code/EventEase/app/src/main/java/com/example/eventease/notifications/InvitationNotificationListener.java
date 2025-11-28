@@ -53,17 +53,24 @@ public class InvitationNotificationListener {
             registration.remove();
         }
         
+        // Use query without orderBy to avoid index requirement
+        // We'll check all PENDING invitations and show notification for the most recent one
         Query query = db.collection("invitations")
                 .whereEqualTo("uid", uid)
-                .whereEqualTo("status", "PENDING")
-                .orderBy("issuedAt", Query.Direction.DESCENDING)
-                .limit(1);
+                .whereEqualTo("status", "PENDING");
         
         registration = query.addSnapshotListener(new EventListener<QuerySnapshot>() {
             @Override
             public void onEvent(@Nullable QuerySnapshot snapshots, @Nullable FirebaseFirestoreException e) {
                 if (e != null) {
                     Log.w(TAG, "Listen failed for invitations", e);
+                    // If it's an index error, log it but continue
+                    if (e instanceof FirebaseFirestoreException) {
+                        FirebaseFirestoreException firestoreEx = (FirebaseFirestoreException) e;
+                        if (firestoreEx.getCode() == FirebaseFirestoreException.Code.FAILED_PRECONDITION) {
+                            Log.w(TAG, "Index required for invitation query, but continuing without orderBy");
+                        }
+                    }
                     return;
                 }
                 
@@ -71,10 +78,24 @@ public class InvitationNotificationListener {
                     return;
                 }
                 
+                // Track the most recent invitation to avoid duplicate notifications
+                DocumentSnapshot mostRecentInvitation = null;
+                long mostRecentTime = 0;
+                
                 for (com.google.firebase.firestore.DocumentChange change : snapshots.getDocumentChanges()) {
                     if (change.getType() == com.google.firebase.firestore.DocumentChange.Type.ADDED) {
-                        handleNewInvitation(change.getDocument());
+                        DocumentSnapshot doc = change.getDocument();
+                        Long issuedAt = doc.getLong("issuedAt");
+                        if (issuedAt != null && issuedAt > mostRecentTime) {
+                            mostRecentTime = issuedAt;
+                            mostRecentInvitation = doc;
+                        }
                     }
+                }
+                
+                // Show notification for the most recent new invitation
+                if (mostRecentInvitation != null) {
+                    handleNewInvitation(mostRecentInvitation);
                 }
             }
         });
@@ -116,7 +137,7 @@ public class InvitationNotificationListener {
     }
     
     private void showInvitationNotification(String eventId, String eventTitle) {
-        String title = "Yay! You are chosen for the " + (eventTitle != null ? eventTitle : "event") + " event 🎉";
+        String title = "You are chosen for the " + (eventTitle != null ? eventTitle : "event") + " event";
         String body = "You've been selected! Tap to view details and accept your invitation.";
         
         Intent intent = new Intent(context, MainActivity.class);

@@ -142,13 +142,26 @@ public class FirebaseAdmittedRepository implements AdmittedRepository {
 
     @Override
     public Task<Boolean> isAdmitted(String eventId, String uid) {
+        if (eventId == null || eventId.isEmpty() || uid == null || uid.isEmpty()) {
+            Log.w(TAG, "isAdmitted called with null/empty eventId or uid");
+            return Tasks.forResult(false);
+        }
+        
+        Log.d(TAG, "Checking if user " + uid + " is admitted to event " + eventId);
         return db.collection("events")
                 .document(eventId)
                 .collection("AdmittedEntrants")
                 .document(uid)
                 .get()
                 .continueWith(task -> {
-                    return task.isSuccessful() && task.getResult() != null && task.getResult().exists();
+                    if (!task.isSuccessful()) {
+                        Log.e(TAG, "Error checking admitted status for event " + eventId + ", uid: " + uid, task.getException());
+                        return false;
+                    }
+                    
+                    boolean isAdmitted = task.getResult() != null && task.getResult().exists();
+                    Log.d(TAG, "User " + uid + " admitted status for event " + eventId + ": " + isAdmitted);
+                    return isAdmitted;
                 });
     }
 
@@ -252,32 +265,25 @@ public class FirebaseAdmittedRepository implements AdmittedRepository {
                                 continue;
                             }
                             
-                            Event event = Event.fromMap(eventDoc.getData());
+                            java.util.Map<String, Object> eventData = eventDoc.getData();
+                            if (eventData == null) {
+                                Log.w(TAG, "Event document " + eventDoc.getId() + " has null data, skipping");
+                                continue;
+                            }
+                            
+                            Event event = Event.fromMap(eventData);
                             if (event != null) {
                                 if (event.getId() == null || event.getId().isEmpty()) {
                                     event.setId(eventDoc.getId());
                                 }
                                 
-                                // Check deadline first, then fall back to start time
-                                long deadline = event.getDeadlineEpochMs();
+                                // Use event start time to determine if event is upcoming
+                                // Note: deadlineEpochMs is for invitation acceptance deadline, NOT the event date
                                 long startTime = event.getStartsAtEpochMs();
                                 
-                                // If deadline is set, use it to determine if event is upcoming
-                                if (deadline > 0) {
-                                    if (deadline > currentTime) {
-                                        // Deadline hasn't passed - event is upcoming
-                                        events.add(event);
-                                        upcomingCount++;
-                                        long hoursUntilDeadline = (deadline - currentTime) / (1000 * 60 * 60);
-                                        Log.d(TAG, "Added upcoming event: " + event.getTitle() + " (id: " + event.getId() + ", deadline in " + hoursUntilDeadline + " hours)");
-                                    } else {
-                                        // Deadline has passed - exclude from upcoming (will be in previous events)
-                                        Log.d(TAG, "Event " + event.getTitle() + " (id: " + event.getId() + ") deadline has passed (deadline: " + deadline + ", currentTime: " + currentTime + "), excluding from upcoming");
-                                    }
-                                } else if (startTime > 0) {
-                                    // No deadline, use start time
+                                if (startTime > 0) {
                                     if (startTime > currentTime) {
-                                        // Event is in the future
+                                        // Event hasn't started yet - event is upcoming
                                         events.add(event);
                                         upcomingCount++;
                                         long hoursUntilStart = (startTime - currentTime) / (1000 * 60 * 60);
@@ -287,10 +293,10 @@ public class FirebaseAdmittedRepository implements AdmittedRepository {
                                         Log.d(TAG, "Event " + event.getTitle() + " (id: " + event.getId() + ") has already started/passed (startTime: " + startTime + ", currentTime: " + currentTime + "), excluding from upcoming");
                                     }
                                 } else {
-                                    // No deadline and no start time - include it as upcoming (treat as upcoming)
+                                    // No start time set - include it as upcoming (treat as upcoming by default)
                                     events.add(event);
                                     upcomingCount++;
-                                    Log.d(TAG, "Added upcoming event (no deadline/start time): " + event.getTitle() + " (id: " + event.getId() + ")");
+                                    Log.d(TAG, "Added upcoming event (no start time set): " + event.getTitle() + " (id: " + event.getId() + ")");
                                 }
                             } else {
                                 Log.w(TAG, "Failed to parse event document: " + eventDoc.getId());
@@ -308,7 +314,8 @@ public class FirebaseAdmittedRepository implements AdmittedRepository {
     }
 
     /**
-     * Gets previous events (events where deadline has passed) for a user who is in AdmittedEntrants.
+     * Gets previous events (events where the event start date has passed) for a user.
+     * Includes ALL events the user was associated with (waitlisted, selected, non-selected, cancelled, or admitted).
      * 
      * @param uid the user ID to get previous events for
      * @return a Task that resolves to a list of previous events
@@ -318,79 +325,129 @@ public class FirebaseAdmittedRepository implements AdmittedRepository {
         
         long currentTime = System.currentTimeMillis();
         
-        // Query all events and check AdmittedEntrants subcollection for each
+        // Query all events and check ALL participation subcollections for each
         return db.collection("events").get().continueWithTask(eventsTask -> {
             if (!eventsTask.isSuccessful() || eventsTask.getResult() == null) {
-                Log.e(TAG, "Failed to load events: " + (eventsTask.getException() != null ? eventsTask.getException().getMessage() : "Unknown error"));
+                Exception error = eventsTask.getException();
+                Log.e(TAG, "Failed to load events: " + (error != null ? error.getMessage() : "Unknown error"));
+                if (error != null) {
+                    Log.e(TAG, "Error details: ", error);
+                    // Check if it's a permission error
+                    if (error instanceof com.google.firebase.firestore.FirebaseFirestoreException) {
+                        com.google.firebase.firestore.FirebaseFirestoreException firestoreEx = 
+                            (com.google.firebase.firestore.FirebaseFirestoreException) error;
+                        if (firestoreEx.getCode() == com.google.firebase.firestore.FirebaseFirestoreException.Code.PERMISSION_DENIED) {
+                            Log.e(TAG, "PERMISSION DENIED: User does not have permission to read events collection. Check Firestore security rules.");
+                        }
+                    }
+                }
                 return Tasks.forResult(new ArrayList<Event>());
             }
             
             QuerySnapshot eventsSnapshot = eventsTask.getResult();
-            Log.d(TAG, "Found " + eventsSnapshot.size() + " total events, checking which ones user is admitted to and deadline has passed");
+            Log.d(TAG, "Found " + eventsSnapshot.size() + " total events, checking which ones user participated in and event start date has passed");
             
             if (eventsSnapshot.isEmpty()) {
                 Log.d(TAG, "No events found in database");
                 return Tasks.forResult(new ArrayList<Event>());
             }
             
-            // Create a list to store event info along with admission status
-            List<Task<Boolean>> admittedTasks = new ArrayList<>();
+            // Create a list to store event info along with participation status
+            // Check ALL subcollections: WaitlistedEntrants, SelectedEntrants, NonSelectedEntrants, CancelledEntrants, AdmittedEntrants
+            List<Task<Boolean>> participationTasks = new ArrayList<>();
             List<DocumentSnapshot> eventDocs = new ArrayList<>();
+            
+            String[] subcollections = {
+                "WaitlistedEntrants",
+                "SelectedEntrants",
+                "NonSelectedEntrants",
+                "CancelledEntrants",
+                "AdmittedEntrants"
+            };
             
             for (QueryDocumentSnapshot eventDoc : eventsSnapshot) {
                 eventDocs.add(eventDoc);
-                DocumentReference admittedRef = eventDoc.getReference()
-                    .collection("AdmittedEntrants")
-                    .document(uid);
-                Task<Boolean> admissionTask = admittedRef.get().continueWith(admittedTask -> {
-                    boolean isAdmitted = admittedTask.isSuccessful() && 
-                                        admittedTask.getResult() != null && 
-                                        admittedTask.getResult().exists();
-                    return isAdmitted;
+                DocumentReference eventRef = eventDoc.getReference();
+                
+                // Check if user is in ANY of the participation subcollections
+                List<Task<Boolean>> subcollectionTasks = new ArrayList<>();
+                for (String subcollectionName : subcollections) {
+                    DocumentReference userRef = eventRef.collection(subcollectionName).document(uid);
+                    Task<Boolean> subcollectionTask = userRef.get().continueWith(task -> {
+                        return task.isSuccessful() && 
+                               task.getResult() != null && 
+                               task.getResult().exists();
+                    });
+                    subcollectionTasks.add(subcollectionTask);
+                }
+                
+                // Combine all subcollection checks - user is associated if they're in ANY subcollection
+                Task<Boolean> participationTask = Tasks.whenAllComplete(subcollectionTasks).continueWith(allSubTasks -> {
+                    if (!allSubTasks.isSuccessful() || allSubTasks.getResult() == null) {
+                        return false;
+                    }
+                    
+                    // Check if user exists in any subcollection
+                    for (com.google.android.gms.tasks.Task<?> subTask : allSubTasks.getResult()) {
+                        if (subTask.isSuccessful()) {
+                            try {
+                                @SuppressWarnings("unchecked")
+                                Task<Boolean> boolTask = (Task<Boolean>) subTask;
+                                Boolean exists = boolTask.getResult();
+                                if (Boolean.TRUE.equals(exists)) {
+                                    return true; // User is in at least one subcollection
+                                }
+                            } catch (Exception e) {
+                                Log.w(TAG, "Error checking subcollection participation", e);
+                            }
+                        }
+                    }
+                    return false; // User not in any subcollection
                 });
-                admittedTasks.add(admissionTask);
+                
+                participationTasks.add(participationTask);
             }
             
-            if (admittedTasks.isEmpty()) {
+            if (participationTasks.isEmpty()) {
                 Log.d(TAG, "No events to check");
                 return Tasks.forResult(new ArrayList<Event>());
             }
             
-            Log.d(TAG, "Checking " + admittedTasks.size() + " events for admission status and deadline");
+            Log.d(TAG, "Checking " + participationTasks.size() + " events for participation status and event start date");
             // Use whenAllComplete to wait for all tasks (including failed ones)
-            return Tasks.whenAllComplete(admittedTasks).continueWith(allTasks -> {
+            return Tasks.whenAllComplete(participationTasks).continueWith(allTasks -> {
                 if (!allTasks.isSuccessful() || allTasks.getResult() == null) {
-                    Log.e(TAG, "Failed to complete all admission checks: " + 
+                    Log.e(TAG, "Failed to complete all participation checks: " + 
                           (allTasks.getException() != null ? allTasks.getException().getMessage() : "Unknown error"));
                     return new ArrayList<Event>();
                 }
                 
                 List<Event> events = new ArrayList<>();
-                int admittedCount = 0;
+                int participatedCount = 0;
                 int previousCount = 0;
                 
                 // Extract results from completed tasks
                 List<com.google.android.gms.tasks.Task<?>> completedTasks = allTasks.getResult();
                 for (int i = 0; i < completedTasks.size() && i < eventDocs.size(); i++) {
                     @SuppressWarnings("unchecked")
-                    Task<Boolean> admittedTask = (Task<Boolean>) completedTasks.get(i);
+                    Task<Boolean> participationTask = (Task<Boolean>) completedTasks.get(i);
                     
-                    Boolean isAdmitted = null;
-                    if (admittedTask.isSuccessful()) {
+                    Boolean isParticipated = null;
+                    if (participationTask.isSuccessful()) {
                         try {
-                            isAdmitted = admittedTask.getResult();
+                            isParticipated = participationTask.getResult();
                         } catch (Exception e) {
-                            Log.w(TAG, "Error getting result from admission check for event " + eventDocs.get(i).getId() + ": " + e.getMessage());
+                            Log.w(TAG, "Error getting result from participation check for event " + eventDocs.get(i).getId() + ": " + e.getMessage());
                         }
                     } else {
-                        Exception ex = admittedTask.getException();
+                        Exception ex = participationTask.getException();
                         if (ex != null) {
-                            Log.w(TAG, "Admission check failed for event " + eventDocs.get(i).getId() + ": " + ex.getMessage());
+                            Log.w(TAG, "Participation check failed for event " + eventDocs.get(i).getId() + ": " + ex.getMessage());
                         }
                     }
                     
-                    if (Boolean.TRUE.equals(isAdmitted)) {
-                        admittedCount++;
+                    if (Boolean.TRUE.equals(isParticipated)) {
+                        participatedCount++;
                         DocumentSnapshot eventDoc = eventDocs.get(i);
                         try {
                             if (!eventDoc.exists()) {
@@ -398,26 +455,41 @@ public class FirebaseAdmittedRepository implements AdmittedRepository {
                                 continue;
                             }
                             
-                            Event event = Event.fromMap(eventDoc.getData());
+                            java.util.Map<String, Object> eventData = eventDoc.getData();
+                            if (eventData == null) {
+                                Log.w(TAG, "Event document " + eventDoc.getId() + " has null data, skipping");
+                                continue;
+                            }
+                            
+                            Event event = Event.fromMap(eventData);
                             if (event != null) {
                                 if (event.getId() == null || event.getId().isEmpty()) {
                                     event.setId(eventDoc.getId());
                                 }
                                 
-                                // Check if deadline has passed
-                                long deadline = event.getDeadlineEpochMs();
-                                if (deadline > 0 && deadline < currentTime) {
-                                    // Event deadline has passed - include it as previous event
+                                // Check if event start date has passed
+                                // Note: deadlineEpochMs is for invitation acceptance deadline, NOT the event date
+                                long startTime = event.getStartsAtEpochMs();
+                                boolean isPrevious = false;
+                                String reason = "";
+                                
+                                if (startTime > 0 && startTime < currentTime) {
+                                    // Event start date has passed - include it as previous event
+                                    isPrevious = true;
+                                    long hoursSinceStart = (currentTime - startTime) / (1000 * 60 * 60);
+                                    reason = "event started " + hoursSinceStart + " hours ago";
+                                } else if (startTime > 0 && startTime >= currentTime) {
+                                    // Event start date hasn't passed yet
+                                    Log.d(TAG, "Event " + event.getTitle() + " (id: " + event.getId() + ") hasn't started yet (startTime: " + startTime + ", currentTime: " + currentTime + "), excluding from previous");
+                                } else {
+                                    // No start time set - can't determine if it's previous
+                                    Log.d(TAG, "Event " + event.getTitle() + " (id: " + event.getId() + ") has no start time set, skipping from previous events");
+                                }
+                                
+                                if (isPrevious) {
                                     events.add(event);
                                     previousCount++;
-                                    long hoursSinceDeadline = (currentTime - deadline) / (1000 * 60 * 60);
-                                    Log.d(TAG, "Added previous event: " + event.getTitle() + " (id: " + event.getId() + ", deadline passed " + hoursSinceDeadline + " hours ago)");
-                                } else if (deadline == 0) {
-                                    // No deadline set - skip (can't determine if it's previous)
-                                    Log.d(TAG, "Event " + event.getTitle() + " (id: " + event.getId() + ") has no deadline set, skipping");
-                                } else {
-                                    // Deadline hasn't passed yet
-                                    Log.d(TAG, "Event " + event.getTitle() + " (id: " + event.getId() + ") deadline hasn't passed yet (deadline: " + deadline + ", currentTime: " + currentTime + "), excluding from previous");
+                                    Log.d(TAG, "Added previous event: " + event.getTitle() + " (id: " + event.getId() + ", " + reason + ")");
                                 }
                             } else {
                                 Log.w(TAG, "Failed to parse event document: " + eventDoc.getId());
@@ -428,7 +500,7 @@ public class FirebaseAdmittedRepository implements AdmittedRepository {
                     }
                 }
                 
-                Log.d(TAG, "Found " + admittedCount + " admitted events, " + previousCount + " are previous (deadline passed) for uid: " + uid);
+                Log.d(TAG, "Found " + participatedCount + " events user participated in, " + previousCount + " are previous (event start date passed) for uid: " + uid);
                 return events;
             });
         });

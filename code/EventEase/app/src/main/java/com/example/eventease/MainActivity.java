@@ -268,9 +268,13 @@ public class MainActivity extends AppCompatActivity {
 
                     // Initialize listeners only once to prevent duplicates
                     if (!listenersInitialized) {
-                        // Initialize FCM token manager and invitation listener
+                        // Initialize FCM token manager
+                        FCMTokenManager.getInstance().initialize();
+                        
+                        // Initialize InvitationNotificationListener for local notifications
+                        // (Cloud Functions may also send notifications, but local listener ensures
+                        // notifications work even if Cloud Functions fail, and has cooldown to prevent duplicates)
                         if (invitationListener == null) {
-                            FCMTokenManager.getInstance().initialize();
                             invitationListener = new InvitationNotificationListener(this);
                             invitationListener.startListening();
                         }
@@ -353,8 +357,9 @@ public class MainActivity extends AppCompatActivity {
     }
     
     /**
-     * Initializes FCM token manager and invitation listener.
+     * Initializes FCM token manager.
      * Should be called after notification permission is granted (or on older Android versions).
+     * Note: Notifications are sent via Cloud Functions, not local listeners, to avoid duplicates.
      */
     private void initializeNotifications() {
         // TEMPORARY FIX: Force recreate notification channel with HIGH importance
@@ -375,8 +380,7 @@ public class MainActivity extends AppCompatActivity {
         com.example.eventease.notifications.NotificationChannelManager.createNotificationChannel(this);
         
         FCMTokenManager.getInstance().initialize();
-        invitationListener = new InvitationNotificationListener(this);
-        invitationListener.startListening();
+        // Note: InvitationNotificationListener is disabled - notifications are sent via Cloud Functions
     }
 
     @Override

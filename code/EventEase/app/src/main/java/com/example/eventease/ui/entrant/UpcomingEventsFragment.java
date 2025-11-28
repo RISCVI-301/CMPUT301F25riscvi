@@ -116,18 +116,32 @@ public class UpcomingEventsFragment extends Fragment {
 
     private void loadUpcomingEvents() {
         if (admittedRepo == null || authManager == null) {
-            android.util.Log.w("UpcomingEventsFragment", "Repositories not initialized");
+            android.util.Log.w("UpcomingEventsFragment", "Repositories not initialized - admittedRepo: " + admittedRepo + ", authManager: " + authManager);
             return;
         }
         
         setLoading(true);
         String uid = authManager.getUid();
+        if (uid == null || uid.isEmpty()) {
+            android.util.Log.e("UpcomingEventsFragment", "User UID is null or empty");
+            setLoading(false);
+            adapter.submitEvents(new ArrayList<>());
+            updateEmptyState(true);
+            return;
+        }
+        
         android.util.Log.d("UpcomingEventsFragment", "Loading upcoming events for uid: " + uid);
+        android.util.Log.d("UpcomingEventsFragment", "admittedRepo: " + admittedRepo);
         
         admittedRepo.getUpcomingEvents(uid)
                 .addOnSuccessListener(events -> {
                     if (!isAdded()) return;
                     android.util.Log.d("UpcomingEventsFragment", "Loaded " + (events != null ? events.size() : 0) + " upcoming events");
+                    if (events != null && !events.isEmpty()) {
+                        for (Event event : events) {
+                            android.util.Log.d("UpcomingEventsFragment", "  - Event: " + event.getTitle() + " (id: " + event.getId() + ")");
+                        }
+                    }
                     setLoading(false);
                     adapter.submitEvents(events != null ? events : new ArrayList<>());
                     updateEmptyState(events == null || events.isEmpty());
@@ -135,6 +149,9 @@ public class UpcomingEventsFragment extends Fragment {
                 .addOnFailureListener(e -> {
                     if (!isAdded()) return;
                     android.util.Log.e("UpcomingEventsFragment", "Failed to load upcoming events", e);
+                    if (e != null && e.getMessage() != null) {
+                        android.util.Log.e("UpcomingEventsFragment", "Error message: " + e.getMessage());
+                    }
                     setLoading(false);
                     updateEmptyState(true);
                     adapter.submitEvents(new ArrayList<>());

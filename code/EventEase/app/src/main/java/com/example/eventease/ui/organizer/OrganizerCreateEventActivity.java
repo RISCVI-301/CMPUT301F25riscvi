@@ -17,9 +17,11 @@ import android.os.Handler;
 import android.os.Looper;
 import android.text.TextUtils;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
+import android.view.inputmethod.EditorInfo;
 import android.widget.*;
 import android.provider.MediaStore;
 import androidx.activity.result.ActivityResultLauncher;
@@ -28,11 +30,14 @@ import androidx.annotation.LayoutRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 
 import com.bumptech.glide.Glide;
 import com.example.eventease.R;
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.chip.Chip;
+import com.google.android.material.chip.ChipGroup;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
@@ -84,12 +89,14 @@ import java.util.UUID;
  */
 public class OrganizerCreateEventActivity extends AppCompatActivity {
     private static final String TAG = "CreateEvent";
+    private static final int MAX_TAGS = 5;
     // --- UI Elements ---
     private ImageButton btnBack, btnPickPoster;
     private ImageView posterPreview;
     private androidx.cardview.widget.CardView posterPreviewCard;
     private com.google.android.material.button.MaterialButton btnCropPoster;
-    private EditText etTitle, etDescription, etGuidelines, etLocation, etCapacity, etSampleSize;
+    private EditText etTitle, etDescription, etGuidelines, etLocation, etCapacity, etSampleSize, etTags;
+    private ChipGroup chipGroupTags;
     private TextView tvSampleSize;
     private Button btnStart, btnEnd, btnDeadline, btnEventStart, btnSave;
     private Switch swGeo, swQr;
@@ -102,6 +109,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
     private Uri posterUri = null;
     private String organizerId;
     private boolean isResolvingOrganizerId;
+    private final ArrayList<String> interests = new ArrayList<>();
     
     // Image cropping
     private android.graphics.Matrix imageMatrix;
@@ -171,6 +179,8 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         etCapacity = findViewById(R.id.etCapacity);
         etSampleSize = findViewById(R.id.etSampleSize);
         tvSampleSize = findViewById(R.id.tvSampleSize);
+        etTags = findViewById(R.id.etTags);
+        chipGroupTags = findViewById(R.id.chipGroupTags);
         btnStart = findViewById(R.id.btnStart);
         btnEnd = findViewById(R.id.btnEnd);
         btnDeadline = findViewById(R.id.btnDeadline);
@@ -181,6 +191,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         rgEntrants = findViewById(R.id.rgEntrants);
         rbAny = findViewById(R.id.rbAny);
         rbSpecific = findViewById(R.id.rbSpecific);
+        setupTagInput();
 
         organizerId = getIntent().getStringExtra(OrganizerMyEventActivity.EXTRA_ORGANIZER_ID);
         if (organizerId == null || organizerId.trim().isEmpty()) {
@@ -218,6 +229,86 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
             btnCropPoster.setOnClickListener(v -> showCropDialog());
         }
         btnSave.setOnClickListener(v -> beginSaveEvent());
+    }
+
+    private void setupTagInput() {
+        if (etTags == null) {
+            return;
+        }
+        etTags.setOnEditorActionListener((v, actionId, event) -> {
+            if (actionId == EditorInfo.IME_ACTION_DONE
+                    || actionId == EditorInfo.IME_ACTION_GO
+                    || actionId == EditorInfo.IME_ACTION_NEXT) {
+                addTagFromInput();
+                return true;
+            }
+            if (event != null && event.getKeyCode() == KeyEvent.KEYCODE_ENTER
+                    && event.getAction() == KeyEvent.ACTION_DOWN) {
+                addTagFromInput();
+                return true;
+            }
+            return false;
+        });
+        etTags.setOnKeyListener((v, keyCode, event) -> {
+            if (keyCode == KeyEvent.KEYCODE_ENTER && event.getAction() == KeyEvent.ACTION_DOWN) {
+                addTagFromInput();
+                return true;
+            }
+            return false;
+        });
+    }
+
+    private void addTagFromInput() {
+        if (etTags == null) {
+            return;
+        }
+        String raw = safe(etTags.getText());
+        if (raw.isEmpty()) {
+            return;
+        }
+        addTag(raw);
+        etTags.setText("");
+    }
+
+    private void addTag(String tag) {
+        if (TextUtils.isEmpty(tag)) {
+            return;
+        }
+        String normalized = tag.trim();
+        if (normalized.isEmpty()) {
+            return;
+        }
+        if (interests.size() >= MAX_TAGS) {
+            toast("You can add up to " + MAX_TAGS + " tags");
+            return;
+        }
+        for (String existing : interests) {
+            if (existing.equalsIgnoreCase(normalized)) {
+                return;
+            }
+        }
+        interests.add(normalized);
+        addChipForTag(normalized);
+    }
+
+    private void addChipForTag(String tag) {
+        if (chipGroupTags == null) {
+            return;
+        }
+        Chip chip = new Chip(this);
+        chip.setText(tag);
+        chip.setTextColor(ContextCompat.getColor(this, R.color.ee_text_light));
+        chip.setChipBackgroundColorResource(R.color.ee_card);
+        chip.setCloseIconVisible(true);
+        chip.setCloseIconResource(android.R.drawable.ic_menu_close_clear_cancel);
+        chip.setCloseIconTintResource(R.color.ee_text_light);
+        chip.setClickable(false);
+        chip.setCheckable(false);
+        chip.setOnCloseIconClickListener(v -> {
+            interests.removeIf(s -> s.equalsIgnoreCase(tag));
+            chipGroupTags.removeView(chip);
+        });
+        chipGroupTags.addView(chip);
     }
     /**
      * Displays a DatePickerDialog followed by a TimePickerDialog to allow the user
@@ -429,6 +520,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
      * to upload the event poster and save the event details.
      */
     private void doValidateAndSave() {
+        addTagFromInput();
         String title = safe(etTitle.getText());
         if (title.isEmpty()) { etTitle.setError("Event name is required"); etTitle.requestFocus(); return; }
         if (title.length() > 80) { etTitle.setError("Max 80 characters"); etTitle.requestFocus(); return; }
@@ -703,6 +795,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         doc.put("notes", TextUtils.isEmpty(description) ? null : description);
         doc.put("guidelines", TextUtils.isEmpty(guidelines) ? null : guidelines);
         doc.put("location", TextUtils.isEmpty(location) ? null : location);
+        doc.put("interests", new ArrayList<>(interests));
         doc.put("registrationStart", regStartEpochMs);
         doc.put("registrationEnd", regEndEpochMs);
         doc.put("deadlineEpochMs", deadlineEpochMs);
@@ -953,6 +1046,13 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         etGuidelines.setText("");
         etLocation.setText("");
         etCapacity.setText("");
+        if (etTags != null) {
+            etTags.setText("");
+        }
+        interests.clear();
+        if (chipGroupTags != null) {
+            chipGroupTags.removeAllViews();
+        }
         rgEntrants.check(R.id.rbAny);
         etCapacity.setVisibility(View.GONE);
         etCapacity.setEnabled(false);

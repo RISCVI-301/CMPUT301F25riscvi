@@ -112,6 +112,10 @@
             android:label="Workflow Test"
             android:theme="@style/Theme.EventEase" />
 
+        <activity
+            android:name=".ui.entrant.notifications.NotificationsActivity"
+            android:exported="false" />
+
         <service
             android:name="com.example.eventease.notifications.EventNotificationService"
             android:exported="false">
