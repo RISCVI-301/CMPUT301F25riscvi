@@ -273,7 +273,12 @@ public class MainActivity extends AppCompatActivity {
 
                     // Initialize listeners only once to prevent duplicates
                     if (!listenersInitialized) {
-                        // Initialize FCM token manager and invitation listener
+                        // Initialize FCM token manager
+                        FCMTokenManager.getInstance().initialize();
+                        
+                        // Initialize InvitationNotificationListener for local notifications
+                        // (Cloud Functions may also send notifications, but local listener ensures
+                        // notifications work even if Cloud Functions fail, and has cooldown to prevent duplicates)
                         if (invitationListener == null) {
                             FCMTokenManager.getInstance().initialize(MainActivity.this);
                             invitationListener = new InvitationNotificationListener(this);
@@ -358,8 +363,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * Initializes FCM token manager and invitation listener.
+     * Initializes FCM token manager.
      * Should be called after notification permission is granted (or on older Android versions).
+     * Note: Notifications are sent via Cloud Functions, not local listeners, to avoid duplicates.
      */
     private void initializeNotifications() {
         // TEMPORARY FIX: Force recreate notification channel with HIGH importance
@@ -384,8 +390,8 @@ public class MainActivity extends AppCompatActivity {
         // Only create invitation listener if it doesn't already exist
         // (It may already be created in the navigation listener)
         if (invitationListener == null) {
-        invitationListener = new InvitationNotificationListener(this);
-        invitationListener.startListening();
+            invitationListener = new InvitationNotificationListener(this);
+            invitationListener.startListening();
         }
     }
 
@@ -405,6 +411,71 @@ public class MainActivity extends AppCompatActivity {
 
     private void handleExternalNav(android.content.Intent intent) {
         if (intent == null) return;
+        
+        // Handle deep link from QR code (https://eventease.app/event/{eventId} or eventease://event/{eventId})
+        android.net.Uri data = intent.getData();
+        if (data != null) {
+            String eventId = null;
+            String scheme = data.getScheme();
+            String host = data.getHost();
+            String path = data.getPath();
+            String fullUri = data.toString();
+            
+            Log.d("MainActivity", "Deep link received - Scheme: " + scheme + ", Host: " + host + ", Path: " + path + ", Full URI: " + fullUri);
+            
+            // Handle HTTP URL format: https://eventease.app/event/{eventId}
+            if ("https".equals(scheme) && "eventease.app".equals(host)) {
+                if (path != null) {
+                    if (path.startsWith("/event/")) {
+                        eventId = path.substring(7); // Remove leading "/event/"
+                    } else if (path.startsWith("/event")) {
+                        eventId = path.substring(6); // Remove leading "/event"
+                        if (eventId.startsWith("/")) {
+                            eventId = eventId.substring(1); // Remove any remaining "/"
+                        }
+                    }
+                }
+            }
+            // Handle custom scheme format: eventease://event/{eventId}
+            else if ("eventease".equals(scheme) && "event".equals(host)) {
+                if (path != null) {
+                    // Remove leading "/" if present
+                    if (path.startsWith("/")) {
+                        eventId = path.substring(1);
+                    } else {
+                        eventId = path;
+                    }
+                } else {
+                    // If no path, try to get from query or use the full URI
+                    // Some QR scanners might encode it differently
+                    String query = data.getQuery();
+                    if (query != null && query.startsWith("id=")) {
+                        eventId = query.substring(3);
+                    }
+                }
+            }
+            
+            // Clean up eventId - remove any trailing slashes or whitespace
+            if (eventId != null) {
+                eventId = eventId.trim();
+                if (eventId.endsWith("/")) {
+                    eventId = eventId.substring(0, eventId.length() - 1);
+                }
+            }
+            
+            Log.d("MainActivity", "Extracted eventId: " + eventId);
+            
+            if (eventId != null && !eventId.isEmpty()) {
+                Log.d("MainActivity", "Opening EventDetailActivity from QR code - eventId: " + eventId);
+                // Open EventDetailActivity directly
+                Intent detailIntent = new Intent(this, com.example.eventease.ui.entrant.eventdetail.EventDetailActivity.class);
+                detailIntent.putExtra("eventId", eventId);
+                startActivity(detailIntent);
+                return;
+            } else {
+                Log.w("MainActivity", "Could not extract eventId from deep link: " + fullUri);
+            }
+        }
         
         // Check if notification contains eventId - open EventDetailActivity directly
         String eventId = intent.getStringExtra("eventId");

@@ -178,6 +178,20 @@
                     tools:text="• Bring your own towel and swimwear&#10;• No glass containers&#10;• Follow lifeguard instructions" />
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- Event QR Button -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnEventQR"
+                style="@style/Widget.MaterialComponents.Button"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:text="Event QR"
+                android:textAllCaps="false"
+                android:textStyle="bold"
+                android:textColor="#2C4A6E"
+                app:cornerRadius="16dp"
+                android:layout_marginBottom="12dp"
+                android:backgroundTint="#7FDBDA" />
+
             <!-- Delete button -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnDeleteEvent"

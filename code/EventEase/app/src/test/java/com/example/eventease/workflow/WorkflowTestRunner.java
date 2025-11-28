@@ -47,11 +47,11 @@ public class WorkflowTestRunner {
         
         if (result.wasSuccessful()) {
             System.out.println("╔════════════════════════════════════════════════════════════╗");
-            System.out.println("║              ✓ ALL TESTS PASSED SUCCESSFULLY!              ║");
+            System.out.println("║               ALL TESTS PASSED SUCCESSFULLY!               ║");
             System.out.println("╚════════════════════════════════════════════════════════════╝");
         } else {
             System.out.println("╔════════════════════════════════════════════════════════════╗");
-            System.out.println("║                    ✗ SOME TESTS FAILED                      ║");
+            System.out.println("║                    SOME TESTS FAILED                        ║");
             System.out.println("╚════════════════════════════════════════════════════════════╝");
             System.out.println("\nFailures:\n");
             for (Failure failure : result.getFailures()) {

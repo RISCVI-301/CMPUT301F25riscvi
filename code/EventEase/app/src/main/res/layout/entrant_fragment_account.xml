@@ -60,6 +60,30 @@
                 android:layout_gravity="center_vertical"
                 android:layout_marginStart="16dp"/>
 
+            <FrameLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:layout_marginEnd="12dp">
+
+                <ImageView
+                    android:id="@+id/notificationBellButton"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:src="@drawable/entrant_ic_notification_bell"
+                    app:tint="#FFFFFF"/>
+
+                <View
+                    android:id="@+id/notificationBadge"
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:layout_gravity="top|end"
+                    android:layout_marginTop="2dp"
+                    android:layout_marginEnd="2dp"
+                    android:background="@drawable/entrant_notification_badge"
+                    android:visibility="gone"/>
+            </FrameLayout>
+
             <ImageView
                 android:id="@+id/settingsButton"
                 android:layout_width="32dp"
@@ -76,7 +100,7 @@
         android:layout_weight="1"/>
 
     <androidx.cardview.widget.CardView
-        android:id="@+id/notificationsCard"
+        android:id="@+id/notificationPreferencesCard"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginHorizontal="16dp"
@@ -85,29 +109,36 @@
         app:cardBackgroundColor="#536C8C"
         android:elevation="8dp">
 
-        <LinearLayout
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:padding="16dp"
-            android:gravity="center_vertical">
+            android:text="Notification Preferences"
+            android:textSize="24sp"
+            android:textColor="#FFFFFF"
+            android:fontFamily="@font/entrant_fredoka_one"
+            android:gravity="center"
+            android:padding="16dp"/>
+    </androidx.cardview.widget.CardView>
 
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Notifications"
-                android:textSize="24sp"
-                android:textColor="#FFFFFF"
-                android:fontFamily="@font/entrant_fredoka_one"/>
+    <androidx.cardview.widget.CardView
+        android:id="@+id/testNotificationButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginVertical="8dp"
+        app:cardCornerRadius="16dp"
+        app:cardBackgroundColor="#FFC107"
+        android:elevation="8dp">
 
-            <com.google.android.material.switchmaterial.SwitchMaterial
-                android:id="@+id/notificationToggle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="16dp"
-                android:checked="true"/>
-        </LinearLayout>
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Test: Send Notification to Self"
+            android:textSize="20sp"
+            android:textColor="#223C65"
+            android:fontFamily="@font/entrant_fredoka_one"
+            android:gravity="center"
+            android:padding="16dp"/>
     </androidx.cardview.widget.CardView>
 
     <androidx.cardview.widget.CardView

@@ -29,6 +29,10 @@
         <activity
             android:name="com.example.eventease.ui.entrant.discover.EventDetailsDiscoverActivity"
             android:exported="false" />
+        <!-- Admin Event Detail Activity -->
+        <activity
+            android:name="com.example.eventease.admin.event.ui.EventDetailActivity"
+            android:exported="false" />
         <activity
             android:name="com.example.eventease.MainActivity"
             android:exported="true">
@@ -36,6 +40,20 @@
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- Deep link intent filter for QR codes - Custom scheme (primary) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="eventease" android:host="event" />
+            </intent-filter>
+            <!-- Alternative: HTTP URL format (requires App Links verification for full support) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="eventease.app" android:pathPrefix="/event" />
             </intent-filter>
         </activity>
 
@@ -100,6 +118,10 @@
             android:exported="false"
             android:label="Workflow Test"
             android:theme="@style/Theme.EventEase" />
+
+        <activity
+            android:name=".ui.entrant.notifications.NotificationsActivity"
+            android:exported="false" />
 
         <service
             android:name="com.example.eventease.notifications.EventNotificationService"

@@ -41,3 +41,5 @@ functions/.gitignore
 config/
 logs/
 compiled/
+
+Entrants-worktree/

@@ -29,8 +29,6 @@ public class Event {
     public String location;
     /** Maximum capacity of the event. */
     public int capacity;
-    /** Sample size - number of invitations to send initially from waitlist. */
-    public int sampleSize;
     /** Current number of people on waitlist (deprecated - use waitlist.size()). */
     public int waitlistCount;
     /** List of user IDs on the waitlist. */
@@ -51,6 +49,8 @@ public class Event {
     public long createdAtEpochMs;
     /** QR code payload string (e.g., "event:<id>"). */
     @Nullable public String qrPayload;
+    /** Interests/tags for filtering (e.g., Outdoor, Music). */
+    @Nullable public List<String> interests;
 
     public Event() { /* for Firestore */ }
 
@@ -85,7 +85,6 @@ public class Event {
         m.put("registrationEnd", registrationEnd);
         m.put("location", location);
         m.put("capacity", capacity);
-        m.put("sampleSize", sampleSize);
         m.put("waitlistCount", waitlistCount);
         m.put("waitlist", waitlist != null ? waitlist : new ArrayList<>());
         m.put("admitted", admitted != null ? admitted : new ArrayList<>());
@@ -96,6 +95,7 @@ public class Event {
         m.put("organizerId", organizerId);
         m.put("createdAtEpochMs", createdAtEpochMs);
         m.put("qrPayload", qrPayload);
+        m.put("interests", interests != null ? interests : new ArrayList<>());
         return m;
     }
     
@@ -113,6 +113,14 @@ public class Event {
         e.title = (String) m.get("title");
         
         Object startsAt = m.get("startsAtEpochMs");
+        if (startsAt == null) {
+            // Fallback to eventStartEpochMs (with "event" prefix) for backwards compatibility
+            startsAt = m.get("eventStartEpochMs");
+        }
+        if (startsAt == null) {
+            // Also check for eventStart (without EpochMs suffix) as another fallback
+            startsAt = m.get("eventStart");
+        }
         e.startsAtEpochMs = startsAt != null ? ((Number) startsAt).longValue() : 0;
         
         Object deadline = m.get("deadlineEpochMs");
@@ -128,9 +136,6 @@ public class Event {
         
         Object cap = m.get("capacity");
         e.capacity = cap != null ? ((Number) cap).intValue() : 0;
-        
-        Object sampleSize = m.get("sampleSize");
-        e.sampleSize = sampleSize != null ? ((Number) sampleSize).intValue() : 0;
         
         Object wc = m.get("waitlistCount");
         e.waitlistCount = wc != null ? ((Number) wc).intValue() : 0;
@@ -177,6 +182,15 @@ public class Event {
         
         e.qrPayload = (String) m.get("qrPayload");
         
+        Object interestsObj = m.get("interests");
+        if (interestsObj instanceof List) {
+            @SuppressWarnings("unchecked")
+            List<String> interestList = (List<String>) interestsObj;
+            e.interests = interestList != null ? new ArrayList<>(interestList) : new ArrayList<>();
+        } else {
+            e.interests = new ArrayList<>();
+        }
+        
         return e;
     }
 
@@ -221,6 +235,11 @@ public class Event {
      * @param startsAtEpochMs the start time in milliseconds
      */
     public void setStartsAtEpochMs(long startsAtEpochMs) { this.startsAtEpochMs = startsAtEpochMs; }
+
+    /** Optional getter for interests. */
+    public List<String> getInterests() { return interests; }
+
+    public void setInterests(List<String> interests) { this.interests = interests; }
 
     /**
      * Gets the event deadline in milliseconds since epoch (UTC).
@@ -286,20 +305,6 @@ public class Event {
      * @param capacity the event capacity to set
      */
     public void setCapacity(int capacity) { this.capacity = capacity; }
-
-    /**
-     * Gets the sample size (number of initial invitations to send).
-     *
-     * @return the sample size
-     */
-    public int getSampleSize() { return sampleSize; }
-
-    /**
-     * Sets the sample size (number of initial invitations to send).
-     *
-     * @param sampleSize the sample size to set
-     */
-    public void setSampleSize(int sampleSize) { this.sampleSize = sampleSize; }
 
     /**
      * Gets the waitlist count (deprecated - use getWaitlist().size() instead).

@@ -36,7 +36,7 @@ public class FCMTokenManager {
         FirebaseMessaging.getInstance().getToken()
                 .addOnCompleteListener(task -> {
                     if (!task.isSuccessful()) {
-                        Log.w(TAG, "✗ Fetching FCM registration token failed", task.getException());
+                        Log.w(TAG, "Fetching FCM registration token failed", task.getException());
                         if (task.getException() != null) {
                             Log.w(TAG, "  Error: " + task.getException().getMessage());
                         }
@@ -45,11 +45,11 @@ public class FCMTokenManager {
                     
                     String token = task.getResult();
                     if (token == null || token.isEmpty()) {
-                        Log.w(TAG, "✗ FCM token is null or empty");
+                        Log.w(TAG, "FCM token is null or empty");
                         return;
                     }
                     
-                    Log.d(TAG, "✓ FCM Registration Token received (length: " + token.length() + ")");
+                    Log.d(TAG, "FCM Registration Token received (length: " + token.length() + ")");
                     saveTokenToFirestore(token);
                     
                     // Verify token was saved after a short delay
@@ -81,12 +81,12 @@ public class FCMTokenManager {
         db.collection("users").document(uid)
                 .update("fcmToken", token)
                 .addOnSuccessListener(aVoid -> {
-                    Log.d(TAG, "✓ FCM token saved to Firestore for user: " + uid);
+                    Log.d(TAG, "FCM token saved to Firestore for user: " + uid);
                     Log.d(TAG, "  Document path: users/" + uid);
                     Log.d(TAG, "  Token: " + (token != null && token.length() > 20 ? token.substring(0, 20) + "..." : token));
                 })
                 .addOnFailureListener(e -> {
-                    Log.e(TAG, "✗ Failed to save FCM token to Firestore for user: " + uid, e);
+                    Log.e(TAG, "Failed to save FCM token to Firestore for user: " + uid, e);
                     Log.e(TAG, "  Error: " + e.getMessage());
                     // Try to create the document if it doesn't exist
                     if (e.getMessage() != null && e.getMessage().contains("No document to update")) {
@@ -96,10 +96,10 @@ public class FCMTokenManager {
                         db.collection("users").document(uid)
                                 .set(userData, com.google.firebase.firestore.SetOptions.merge())
                                 .addOnSuccessListener(aVoid -> {
-                                    Log.d(TAG, "✓ Created user document with FCM token");
+                                    Log.d(TAG, "Created user document with FCM token");
                                 })
                                 .addOnFailureListener(e2 -> {
-                                    Log.e(TAG, "✗ Failed to create user document", e2);
+                                    Log.e(TAG, "Failed to create user document", e2);
                                 });
                     }
                 });
