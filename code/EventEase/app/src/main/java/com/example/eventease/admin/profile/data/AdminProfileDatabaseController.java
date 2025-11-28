@@ -169,6 +169,12 @@ public class AdminProfileDatabaseController {
             Log.w(TAG, "deleteOrganizerEvents: UID is null or empty, skipping delete");
             return;
         }
+
+        db.collection("events")
+                .whereEqualTo("organizerId", uid)
+                .get();
+
+
     }
 
 
