@@ -16,6 +16,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
+import androidx.appcompat.app.AlertDialog;
+import android.widget.Toast;
+
 public class AdminProfileAdapter extends RecyclerView.Adapter<AdminProfileAdapter.ProfileViewHolder> {
 
     private final LayoutInflater inflater;
