@@ -153,7 +153,15 @@ public class AdminProfileDatabaseController {
         }
 
         DocumentReference userRef = db.collection("users").document(uid);
-        
+        userRef.update("roles", FieldValue.arrayRemove("organizer"))
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "Removed organizer role for user: " + uid);
+                    callback.onSuccess();
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to remove organizer role for user: " + uid, e);
+                    callback.onError(e);
+                });
     }
 
 
