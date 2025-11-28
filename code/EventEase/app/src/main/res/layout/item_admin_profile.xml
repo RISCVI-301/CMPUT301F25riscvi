@@ -55,29 +55,30 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:gravity="end"
             android:layout_marginTop="8dp">
 
             <androidx.appcompat.widget.AppCompatButton
                 android:id="@+id/btnRemoveOrganizer"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Remove Organizer"
-                android:textColor="#000000"
+                android:text="REMOVE ORGANIZER"
                 android:backgroundTint="#FFC107"
                 android:layout_marginEnd="8dp"
                 android:visibility="gone" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
 
             <androidx.appcompat.widget.AppCompatButton
                 android:id="@+id/btnDelete"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Delete"
-                android:textColor="#FFFFFF"
-                android:backgroundTint="#FF5252"
-                android:paddingStart="16dp"
-                android:paddingEnd="16dp" />
+                android:text="DELETE"
+                android:backgroundTint="#FF5252" />
         </LinearLayout>
+
 
     </LinearLayout>
 
