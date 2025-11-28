@@ -112,13 +112,6 @@
             android:name=".ui.organizer.OrganizerEntrantLocationsActivity"
             android:exported="false" />
 
-        <!-- Test Activity for Visual Workflow Testing -->
-        <activity
-            android:name=".test.WorkflowTestActivity"
-            android:exported="false"
-            android:label="Workflow Test"
-            android:theme="@style/Theme.EventEase" />
-
         <activity
             android:name=".ui.entrant.notifications.NotificationsActivity"
             android:exported="false" />
