@@ -43,12 +43,11 @@ public class NotificationChannelManager {
         NotificationChannel channel = notificationManager.getNotificationChannel(CHANNEL_ID);
         
         if (channel == null) {
-            // Channel doesn't exist, create it with DEFAULT importance (normal notifications)
-            // DEFAULT is standard and less likely to be blocked by system/user
+            // Channel doesn't exist, create it with HIGH importance for heads-up notifications
             channel = new NotificationChannel(
                     CHANNEL_ID,
                     CHANNEL_NAME,
-                    NotificationManager.IMPORTANCE_DEFAULT
+                    NotificationManager.IMPORTANCE_HIGH
             );
             channel.setDescription("Notifications for event invitations");
             channel.enableLights(true);
@@ -60,7 +59,7 @@ public class NotificationChannelManager {
             );
             
             notificationManager.createNotificationChannel(channel);
-            Log.d(TAG, "Notification channel created: " + CHANNEL_ID + " with DEFAULT importance (normal notifications)");
+            Log.d(TAG, "✓ Notification channel created: " + CHANNEL_ID + " with HIGH importance (heads-up notifications)");
         } else {
             // Channel exists - check its importance
             int currentImportance = channel.getImportance();
@@ -70,8 +69,8 @@ public class NotificationChannelManager {
             // If channel is blocked (NONE), try to fix it
             // Note: On some phones, blocked channels don't show in settings UI
             if (currentImportance == NotificationManager.IMPORTANCE_NONE) {
-                Log.w(TAG, "Channel is BLOCKED (importance = NONE)");
-                Log.w(TAG, "Attempting to recreate channel...");
+                Log.w(TAG, "⚠ Channel is BLOCKED (importance = NONE)");
+                Log.w(TAG, "  Attempting to recreate channel...");
                 
                 // Delete the blocked channel
                 try {
@@ -86,11 +85,11 @@ public class NotificationChannelManager {
                         Thread.currentThread().interrupt();
                     }
                     
-                    // Recreate with DEFAULT importance
+                    // Recreate with HIGH importance for heads-up notifications
                     channel = new NotificationChannel(
                             CHANNEL_ID,
                             CHANNEL_NAME,
-                            NotificationManager.IMPORTANCE_DEFAULT
+                            NotificationManager.IMPORTANCE_HIGH
                     );
                     channel.setDescription("Notifications for event invitations");
                     channel.enableLights(true);
@@ -125,10 +124,10 @@ public class NotificationChannelManager {
                         Log.d(TAG, "  Verification: new importance = " + newImportance + " (0=NONE, 1=MIN, 2=LOW, 3=DEFAULT, 4=HIGH)");
                         
                         if (newImportance != NotificationManager.IMPORTANCE_NONE) {
-                            Log.d(TAG, "Channel recreated successfully with DEFAULT importance");
-                            Log.d(TAG, "New importance: " + newImportance);
+                            Log.d(TAG, "✓ Channel recreated successfully with DEFAULT importance");
+                            Log.d(TAG, "  New importance: " + newImportance);
                         } else {
-                            Log.e(TAG, "Channel recreated but STILL BLOCKED (importance = NONE)");
+                            Log.e(TAG, "✗ Channel recreated but STILL BLOCKED (importance = NONE)");
                             Log.e(TAG, "  This usually means:");
                             Log.e(TAG, "  1. Android system is immediately blocking it");
                             Log.e(TAG, "  2. User has manually disabled it in settings");
@@ -142,11 +141,11 @@ public class NotificationChannelManager {
                             Log.e(TAG, "  3. Check Do Not Disturb: Settings → Notifications → Do Not Disturb");
                         }
                     } else {
-                        Log.e(TAG, "Channel verification failed - channel not found after recreation");
-                        Log.e(TAG, "This may indicate a system issue or the channel was immediately deleted");
+                        Log.e(TAG, "✗ Channel verification failed - channel not found after recreation");
+                        Log.e(TAG, "  This may indicate a system issue or the channel was immediately deleted");
                     }
                 } catch (Exception e) {
-                    Log.e(TAG, "Failed to recreate channel", e);
+                    Log.e(TAG, "✗ Failed to recreate channel", e);
                     Log.e(TAG, "  Please manually enable notifications in device settings");
                 }
             } else if (currentImportance < NotificationManager.IMPORTANCE_DEFAULT && currentImportance > NotificationManager.IMPORTANCE_NONE) {
@@ -158,7 +157,7 @@ public class NotificationChannelManager {
                     channel = new NotificationChannel(
                             CHANNEL_ID,
                             CHANNEL_NAME,
-                            NotificationManager.IMPORTANCE_DEFAULT
+                            NotificationManager.IMPORTANCE_HIGH
                     );
                     channel.setDescription("Notifications for event invitations");
                     channel.enableLights(true);
@@ -169,12 +168,13 @@ public class NotificationChannelManager {
                             null
                     );
                     notificationManager.createNotificationChannel(channel);
-                    Log.d(TAG, "Channel updated to DEFAULT importance");
+                    Log.d(TAG, "✓ Channel updated to HIGH importance");
                 } catch (Exception e) {
                     Log.w(TAG, "Could not update channel importance (user may have locked it)", e);
                 }
             } else {
-                Log.d(TAG, "Channel is enabled (importance: " + currentImportance + ")");
+                // Channel is enabled (DEFAULT, HIGH, or even LOW/MIN is okay - at least it's not NONE)
+                Log.d(TAG, "✓ Channel is enabled (importance: " + currentImportance + ")");
             }
         }
     }

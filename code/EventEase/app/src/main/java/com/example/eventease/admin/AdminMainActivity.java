@@ -28,7 +28,6 @@ import com.example.eventease.auth.UserRoleChecker;
 import com.example.eventease.notifications.FCMTokenManager;
 import com.example.eventease.util.ToastUtil;
 import com.google.firebase.FirebaseApp;
-import com.google.firebase.auth.FirebaseAuth;
 
 /**
  * Main activity for admin users.
@@ -67,10 +66,11 @@ public class AdminMainActivity extends AppCompatActivity {
         FirebaseApp.initializeApp(this);
         Log.d("AdminMainActivity", "FirebaseApp initialized: " + (FirebaseApp.getApps(this).size() > 0));
 
-        // Check if user is admin, if not redirect to login
-        FirebaseAuth auth = FirebaseAuth.getInstance();
-        if (auth.getCurrentUser() == null) {
-            // Not authenticated, redirect to login
+        // Check if device has profile
+        com.example.eventease.auth.DeviceAuthManager authManager = 
+            new com.example.eventease.auth.DeviceAuthManager(this);
+        if (!authManager.hasCachedProfile()) {
+            // No profile, redirect to main
             finish();
             return;
         }
@@ -96,7 +96,7 @@ public class AdminMainActivity extends AppCompatActivity {
         requestNotificationPermission();
 
         // Verify admin role
-        UserRoleChecker.isAdmin().addOnCompleteListener(task -> {
+        UserRoleChecker.isAdmin(this).addOnCompleteListener(task -> {
             if (!task.isSuccessful() || !Boolean.TRUE.equals(task.getResult())) {
                 // Not admin, redirect to main activity
                 Intent intent = new Intent(AdminMainActivity.this, com.example.eventease.MainActivity.class);
@@ -254,11 +254,12 @@ public class AdminMainActivity extends AppCompatActivity {
      * Public so that admin fragments can call it.
      */
     public void performLogout() {
-        // Sign out from Firebase
-        FirebaseAuth auth = FirebaseAuth.getInstance();
-        auth.signOut();
+        // Device auth - clear cached profile data
+        com.example.eventease.auth.DeviceAuthManager authManager = 
+            new com.example.eventease.auth.DeviceAuthManager(this);
+        authManager.clearCache();
 
-        // Clear Remember Me preferences
+        // Clear any other preferences
         SharedPreferences prefs = getSharedPreferences("EventEasePrefs", MODE_PRIVATE);
         prefs.edit()
             .putBoolean("rememberMe", false)
@@ -304,7 +305,7 @@ public class AdminMainActivity extends AppCompatActivity {
      * Should be called after notification permission is granted (or on older Android versions).
      */
     private void initializeNotifications() {
-        FCMTokenManager.getInstance().initialize();
+        FCMTokenManager.getInstance().initialize(this);
     }
 }
 

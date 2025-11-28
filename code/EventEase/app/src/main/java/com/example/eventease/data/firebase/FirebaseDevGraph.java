@@ -1,8 +1,5 @@
 package com.example.eventease.data.firebase;
 
-import com.example.eventease.auth.AuthManager;
-import com.example.eventease.auth.FirebaseAuthManager;
-
 import java.util.*;
 
 /**
@@ -12,8 +9,6 @@ import java.util.*;
  * for all repository instances. Repositories are initialized once and reused throughout the application lifecycle.
  */
 public final class FirebaseDevGraph {
-    /** Authentication manager for user authentication operations. */
-    public final AuthManager auth;
     /** Repository for event data operations. */
     public final FirebaseEventRepository events;
     /** Repository for waitlist operations. */
@@ -28,10 +23,9 @@ public final class FirebaseDevGraph {
     /**
      * Constructs a new dependency graph and initializes all repositories.
      * Repositories are initialized with empty seed data as data is loaded from Firebase.
+     * Note: Authentication now handled by DeviceAuthManager, not part of this graph.
      */
     public FirebaseDevGraph() {
-        this.auth = new FirebaseAuthManager();
-        
         // Initialize repositories with empty seed data, data loads from firebase
         events = new FirebaseEventRepository(new ArrayList<>());
         waitlists = new FirebaseWaitlistRepository(events);

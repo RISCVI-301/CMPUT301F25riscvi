@@ -15,4 +15,7 @@
     <color name="header_text_green">#114C43</color>
     <color name="event_name_bg_blue">#9DBCD6</color>
     <color name="medium_blue_component">#4A628A</color>
+    
+    <!-- Additional Colors -->
+    <color name="gray">#757575</color>
 </resources>

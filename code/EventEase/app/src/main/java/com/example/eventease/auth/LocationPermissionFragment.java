@@ -29,7 +29,6 @@ import com.example.eventease.R;
 import com.example.eventease.notifications.FCMTokenManager;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
-import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.FirebaseFirestore;
 
 import java.util.HashMap;
@@ -54,7 +53,6 @@ public class LocationPermissionFragment extends Fragment {
 
     private FusedLocationProviderClient fusedLocationClient;
     private FirebaseFirestore db;
-    private FirebaseAuth auth;
 
     private ActivityResultLauncher<String[]> locationPermissionLauncher;
     private ActivityResultLauncher<String> notificationPermissionLauncher;
@@ -92,11 +90,15 @@ public class LocationPermissionFragment extends Fragment {
                     if (isGranted) {
                         Log.d(TAG, "Notification permission granted on first sign-in");
                         // Initialize FCM after permission is granted
-                        FCMTokenManager.getInstance().initialize();
+                        if (getContext() != null) {
+                            FCMTokenManager.getInstance().initialize(getContext());
+                        }
                     } else {
                         Log.w(TAG, "Notification permission denied on first sign-in");
                         // Still initialize FCM - may work on older Android versions
-                        FCMTokenManager.getInstance().initialize();
+                        if (getContext() != null) {
+                            FCMTokenManager.getInstance().initialize(getContext());
+                        }
                     }
                     // Navigate to discover after notification permission is handled
                     navigateToDiscover();
@@ -116,7 +118,6 @@ public class LocationPermissionFragment extends Fragment {
         // Initialize Firebase and Location services
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity());
         db = FirebaseFirestore.getInstance();
-        auth = FirebaseAuth.getInstance();
 
         // Initialize views
         btnAllowOnce = view.findViewById(R.id.btnAllowOnce);
@@ -145,7 +146,9 @@ public class LocationPermissionFragment extends Fragment {
         savePermissionPreference(PERMISSION_DENIED);
         
         // Save null location to Firestore
-        String uid = auth.getCurrentUser() != null ? auth.getCurrentUser().getUid() : null;
+        com.example.eventease.auth.DeviceAuthManager authManager = 
+            new com.example.eventease.auth.DeviceAuthManager(requireContext());
+        String uid = authManager.getUid();
         if (uid != null) {
             Map<String, Object> updates = new HashMap<>();
             updates.put("location", null);
@@ -238,7 +241,9 @@ public class LocationPermissionFragment extends Fragment {
     }
 
     private void saveLocationToFirestore(Location location) {
-        String uid = auth.getCurrentUser() != null ? auth.getCurrentUser().getUid() : null;
+        com.example.eventease.auth.DeviceAuthManager authManager = 
+            new com.example.eventease.auth.DeviceAuthManager(requireContext());
+        String uid = authManager.getUid();
         if (uid == null) {
             setLoading(false);
             Toast.makeText(requireContext(), "User not authenticated", Toast.LENGTH_SHORT).show();
@@ -286,13 +291,17 @@ public class LocationPermissionFragment extends Fragment {
             } else {
                 Log.d(TAG, "Notification permission already granted");
                 // Initialize FCM and navigate
-                FCMTokenManager.getInstance().initialize();
+                if (getContext() != null) {
+                    FCMTokenManager.getInstance().initialize(getContext());
+                }
                 navigateToDiscover();
             }
         } else {
             // Android 12 and below - permission granted via manifest
             Log.d(TAG, "Android version < 13, notification permission granted via manifest");
-            FCMTokenManager.getInstance().initialize();
+            if (getContext() != null) {
+                FCMTokenManager.getInstance().initialize(getContext());
+            }
             navigateToDiscover();
         }
     }

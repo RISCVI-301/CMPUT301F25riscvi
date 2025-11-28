@@ -33,15 +33,28 @@
 
             <TextView
                 android:id="@+id/header_title"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="12dp"
+                android:layout_weight="1"
                 android:fontFamily="@font/fredoka_bold"
                 android:gravity="start"
                 android:text="EventEase"
                 android:textColor="@color/header_text_green"
                 android:textSize="34sp"
                 android:textStyle="bold" />
+
+            <ImageView
+                android:id="@+id/share_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:padding="8dp"
+                android:src="@drawable/entrant_ic_share"
+                android:tint="@color/header_text_green"
+                android:contentDescription="Share QR"
+                android:clickable="true"
+                android:focusable="true" />
         </LinearLayout>
 
         <TextView
@@ -170,6 +183,24 @@
             android:textSize="26sp"
             android:textStyle="bold"
             app:backgroundTint="#9EFFF1"
+            app:cornerRadius="12dp" />
+
+        <!-- Change Deadlines Button (for testing) -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/change_deadlines_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginStart="24dp"
+            android:layout_marginTop="16dp"
+            android:layout_marginEnd="24dp"
+            android:fontFamily="@font/fredoka_bold"
+            android:paddingVertical="10dp"
+            android:text="Change Deadlines (Testing)"
+            android:textColor="#223C65"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            app:backgroundTint="#FFD700"
             app:cornerRadius="12dp" />
 
 

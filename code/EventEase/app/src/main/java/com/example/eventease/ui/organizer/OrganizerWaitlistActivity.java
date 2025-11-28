@@ -18,8 +18,6 @@ import com.bumptech.glide.Glide;
 import com.example.eventease.R;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -28,10 +26,40 @@ import com.google.firebase.firestore.WriteBatch;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
 
+import androidx.annotation.LayoutRes;
+import androidx.core.content.FileProvider;
+
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.WriterException;
+import com.google.zxing.common.BitMatrix;
+import com.google.zxing.qrcode.QRCodeWriter;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Calendar;
+import java.text.SimpleDateFormat;
+import java.util.Locale;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import android.app.DatePickerDialog;
+import android.app.TimePickerDialog;
+import android.app.Dialog;
+import android.content.ContentValues;
+import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
+import android.os.Build;
+import android.os.Environment;
+import android.provider.MediaStore;
+import android.view.ViewGroup;
+import android.view.Window;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 
 public class OrganizerWaitlistActivity extends AppCompatActivity {
     private static final String TAG = "OrganizerWaitlist";
@@ -43,8 +71,8 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
     private ImageView backButton;
     private MaterialButton deleteEventButton;
     private MaterialButton entrantDetailsButton;
+    private MaterialButton changeDeadlinesButton;
 
-    private FirebaseAuth mAuth;
     private FirebaseFirestore db;
     private FirebaseStorage storage;
 
@@ -66,7 +94,6 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_organizer_waitlist);
 
-        mAuth = FirebaseAuth.getInstance();
         db = FirebaseFirestore.getInstance();
         storage = FirebaseStorage.getInstance();
 
@@ -77,6 +104,7 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
         backButton = findViewById(R.id.back_button);
         entrantDetailsButton = findViewById(R.id.entrant_details_button);
         deleteEventButton = findViewById(R.id.delete_event_button);
+        changeDeadlinesButton = findViewById(R.id.change_deadlines_button);
 
         currentEventId = getIntent().getStringExtra("eventId");
 
@@ -100,6 +128,11 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
             }
         });
         deleteEventButton.setOnClickListener(v -> showDeleteEventConfirmation());
+        
+        // Set up change deadlines button (for testing)
+        if (changeDeadlinesButton != null) {
+            changeDeadlinesButton.setOnClickListener(v -> showChangeDeadlinesDialog());
+        }
 
         // Set up notification button for Waitlisted Entrants
         ImageView mailIcon = findViewById(R.id.mail_icon);
@@ -107,22 +140,35 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
             mailIcon.setOnClickListener(v -> showSendNotificationsToWaitlistedConfirmation());
         }
 
+        // Set up location button to view entrant locations on map
+        ImageView locationIcon = findViewById(R.id.location_icon);
+        if (locationIcon != null) {
+            locationIcon.setClickable(true);
+            locationIcon.setFocusable(true);
+            locationIcon.setOnClickListener(v -> {
+                if (currentEventId == null || currentEventId.isEmpty()) {
+                    Toast.makeText(this, "Missing event ID", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                android.content.Intent mapIntent = new android.content.Intent(this, OrganizerEntrantLocationsActivity.class);
+                mapIntent.putExtra("eventId", currentEventId);
+                startActivity(mapIntent);
+            });
+        }
+
+        // Set up share button to show QR code
+        ImageView shareButton = findViewById(R.id.share_button);
+        if (shareButton != null) {
+            shareButton.setOnClickListener(v -> showEventQRDialog());
+        }
+
         signInAndLoadData();
     }
 
     private void signInAndLoadData() {
-        FirebaseUser currentUser = mAuth.getCurrentUser();
-        if (currentUser != null) {
-            checkAndProcessSelection();
-            loadEventDataFromFirestore(currentEventId);
-        } else {
-            mAuth.signInAnonymously()
-                    .addOnSuccessListener(r -> {
-                        checkAndProcessSelection();
-                        loadEventDataFromFirestore(currentEventId);
-                    })
-                    .addOnFailureListener(e -> Toast.makeText(this, "Auth failed", Toast.LENGTH_SHORT).show());
-        }
+        // Device auth - no sign in needed, just load data
+        checkAndProcessSelection();
+        loadEventDataFromFirestore(currentEventId);
     }
     
     private void checkAndProcessSelection() {
@@ -475,6 +521,451 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
                 Log.e(TAG, "Failed to send notifications: " + error);
             }
         });
+    }
+    
+    /**
+     * Shows a dialog to change event deadlines for testing purposes.
+     */
+    private void showChangeDeadlinesDialog() {
+        if (currentEventId == null || currentEventId.isEmpty()) {
+            Toast.makeText(this, "Event ID not found", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        // Load current event data
+        db.collection("events").document(currentEventId).get()
+                .addOnSuccessListener(eventDoc -> {
+                    if (eventDoc == null || !eventDoc.exists()) {
+                        Toast.makeText(this, "Event not found", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    
+                    Long registrationEnd = eventDoc.getLong("registrationEnd");
+                    Long deadlineEpochMs = eventDoc.getLong("deadlineEpochMs");
+                    Long startsAtEpochMs = eventDoc.getLong("startsAtEpochMs");
+                    
+                    // Create dialog layout
+                    LinearLayout dialogLayout = new LinearLayout(this);
+                    dialogLayout.setOrientation(LinearLayout.VERTICAL);
+                    dialogLayout.setPadding(50, 40, 50, 10);
+                    
+                    // Registration End Date/Time
+                    TextView regEndLabel = new TextView(this);
+                    regEndLabel.setText("Registration End:");
+                    regEndLabel.setTextSize(16);
+                    regEndLabel.setTextColor(android.graphics.Color.BLACK);
+                    dialogLayout.addView(regEndLabel);
+                    
+                    TextView regEndDisplay = new TextView(this);
+                    regEndDisplay.setId(android.R.id.text1);
+                    regEndDisplay.setTextSize(14);
+                    regEndDisplay.setPadding(0, 5, 0, 15);
+                    regEndDisplay.setTextColor(android.graphics.Color.DKGRAY);
+                    if (registrationEnd != null && registrationEnd > 0) {
+                        SimpleDateFormat sdf = new SimpleDateFormat("MMM d, yyyy 'at' h:mm a", Locale.getDefault());
+                        regEndDisplay.setText("Current: " + sdf.format(new java.util.Date(registrationEnd)));
+                    } else {
+                        regEndDisplay.setText("Not set");
+                    }
+                    dialogLayout.addView(regEndDisplay);
+                    
+                    // Invitation Deadline Date/Time
+                    TextView deadlineLabel = new TextView(this);
+                    deadlineLabel.setText("Invitation Deadline:");
+                    deadlineLabel.setTextSize(16);
+                    deadlineLabel.setTextColor(android.graphics.Color.BLACK);
+                    dialogLayout.addView(deadlineLabel);
+                    
+                    TextView deadlineDisplay = new TextView(this);
+                    deadlineDisplay.setId(android.R.id.text2);
+                    deadlineDisplay.setTextSize(14);
+                    deadlineDisplay.setPadding(0, 5, 0, 15);
+                    deadlineDisplay.setTextColor(android.graphics.Color.DKGRAY);
+                    if (deadlineEpochMs != null && deadlineEpochMs > 0) {
+                        SimpleDateFormat sdf = new SimpleDateFormat("MMM d, yyyy 'at' h:mm a", Locale.getDefault());
+                        deadlineDisplay.setText("Current: " + sdf.format(new java.util.Date(deadlineEpochMs)));
+                    } else {
+                        deadlineDisplay.setText("Not set");
+                    }
+                    dialogLayout.addView(deadlineDisplay);
+                    
+                    // Event Start Date/Time
+                    TextView startLabel = new TextView(this);
+                    startLabel.setText("Event Start:");
+                    startLabel.setTextSize(16);
+                    startLabel.setTextColor(android.graphics.Color.BLACK);
+                    dialogLayout.addView(startLabel);
+                    
+                    TextView startDisplay = new TextView(this);
+                    startDisplay.setId(android.R.id.button1);
+                    startDisplay.setTextSize(14);
+                    startDisplay.setPadding(0, 5, 0, 15);
+                    startDisplay.setTextColor(android.graphics.Color.DKGRAY);
+                    if (startsAtEpochMs != null && startsAtEpochMs > 0) {
+                        SimpleDateFormat sdf = new SimpleDateFormat("MMM d, yyyy 'at' h:mm a", Locale.getDefault());
+                        startDisplay.setText("Current: " + sdf.format(new java.util.Date(startsAtEpochMs)));
+                    } else {
+                        startDisplay.setText("Not set");
+                    }
+                    dialogLayout.addView(startDisplay);
+                    
+                    // Store current values for use in pickers
+                    final long[] newRegistrationEnd = {registrationEnd != null ? registrationEnd : System.currentTimeMillis()};
+                    final long[] newDeadlineEpochMs = {deadlineEpochMs != null ? deadlineEpochMs : System.currentTimeMillis()};
+                    final long[] newStartsAtEpochMs = {startsAtEpochMs != null ? startsAtEpochMs : System.currentTimeMillis()};
+                    
+                    // Create date/time picker helper
+                    Runnable updateRegEnd = () -> {
+                        Calendar cal = Calendar.getInstance();
+                        cal.setTimeInMillis(newRegistrationEnd[0]);
+                        new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
+                            cal.set(year, month, dayOfMonth);
+                            new TimePickerDialog(this, (view2, hourOfDay, minute) -> {
+                                cal.set(Calendar.HOUR_OF_DAY, hourOfDay);
+                                cal.set(Calendar.MINUTE, minute);
+                                newRegistrationEnd[0] = cal.getTimeInMillis();
+                                SimpleDateFormat sdf = new SimpleDateFormat("MMM d, yyyy 'at' h:mm a", Locale.getDefault());
+                                regEndDisplay.setText("New: " + sdf.format(cal.getTime()));
+                            }, cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE), false).show();
+                        }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show();
+                    };
+                    
+                    Runnable updateDeadline = () -> {
+                        Calendar cal = Calendar.getInstance();
+                        cal.setTimeInMillis(newDeadlineEpochMs[0]);
+                        new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
+                            cal.set(year, month, dayOfMonth);
+                            new TimePickerDialog(this, (view2, hourOfDay, minute) -> {
+                                cal.set(Calendar.HOUR_OF_DAY, hourOfDay);
+                                cal.set(Calendar.MINUTE, minute);
+                                newDeadlineEpochMs[0] = cal.getTimeInMillis();
+                                SimpleDateFormat sdf = new SimpleDateFormat("MMM d, yyyy 'at' h:mm a", Locale.getDefault());
+                                deadlineDisplay.setText("New: " + sdf.format(cal.getTime()));
+                            }, cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE), false).show();
+                        }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show();
+                    };
+                    
+                    Runnable updateStart = () -> {
+                        Calendar cal = Calendar.getInstance();
+                        cal.setTimeInMillis(newStartsAtEpochMs[0]);
+                        new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
+                            cal.set(year, month, dayOfMonth);
+                            new TimePickerDialog(this, (view2, hourOfDay, minute) -> {
+                                cal.set(Calendar.HOUR_OF_DAY, hourOfDay);
+                                cal.set(Calendar.MINUTE, minute);
+                                newStartsAtEpochMs[0] = cal.getTimeInMillis();
+                                SimpleDateFormat sdf = new SimpleDateFormat("MMM d, yyyy 'at' h:mm a", Locale.getDefault());
+                                startDisplay.setText("New: " + sdf.format(cal.getTime()));
+                            }, cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE), false).show();
+                        }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show();
+                    };
+                    
+                    // Make text views clickable
+                    regEndDisplay.setOnClickListener(v -> updateRegEnd.run());
+                    deadlineDisplay.setOnClickListener(v -> updateDeadline.run());
+                    startDisplay.setOnClickListener(v -> updateStart.run());
+                    
+                    regEndDisplay.setClickable(true);
+                    regEndDisplay.setFocusable(true);
+                    deadlineDisplay.setClickable(true);
+                    deadlineDisplay.setFocusable(true);
+                    startDisplay.setClickable(true);
+                    startDisplay.setFocusable(true);
+                    
+                    new MaterialAlertDialogBuilder(this)
+                            .setTitle("Change Deadlines (Testing)")
+                            .setView(dialogLayout)
+                            .setMessage("Tap on each date/time to change it. This is for testing purposes only.")
+                            .setPositiveButton("Save", (dialog, which) -> {
+                                updateDeadlines(newRegistrationEnd[0], newDeadlineEpochMs[0], newStartsAtEpochMs[0]);
+                            })
+                            .setNegativeButton("Cancel", null)
+                            .show();
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to load event for deadline change", e);
+                    Toast.makeText(this, "Failed to load event: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                });
+    }
+    
+    /**
+     * Updates the event deadlines in Firestore.
+     */
+    private void updateDeadlines(long registrationEnd, long deadlineEpochMs, long startsAtEpochMs) {
+        if (currentEventId == null || currentEventId.isEmpty()) {
+            Toast.makeText(this, "Event ID not found", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        Toast.makeText(this, "Updating deadlines...", Toast.LENGTH_SHORT).show();
+        
+        // FIX: First, update the waitlistCount to match the actual count in the subcollection
+        // This ensures the capacity check is accurate after deadline changes
+        DocumentReference eventRef = db.collection("events").document(currentEventId);
+        eventRef.collection("WaitlistedEntrants").get()
+                .addOnSuccessListener(waitlistSnapshot -> {
+                    int actualWaitlistCount = waitlistSnapshot != null ? waitlistSnapshot.size() : 0;
+                    Log.d(TAG, "Actual waitlist count: " + actualWaitlistCount);
+                    
+                    Map<String, Object> updates = new HashMap<>();
+                    updates.put("registrationEnd", registrationEnd);
+                    updates.put("deadlineEpochMs", deadlineEpochMs);
+                    updates.put("startsAtEpochMs", startsAtEpochMs);
+                    updates.put("waitlistCount", actualWaitlistCount); // FIX: Update waitlistCount to actual count
+                    
+                    // Also reset flags so automatic processes can run again
+                    updates.put("selectionProcessed", false);
+                    updates.put("selectionNotificationSent", false);
+                    updates.put("deadlineNotificationSent", false);
+                    updates.put("sorryNotificationSent", false);
+                    
+                    eventRef.update(updates)
+                            .addOnSuccessListener(aVoid -> {
+                                Log.d(TAG, "Deadlines updated successfully. WaitlistCount set to: " + actualWaitlistCount);
+                                SimpleDateFormat sdf = new SimpleDateFormat("MMM d, yyyy 'at' h:mm a", Locale.getDefault());
+                                String message = "Deadlines updated:\n" +
+                                        "Registration End: " + sdf.format(new java.util.Date(registrationEnd)) + "\n" +
+                                        "Invitation Deadline: " + sdf.format(new java.util.Date(deadlineEpochMs)) + "\n" +
+                                        "Event Start: " + sdf.format(new java.util.Date(startsAtEpochMs)) + "\n" +
+                                        "Waitlist Count: " + actualWaitlistCount;
+                                Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+                                
+                                // Reload event data to reflect changes
+                                loadEventDataFromFirestore(currentEventId);
+                            })
+                            .addOnFailureListener(e -> {
+                                Log.e(TAG, "Failed to update deadlines", e);
+                                Toast.makeText(this, "Failed to update deadlines: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                            });
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to count waitlist entries, proceeding with update anyway", e);
+                    // On error, still update deadlines but set waitlistCount to 0 as fallback
+                    Map<String, Object> updates = new HashMap<>();
+                    updates.put("registrationEnd", registrationEnd);
+                    updates.put("deadlineEpochMs", deadlineEpochMs);
+                    updates.put("startsAtEpochMs", startsAtEpochMs);
+                    updates.put("waitlistCount", 0); // Fallback to 0 if we can't count
+                    
+                    // Also reset flags so automatic processes can run again
+                    updates.put("selectionProcessed", false);
+                    updates.put("selectionNotificationSent", false);
+                    updates.put("deadlineNotificationSent", false);
+                    updates.put("sorryNotificationSent", false);
+                    
+                    eventRef.update(updates)
+                            .addOnSuccessListener(aVoid -> {
+                                Log.d(TAG, "Deadlines updated (with fallback waitlistCount=0)");
+                                SimpleDateFormat sdf = new SimpleDateFormat("MMM d, yyyy 'at' h:mm a", Locale.getDefault());
+                                String message = "Deadlines updated:\n" +
+                                        "Registration End: " + sdf.format(new java.util.Date(registrationEnd)) + "\n" +
+                                        "Invitation Deadline: " + sdf.format(new java.util.Date(deadlineEpochMs)) + "\n" +
+                                        "Event Start: " + sdf.format(new java.util.Date(startsAtEpochMs));
+                                Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+                                
+                                // Reload event data to reflect changes
+                                loadEventDataFromFirestore(currentEventId);
+                            })
+                            .addOnFailureListener(e2 -> {
+                                Log.e(TAG, "Failed to update deadlines", e2);
+                                Toast.makeText(this, "Failed to update deadlines: " + e2.getMessage(), Toast.LENGTH_LONG).show();
+                            });
+                });
+    }
+
+    /**
+     * Shows the Event QR code dialog
+     */
+    private void showEventQRDialog() {
+        if (currentEventId == null || currentEventId.isEmpty()) {
+            Toast.makeText(this, "Event ID not available", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Fetch event data to get qrPayload
+        db.collection("events").document(currentEventId).get()
+                .addOnSuccessListener(documentSnapshot -> {
+                    if (!documentSnapshot.exists()) {
+                        Toast.makeText(this, "Event not found", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    String eventTitle = documentSnapshot.getString("title");
+                    String storedQrPayload = documentSnapshot.getString("qrPayload");
+
+                    // Use stored qrPayload if available, otherwise generate it
+                    final String qrPayload;
+                    if (storedQrPayload != null && !storedQrPayload.isEmpty()) {
+                        qrPayload = storedQrPayload;
+                    } else {
+                        // Generate QR payload if not stored (use custom scheme format)
+                        qrPayload = "eventease://event/" + currentEventId;
+                    }
+
+                    final String eventTitleText = eventTitle != null ? eventTitle : "Event";
+
+                    // Show QR dialog
+                    showQrDialog(eventTitleText, qrPayload);
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to fetch event data", e);
+                    Toast.makeText(this, "Failed to load event data", Toast.LENGTH_SHORT).show();
+                });
+    }
+
+    private void showQrDialog(String title, String qrPayload) {
+        android.app.Dialog dialog = createCardDialog(R.layout.dialog_qr_preview);
+        TextView titleView = dialog.findViewById(R.id.tvEventTitle);
+        ImageView imgQr = dialog.findViewById(R.id.imgQr);
+        MaterialButton btnShare = dialog.findViewById(R.id.btnShare);
+        MaterialButton btnSave = dialog.findViewById(R.id.btnSave);
+        MaterialButton btnCopyLink = dialog.findViewById(R.id.btnCopyLink);
+        MaterialButton btnViewEvents = dialog.findViewById(R.id.btnViewEvents);
+
+        if (titleView != null) {
+            titleView.setText(title);
+        }
+
+        final android.graphics.Bitmap qrBitmap = generateQrBitmap(qrPayload);
+        if (imgQr != null) {
+            if (qrBitmap != null) {
+                imgQr.setImageBitmap(qrBitmap);
+            } else {
+                imgQr.setImageResource(R.drawable.ic_event_poster_placeholder);
+            }
+        }
+
+        if (btnShare != null) {
+            btnShare.setOnClickListener(v -> {
+                if (qrBitmap != null) {
+                    shareQrBitmap(qrBitmap, qrPayload);
+                } else {
+                    shareQrText(qrPayload);
+                }
+            });
+        }
+
+        if (btnSave != null) {
+            btnSave.setOnClickListener(v -> {
+                if (qrBitmap != null) {
+                    boolean saved = saveQrToGallery(qrBitmap, title);
+                    if (saved) {
+                        Toast.makeText(this, "Saved to gallery", Toast.LENGTH_SHORT).show();
+                    }
+                } else {
+                    Toast.makeText(this, "QR not ready yet.", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+
+        if (btnCopyLink != null) {
+            btnCopyLink.setOnClickListener(v -> {
+                android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+                android.content.ClipData clip = android.content.ClipData.newPlainText("Event Link", qrPayload);
+                clipboard.setPrimaryClip(clip);
+                Toast.makeText(OrganizerWaitlistActivity.this, "Link copied to clipboard!", Toast.LENGTH_SHORT).show();
+            });
+        }
+
+        if (btnViewEvents != null) {
+            btnViewEvents.setOnClickListener(v -> dialog.dismiss());
+        }
+
+        dialog.show();
+    }
+
+    /**
+     * Creates a card-style dialog
+     */
+    private android.app.Dialog createCardDialog(int layoutRes) {
+        android.app.Dialog dialog = new android.app.Dialog(this);
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
+        dialog.setContentView(layoutRes);
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+            dialog.getWindow().setLayout(android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+        dialog.setCanceledOnTouchOutside(false);
+        return dialog;
+    }
+
+    private android.graphics.Bitmap generateQrBitmap(String payload) {
+        try {
+            com.google.zxing.qrcode.QRCodeWriter writer = new com.google.zxing.qrcode.QRCodeWriter();
+            com.google.zxing.common.BitMatrix matrix = writer.encode(payload, com.google.zxing.BarcodeFormat.QR_CODE, 512, 512);
+            int width = matrix.getWidth();
+            int height = matrix.getHeight();
+            android.graphics.Bitmap bmp = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888);
+            for (int x = 0; x < width; x++) {
+                for (int y = 0; y < height; y++) {
+                    bmp.setPixel(x, y, matrix.get(x, y) ? android.graphics.Color.BLACK : android.graphics.Color.WHITE);
+                }
+            }
+            return bmp;
+        } catch (com.google.zxing.WriterException e) {
+            Log.e(TAG, "QR code generation failed", e);
+            return null;
+        }
+    }
+
+    private void shareQrBitmap(android.graphics.Bitmap bitmap, String payload) {
+        try {
+            java.io.File cacheDir = new java.io.File(getCacheDir(), "qr");
+            if (!cacheDir.exists() && !cacheDir.mkdirs()) {
+                throw new java.io.IOException("Unable to create cache directory");
+            }
+            java.io.File file = new java.io.File(cacheDir, "qr_" + System.currentTimeMillis() + ".png");
+            try (java.io.FileOutputStream out = new java.io.FileOutputStream(file)) {
+                bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out);
+            }
+
+            Uri uri = androidx.core.content.FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", file);
+            android.content.Intent shareIntent = new android.content.Intent(android.content.Intent.ACTION_SEND);
+            shareIntent.setType("image/png");
+            shareIntent.putExtra(android.content.Intent.EXTRA_STREAM, uri);
+            shareIntent.putExtra(android.content.Intent.EXTRA_TEXT, "Scan this QR to view the event: " + payload);
+            shareIntent.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(android.content.Intent.createChooser(shareIntent, "Share QR code"));
+        } catch (java.io.IOException e) {
+            Log.e(TAG, "Failed to share QR bitmap", e);
+            Toast.makeText(this, "Unable to share QR. Try again.", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void shareQrText(String payload) {
+        android.content.Intent shareIntent = new android.content.Intent(android.content.Intent.ACTION_SEND);
+        shareIntent.setType("text/plain");
+        shareIntent.putExtra(android.content.Intent.EXTRA_TEXT, payload);
+        startActivity(android.content.Intent.createChooser(shareIntent, "Share event link"));
+    }
+
+    private boolean saveQrToGallery(android.graphics.Bitmap bitmap, String title) {
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q) {
+            Toast.makeText(this, "Saving to gallery requires Android 10 or newer. Use Share instead.", Toast.LENGTH_SHORT).show();
+            return false;
+        }
+
+        String fileName = "EventEase_" + System.currentTimeMillis() + ".png";
+        try {
+            android.content.ContentValues values = new android.content.ContentValues();
+            values.put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, fileName);
+            values.put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "image/png");
+            values.put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_PICTURES + "/EventEase");
+
+            Uri uri = getContentResolver().insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+            if (uri == null) {
+                throw new java.io.IOException("Unable to create MediaStore entry");
+            }
+            try (java.io.OutputStream out = getContentResolver().openOutputStream(uri)) {
+                if (out == null) throw new java.io.IOException("Unable to open output stream");
+                bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out);
+            }
+            return true;
+        } catch (java.io.IOException e) {
+            Log.e(TAG, "Failed to save QR to gallery", e);
+            Toast.makeText(this, "Unable to save QR. Try again.", Toast.LENGTH_SHORT).show();
+            return false;
+        }
     }
 
 }

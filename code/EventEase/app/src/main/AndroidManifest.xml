@@ -29,6 +29,10 @@
         <activity
             android:name="com.example.eventease.ui.entrant.discover.EventDetailsDiscoverActivity"
             android:exported="false" />
+        <!-- Admin Event Detail Activity -->
+        <activity
+            android:name="com.example.eventease.admin.event.ui.EventDetailActivity"
+            android:exported="false" />
         <activity
             android:name="com.example.eventease.MainActivity"
             android:exported="true">
@@ -37,11 +41,44 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Deep link intent filter for QR codes - Custom scheme (primary) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="eventease" android:host="event" />
+            </intent-filter>
+            <!-- Alternative: HTTP URL format (requires App Links verification for full support) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="eventease.app" android:pathPrefix="/event" />
+            </intent-filter>
         </activity>
+
+        <!-- Profile Setup Activity (First-time user) -->
+        <activity
+            android:name="com.example.eventease.auth.ProfileSetupActivity"
+            android:exported="false"
+            android:label="Setup Profile"
+            android:theme="@style/Theme.EventEase" />
+
+        <!-- Admin Activity -->
+        <activity
+            android:name="com.example.eventease.admin.AdminMainActivity"
+            android:exported="false"
+            android:label="Admin Dashboard"
+            android:theme="@style/Theme.EventEase" />
 
         <meta-data
             android:name="preloaded_fonts"
             android:resource="@array/preloaded_fonts" />
+
+        <!-- Google Maps API Key -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="@string/google_maps_api_key" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
@@ -70,6 +107,9 @@
         <activity android:name=".ui.organizer.OrganizerWaitlistActivity" />
         <activity
             android:name=".ui.organizer.OrganizerViewEntrantsActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.organizer.OrganizerEntrantLocationsActivity"
             android:exported="false" />
 
         <activity

@@ -1,9 +1,13 @@
 package com.example.eventease.ui.entrant.profile;
 
+import android.Manifest;
 import android.app.Dialog;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.drawable.BitmapDrawable;
@@ -15,9 +19,10 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
-import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.widget.AppCompatButton;
@@ -30,25 +35,18 @@ import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
 import com.google.android.material.imageview.ShapeableImageView;
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.ListenerRegistration;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.google.firebase.firestore.QuerySnapshot;
 import com.example.eventease.R;
+import com.example.eventease.auth.ProfileSetupActivity;
+import com.example.eventease.notifications.FCMTokenManager;
 import com.example.eventease.util.ToastUtil;
 import com.example.eventease.ui.organizer.OrganizerMyEventActivity;
-import com.example.eventease.ui.organizer.NotificationHelper;
-import com.example.eventease.notifications.NotificationChannelManager;
-import android.app.NotificationManager;
-import android.app.NotificationChannel;
-import android.app.PendingIntent;
-import android.content.Intent;
-import android.os.Build;
-import androidx.core.app.NotificationCompat;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -67,36 +65,34 @@ public class AccountFragment extends Fragment {
     private TextView fullNameText;
     private ShapeableImageView profileImage;
     private FirebaseFirestore db;
-    private FirebaseAuth mAuth;
     private CardView organizerSwitchCard;
     private String organizerIdForSwitch;
+    private ActivityResultLauncher<String> notificationPermissionLauncher;
     private View notificationBadge;
-    private com.google.firebase.firestore.ListenerRegistration notificationBadgeListener;
+    private ListenerRegistration notificationBadgeListener;
 
     public AccountFragment() { }
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-    }
-    
-    @Override
-    public void onDestroyView() {
-        super.onDestroyView();
-        if (notificationBadgeListener != null) {
-            notificationBadgeListener.remove();
-            notificationBadgeListener = null;
-        }
-    }
-    
-    @Override
-    public void onResume() {
-        super.onResume();
-        if (notificationBadgeListener != null) {
-            notificationBadgeListener.remove();
-            notificationBadgeListener = null;
-        }
-        checkForNewNotifications();
+        
+        // Initialize notification permission launcher
+        notificationPermissionLauncher = registerForActivityResult(
+                new ActivityResultContracts.RequestPermission(),
+                isGranted -> {
+                    if (isGranted) {
+                        Log.d(TAG, "Notification permission granted from account page");
+                        // Enable device notifications
+                        enableDeviceNotifications();
+                        // Show preferences dialog after permission is granted
+                        showNotificationPreferencesDialog();
+                    } else {
+                        Log.w(TAG, "Notification permission denied from account page");
+                        // Show message
+                        ToastUtil.showShort(getContext(), "Notification permission is required to enable notifications");
+                    }
+                });
     }
     
     @Nullable
@@ -107,7 +103,6 @@ public class AccountFragment extends Fragment {
         View root = inflater.inflate(R.layout.entrant_fragment_account, container, false);
         
         // Initialize Firebase instances
-        mAuth = FirebaseAuth.getInstance();
         db = FirebaseFirestore.getInstance();
         
         // Initialize views
@@ -128,23 +123,31 @@ public class AccountFragment extends Fragment {
             });
         }
 
-
         // Set up notification preferences card click listener
         CardView notificationPreferencesCard = root.findViewById(R.id.notificationPreferencesCard);
         if (notificationPreferencesCard != null) {
             notificationPreferencesCard.setOnClickListener(v -> {
+                // First check/request permission, then show preferences dialog
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.POST_NOTIFICATIONS) 
+                            != PackageManager.PERMISSION_GRANTED) {
+                        // Request permission first
+                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS);
+                        return;
+                    }
+                }
+                // Permission granted or Android < 13, show preferences dialog
                 showNotificationPreferencesDialog();
             });
         }
-
-        root.findViewById(R.id.logoutButton).setOnClickListener(v -> logout());
 
         root.findViewById(R.id.deleteProfileButton).setOnClickListener(v -> showDeleteConfirmationDialog());
 
         root.findViewById(R.id.settingsButton).setOnClickListener(v -> 
             Navigation.findNavController(v).navigate(R.id.action_accountFragment_to_editProfileFragment));
-
-        ImageView notificationBellButton = root.findViewById(R.id.notificationBellButton);
+        
+        // Set up notification bell button
+        android.widget.ImageView notificationBellButton = root.findViewById(R.id.notificationBellButton);
         notificationBadge = root.findViewById(R.id.notificationBadge);
         
         if (notificationBellButton != null) {
@@ -156,12 +159,8 @@ public class AccountFragment extends Fragment {
             });
         }
         
+        // Check for new notifications and update badge
         checkForNewNotifications();
-
-        CardView testNotificationButton = root.findViewById(R.id.testNotificationButton);
-        if (testNotificationButton != null) {
-            testNotificationButton.setOnClickListener(v -> sendTestNotificationToSelf());
-        }
         
         // Load user data with real-time updates
         loadUserData();
@@ -169,11 +168,417 @@ public class AccountFragment extends Fragment {
         return root;
     }
     
+    /**
+     * Handles notification permission click from account page.
+     * Checks current permission status and requests if needed.
+     */
+    private void handleNotificationPermissionClick() {
+        if (getContext() == null) return;
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            // Android 13+ requires runtime permission
+            if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.POST_NOTIFICATIONS) 
+                    == PackageManager.PERMISSION_GRANTED) {
+                // Permission already granted
+                ToastUtil.showShort(getContext(), "Notification permission is already enabled ✓");
+                // Enable notifications and save preference
+                enableDeviceNotifications();
+                String uid = com.example.eventease.auth.AuthHelper.getUid(requireContext());
+                if (uid != null && !uid.isEmpty()) {
+                    saveNotificationPreference(uid, true);
+                }
+            } else {
+                // Request permission
+                Log.d(TAG, "Requesting notification permission from account page");
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS);
+            }
+        } else {
+            // Android 12 and below - permission granted via manifest
+            ToastUtil.showShort(getContext(), "Notifications are enabled (Android 12 and below)");
+        }
+    }
+    
+    
+    /**
+     * Enables notifications at the device level by ensuring the notification channel is enabled.
+     */
+    private void enableDeviceNotifications() {
+        if (getContext() == null) return;
+        
+        // Use centralized channel manager to ensure channel exists and is properly configured
+        com.example.eventease.notifications.NotificationChannelManager.createNotificationChannel(getContext());
+        
+        NotificationManager notificationManager = 
+            (NotificationManager) getContext().getSystemService(Context.NOTIFICATION_SERVICE);
+        
+        if (notificationManager == null) return;
+        
+        // If notifications are disabled at app level, open settings
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            if (!notificationManager.areNotificationsEnabled()) {
+                openNotificationSettings();
+                return;
+            }
+        }
+        
+        // Check if channel is enabled
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            boolean channelEnabled = com.example.eventease.notifications.NotificationChannelManager.isChannelEnabled(getContext());
+            if (!channelEnabled) {
+                ToastUtil.showShort(getContext(), "Please enable 'Event Invitations' channel in device settings");
+                openNotificationSettings();
+                return;
+            }
+        }
+        
+        ToastUtil.showShort(getContext(), "Notifications enabled ✓");
+        if (getContext() != null) {
+            FCMTokenManager.getInstance().initialize(getContext());
+        }
+    }
+    
+    /**
+     * Disables notifications at the device level.
+     * 
+     * IMPORTANT: We do NOT set the channel to IMPORTANCE_NONE here because:
+     * 1. Once set to NONE, Android prevents programmatic re-enabling
+     * 2. The user must manually enable it in device settings
+     * 3. This causes a poor user experience
+     * 
+     * Instead, we just save the preference and let the user control it via device settings.
+     * The app will respect the user's Firestore preference when sending notifications.
+     */
+    private void disableDeviceNotifications() {
+        if (getContext() == null) return;
+        
+        // Don't modify the channel - just save the preference
+        // The user can control notifications via device settings if they want
+        ToastUtil.showShort(getContext(), "Notifications preference saved. You can control notifications in device settings.");
+    }
+    
+    /**
+     * Opens device notification settings for this app.
+     */
+    private void openNotificationSettings() {
+        if (getContext() == null) return;
+        
+        Intent intent = new Intent();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            intent.setAction(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS);
+            intent.putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, getContext().getPackageName());
+        } else {
+            intent.setAction(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+            intent.setData(android.net.Uri.parse("package:" + getContext().getPackageName()));
+        }
+        
+        try {
+            startActivity(intent);
+            ToastUtil.showShort(getContext(), "Please enable notifications in device settings");
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to open notification settings", e);
+            ToastUtil.showShort(getContext(), "Could not open settings. Please enable notifications manually.");
+        }
+    }
+    
+    /**
+     * Saves notification preference to Firestore.
+     */
+    private void saveNotificationPreference(String uid, boolean enabled) {
+        db.collection("users").document(uid)
+                .update("notificationsEnabled", enabled)
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "Notification preference saved: " + enabled);
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to save notification preference", e);
+                    ToastUtil.showShort(getContext(), "Failed to save preference. Please try again.");
+                });
+    }
+    
+    /**
+     * Shows the notification preferences dialog with toggles for invited and not invited notifications.
+     */
+    private void showNotificationPreferencesDialog() {
+        if (getContext() == null) {
+            return;
+        }
+
+        Dialog dialog = new Dialog(requireContext(), android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
+        dialog.setContentView(R.layout.entrant_dialog_notification_preferences);
+        dialog.setCanceledOnTouchOutside(true);
+
+        // Set window properties for full screen blur
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            WindowManager.LayoutParams layoutParams = dialog.getWindow().getAttributes();
+            layoutParams.dimAmount = 0f;
+            dialog.getWindow().setAttributes(layoutParams);
+            dialog.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+        }
+
+        // Capture screenshot and blur it for the background
+        Bitmap screenshot = captureScreenshot();
+        if (screenshot != null) {
+            Bitmap blurredBitmap = blurBitmap(screenshot, 25f);
+            if (blurredBitmap != null) {
+                android.view.View blurBackground = dialog.findViewById(R.id.dialogBlurBackground);
+                if (blurBackground != null) {
+                    blurBackground.setBackground(new BitmapDrawable(getResources(), blurredBitmap));
+                }
+            }
+        }
+
+        // Make the background clickable to dismiss
+        android.view.View blurBackground = dialog.findViewById(R.id.dialogBlurBackground);
+        if (blurBackground != null) {
+            blurBackground.setOnClickListener(v -> dialog.dismiss());
+        }
+
+        // Get switches
+        com.google.android.material.switchmaterial.SwitchMaterial switchInvited = dialog.findViewById(R.id.switchInvited);
+        com.google.android.material.switchmaterial.SwitchMaterial switchNotInvited = dialog.findViewById(R.id.switchNotInvited);
+        AppCompatButton btnSave = dialog.findViewById(R.id.btnDialogSave);
+
+        // Load current preferences
+        loadNotificationPreferences(switchInvited, switchNotInvited);
+
+        // Set up save button
+        if (btnSave != null) {
+            btnSave.setOnClickListener(v -> {
+                if (switchInvited != null && switchNotInvited != null) {
+                    boolean invitedEnabled = switchInvited.isChecked();
+                    boolean notInvitedEnabled = switchNotInvited.isChecked();
+                    saveNotificationPreferences(invitedEnabled, notInvitedEnabled);
+                    dialog.dismiss();
+                }
+            });
+        }
+
+        dialog.show();
+
+        // Apply animations after dialog is shown
+        androidx.cardview.widget.CardView card = dialog.findViewById(R.id.dialogCardView);
+        if (blurBackground != null && card != null) {
+            android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(getContext(), R.anim.entrant_dialog_fade_in);
+            android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(getContext(), R.anim.entrant_dialog_zoom_in);
+
+            blurBackground.startAnimation(fadeIn);
+            card.startAnimation(zoomIn);
+        }
+    }
+
+    /**
+     * Loads notification preferences from Firestore and sets the switches.
+     */
+    private void loadNotificationPreferences(com.google.android.material.switchmaterial.SwitchMaterial switchInvited,
+                                           com.google.android.material.switchmaterial.SwitchMaterial switchNotInvited) {
+        String currentUserId = com.example.eventease.auth.AuthHelper.getUid(requireContext());
+        if (currentUserId == null || currentUserId.isEmpty() || switchInvited == null || switchNotInvited == null) {
+            // Default to both enabled if no user ID
+            if (switchInvited != null) {
+                switchInvited.setChecked(true);
+            }
+            if (switchNotInvited != null) {
+                switchNotInvited.setChecked(true);
+            }
+            return;
+        }
+
+        db.collection("users").document(currentUserId)
+                .get()
+                .addOnSuccessListener(documentSnapshot -> {
+                    if (documentSnapshot != null && documentSnapshot.exists()) {
+                        // Default to true if not set (receive all notifications)
+                        Boolean invitedEnabled = documentSnapshot.getBoolean("notificationPreferenceInvited");
+                        Boolean notInvitedEnabled = documentSnapshot.getBoolean("notificationPreferenceNotInvited");
+
+                        boolean invited = invitedEnabled != null ? invitedEnabled : true;
+                        boolean notInvited = notInvitedEnabled != null ? notInvitedEnabled : true;
+
+                        switchInvited.setChecked(invited);
+                        switchNotInvited.setChecked(notInvited);
+                    } else {
+                        // Default to both enabled
+                        if (switchInvited != null) {
+                            switchInvited.setChecked(true);
+                        }
+                        if (switchNotInvited != null) {
+                            switchNotInvited.setChecked(true);
+                        }
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to load notification preferences", e);
+                    // Default to both enabled on error
+                    if (switchInvited != null) {
+                        switchInvited.setChecked(true);
+                    }
+                    if (switchNotInvited != null) {
+                        switchNotInvited.setChecked(true);
+                    }
+                });
+    }
+
+    /**
+     * Saves notification preferences to Firestore.
+     */
+    private void saveNotificationPreferences(boolean invitedEnabled, boolean notInvitedEnabled) {
+        String currentUserId = com.example.eventease.auth.AuthHelper.getUid(requireContext());
+        if (currentUserId == null || currentUserId.isEmpty()) {
+            ToastUtil.showShort(getContext(), "Please complete your profile to save preferences");
+            return;
+        }
+
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("notificationPreferenceInvited", invitedEnabled);
+        updates.put("notificationPreferenceNotInvited", notInvitedEnabled);
+
+        db.collection("users").document(currentUserId)
+                .update(updates)
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "Notification preferences saved: invited=" + invitedEnabled + ", notInvited=" + notInvitedEnabled);
+                    ToastUtil.showShort(getContext(), "Notification preferences saved");
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to save notification preferences", e);
+                    ToastUtil.showShort(getContext(), "Failed to save preferences. Please try again.");
+                });
+        }
+        
+    /**
+     * Checks for new notifications and updates the badge visibility.
+     * Listens to notificationRequests and invitations collections in real-time.
+     */
+    private void checkForNewNotifications() {
+        String currentUserId = com.example.eventease.auth.AuthHelper.getUid(requireContext());
+        if (currentUserId == null || currentUserId.isEmpty() || getContext() == null) {
+            return;
+        }
+
+        String uid = currentUserId;
+        SharedPreferences prefs = getContext().getSharedPreferences("EventEasePrefs", Context.MODE_PRIVATE);
+        long lastSeenTime = prefs.getLong("lastNotificationSeenTime", 0);
+        
+        Log.d(TAG, "Setting up real-time notification badge listener for user: " + uid);
+        Log.d(TAG, "Initial last seen time: " + lastSeenTime);
+
+        if (notificationBadgeListener != null) {
+            notificationBadgeListener.remove();
+        }
+
+        notificationBadgeListener = db.collection("notificationRequests")
+                .addSnapshotListener((querySnapshot, e) -> {
+                    if (e != null) {
+                        Log.e(TAG, "Error in notification badge listener", e);
+                        return;
+                    }
+                    
+                    if (querySnapshot == null) {
+                        Log.w(TAG, "Query snapshot is null");
+                        return;
+                    }
+                    
+                    if (getView() == null) {
+                        Log.w(TAG, "View is null, cannot update badge");
+                        return;
+                    }
+
+                    Log.d(TAG, "Real-time update: notificationRequests changed, checking " + querySnapshot.size() + " documents");
+
+                    SharedPreferences currentPrefs = getContext() != null ? 
+                        getContext().getSharedPreferences("EventEasePrefs", Context.MODE_PRIVATE) : null;
+                    if (currentPrefs == null) {
+                        Log.w(TAG, "Cannot get SharedPreferences");
+                        return;
+                    }
+                    
+                    long currentLastSeenTime = currentPrefs.getLong("lastNotificationSeenTime", 0);
+                    Log.d(TAG, "Current last seen time from prefs: " + currentLastSeenTime);
+
+                    boolean hasNewNotifications = false;
+                    int matchingCount = 0;
+                    for (com.google.firebase.firestore.QueryDocumentSnapshot doc : querySnapshot) {
+                        Object userIdsObj = doc.get("userIds");
+                        Long createdAt = doc.getLong("createdAt");
+                        
+                        if (createdAt != null && createdAt > currentLastSeenTime && userIdsObj instanceof List) {
+                            @SuppressWarnings("unchecked")
+                            List<String> userIds = (List<String>) userIdsObj;
+                            if (userIds.contains(uid)) {
+                                hasNewNotifications = true;
+                                matchingCount++;
+                                Log.d(TAG, "Found new notificationRequest: " + doc.getId() + 
+                                    " created at " + createdAt + " (newer than " + currentLastSeenTime + ")");
+                            }
+                        }
+                    }
+
+                    Log.d(TAG, "Found " + matchingCount + " new notificationRequests for this user");
+
+                    final boolean hasNotificationRequests = hasNewNotifications;
+                    
+                    db.collection("invitations")
+                            .whereEqualTo("uid", uid)
+                            .whereEqualTo("status", "PENDING")
+                            .get()
+                            .addOnSuccessListener(invitationSnapshot -> {
+                                Log.d(TAG, "Checking " + invitationSnapshot.size() + " pending invitations");
+                                
+                                boolean hasNewInvitations = false;
+                                int newInvCount = 0;
+                                for (com.google.firebase.firestore.DocumentSnapshot invDoc : invitationSnapshot.getDocuments()) {
+                                    Long issuedAt = invDoc.getLong("issuedAt");
+                                    if (issuedAt != null && issuedAt > currentLastSeenTime) {
+                                        hasNewInvitations = true;
+                                        newInvCount++;
+                                        Log.d(TAG, "Found new invitation: " + invDoc.getId() + 
+                                            " issued at " + issuedAt + " (newer than " + currentLastSeenTime + ")");
+                                    }
+                                }
+                                
+                                Log.d(TAG, "Found " + newInvCount + " new invitations");
+                                
+                                boolean shouldShowBadge = hasNotificationRequests || hasNewInvitations;
+                                
+                                Log.d(TAG, "Badge decision: shouldShowBadge=" + shouldShowBadge + 
+                                    " (notificationRequests=" + hasNotificationRequests + 
+                                    ", invitations=" + hasNewInvitations + ")");
+                                
+                                if (getView() != null && notificationBadge != null) {
+                                    if (getActivity() != null) {
+                                        getActivity().runOnUiThread(() -> {
+                                            if (notificationBadge != null) {
+                                                notificationBadge.setVisibility(shouldShowBadge ? View.VISIBLE : View.GONE);
+                                                Log.d(TAG, "Badge visibility updated to: " + 
+                                                    (shouldShowBadge ? "VISIBLE" : "GONE"));
+                                            }
+            });
+        }
+                                }
+                            })
+                            .addOnFailureListener(error -> {
+                                Log.e(TAG, "Failed to check invitations for badge", error);
+                                // Still update badge based on notificationRequests
+                                if (getView() != null && notificationBadge != null) {
+                                    if (getActivity() != null) {
+                                        getActivity().runOnUiThread(() -> {
+                                            if (notificationBadge != null) {
+                                                notificationBadge.setVisibility(hasNotificationRequests ? View.VISIBLE : View.GONE);
+        }
+                                        });
+                                    }
+                                }
+                            });
+                });
+    }
+    
     private void loadUserData() {
-        FirebaseUser currentUser = mAuth.getCurrentUser();
-        if (currentUser != null) {
+        String currentUserId = com.example.eventease.auth.AuthHelper.getUid(requireContext());
+        if (currentUserId != null && !currentUserId.isEmpty()) {
             // Get the current user's document in the users collection
-            DocumentReference userRef = db.collection("users").document(currentUser.getUid());
+            DocumentReference userRef = db.collection("users").document(currentUserId);
             
             // Listen for real-time updates
             userRef.addSnapshotListener((documentSnapshot, e) -> {
@@ -240,46 +645,6 @@ public class AccountFragment extends Fragment {
         }
 
         return false;
-    }
-
-    private void logout() {
-        if (getContext() == null) return;
-
-        // Sign out from Firebase
-        mAuth.signOut();
-
-        // Clear Remember Me preferences
-        SharedPreferences prefs = getContext().getSharedPreferences("EventEasePrefs", Context.MODE_PRIVATE);
-        prefs.edit()
-            .putBoolean("rememberMe", false)
-            .remove("savedUid")
-            .remove("savedEmail")
-            .remove("savedPassword")
-            .apply();
-
-        ToastUtil.showShort(getContext(), "Logged out successfully");
-
-        // Hide bottom nav and top bar before navigating
-        if (getActivity() != null) {
-            View bottomNav = getActivity().findViewById(R.id.include_bottom);
-            View topBar = getActivity().findViewById(R.id.include_top);
-            if (bottomNav != null) {
-                bottomNav.setVisibility(View.GONE);
-            }
-            if (topBar != null) {
-                topBar.setVisibility(View.GONE);
-            }
-        }
-
-        // Navigate to welcome screen
-        try {
-            if (isAdded() && getView() != null) {
-                Navigation.findNavController(getView()).navigate(R.id.action_accountFragment_to_welcomeFragment);
-            }
-        } catch (Exception e) {
-            ToastUtil.showLong(getContext(), "Navigation error: " + e.getMessage());
-            e.printStackTrace();
-        }
     }
 
     private void showDeleteConfirmationDialog() {
@@ -394,13 +759,13 @@ public class AccountFragment extends Fragment {
     private void deleteProfile() {
         if (getContext() == null) return;
 
-        FirebaseUser currentUser = mAuth.getCurrentUser();
-        if (currentUser == null) {
-            ToastUtil.showLong(getContext(), "Not signed in");
+        String currentUserId = com.example.eventease.auth.AuthHelper.getUid(requireContext());
+        if (currentUserId == null || currentUserId.isEmpty()) {
+            ToastUtil.showLong(getContext(), "Profile not set up");
             return;
         }
 
-        String uid = currentUser.getUid();
+        String uid = currentUserId;
         
         ToastUtil.showShort(getContext(), "Deleting profile...");
 
@@ -420,40 +785,53 @@ public class AccountFragment extends Fragment {
     }
 
     private void deleteUserDocumentAndAuth(String uid) {
-        // Delete user document from Firestore
-        DocumentReference userRef = db.collection("users").document(uid);
-        userRef.delete()
-            .addOnSuccessListener(aVoid -> {
-                // Delete Firebase Auth account
-                FirebaseUser currentUser = mAuth.getCurrentUser();
-                if (currentUser != null) {
-                    currentUser.delete()
-                        .addOnSuccessListener(aVoid1 -> {
-                            // Sign out and clear preferences
-                            mAuth.signOut();
-                            clearPreferences();
-                            ToastUtil.showShort(getContext(), "Profile deleted successfully");
-                            navigateToWelcome();
-                        })
-                        .addOnFailureListener(e -> {
-                            // Even if auth deletion fails, sign out and clear preferences
-                            android.util.Log.e("AccountFragment", "Failed to delete auth account", e);
-                            mAuth.signOut();
-                            clearPreferences();
-                            ToastUtil.showShort(getContext(), "Profile deleted (some cleanup may be pending)");
-                            navigateToWelcome();
-                        });
-                } else {
-                    // User already signed out, just clear preferences
-                    clearPreferences();
-                    ToastUtil.showShort(getContext(), "Profile deleted successfully");
-                    navigateToWelcome();
-                }
+        // Sign in anonymously to get Firebase Auth token for Firestore rules
+        com.google.firebase.auth.FirebaseAuth.getInstance().signInAnonymously()
+            .addOnSuccessListener(authResult -> {
+                // Now delete with authenticated context
+                DocumentReference userRef = db.collection("users").document(uid);
+                userRef.delete()
+                    .addOnSuccessListener(aVoid -> {
+                        // Device auth - clear cache to trigger profile setup on next launch
+                        com.example.eventease.auth.DeviceAuthManager authManager = 
+                            new com.example.eventease.auth.DeviceAuthManager(requireContext());
+                        authManager.clearCache();
+                        clearPreferences();
+                        ToastUtil.showShort(getContext(), "Profile deleted successfully");
+                        launchProfileSetupScreen();
+                    })
+                    .addOnFailureListener(e -> {
+                        android.util.Log.e("AccountFragment", "Failed to delete user document", e);
+                        ToastUtil.showLong(getContext(), "Failed to delete profile: " + e.getMessage());
+                    });
             })
             .addOnFailureListener(e -> {
-                android.util.Log.e("AccountFragment", "Failed to delete user document", e);
-                ToastUtil.showLong(getContext(), "Failed to delete profile: " + e.getMessage());
+                android.util.Log.e("AccountFragment", "Failed to sign in anonymously", e);
+                // Try deleting anyway (might work if rules allow)
+                DocumentReference userRef = db.collection("users").document(uid);
+                userRef.delete()
+                    .addOnSuccessListener(aVoid -> {
+                        com.example.eventease.auth.DeviceAuthManager authManager = 
+                            new com.example.eventease.auth.DeviceAuthManager(requireContext());
+                        authManager.clearCache();
+                        clearPreferences();
+                        ToastUtil.showShort(getContext(), "Profile deleted successfully");
+                        launchProfileSetupScreen();
+                    })
+                    .addOnFailureListener(deleteError -> {
+                        android.util.Log.e("AccountFragment", "Failed to delete user document", deleteError);
+                        ToastUtil.showLong(getContext(), "Failed to delete profile: " + deleteError.getMessage());
+                    });
             });
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        if (notificationBadgeListener != null) {
+            notificationBadgeListener.remove();
+            notificationBadgeListener = null;
+        }
     }
 
     private void clearPreferences() {
@@ -467,446 +845,13 @@ public class AccountFragment extends Fragment {
             .apply();
     }
 
-    private void navigateToWelcome() {
-        try {
-            // Hide bottom nav and top bar before navigating
-            if (getActivity() != null) {
-                View bottomNav = getActivity().findViewById(R.id.include_bottom);
-                View topBar = getActivity().findViewById(R.id.include_top);
-                if (bottomNav != null) {
-                    bottomNav.setVisibility(View.GONE);
-                }
-                if (topBar != null) {
-                    topBar.setVisibility(View.GONE);
-                }
-            }
-            
-            if (isAdded() && getView() != null) {
-                Navigation.findNavController(getView()).navigate(R.id.action_accountFragment_to_welcomeFragment);
-            }
-        } catch (Exception e) {
-            ToastUtil.showLong(getContext(), "Navigation error: " + e.getMessage());
-            e.printStackTrace();
+    private void launchProfileSetupScreen() {
+        if (getContext() == null) return;
+        Intent intent = new Intent(requireContext(), ProfileSetupActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        if (getActivity() != null) {
+            getActivity().finish();
         }
-    }
-
-    /**
-     * Shows the notification preferences dialog.
-     */
-    private void showNotificationPreferencesDialog() {
-        if (getContext() == null) {
-            return;
-        }
-
-        Dialog dialog = new Dialog(requireContext(), android.R.style.Theme_Black_NoTitleBar_Fullscreen);
-        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
-        dialog.setContentView(R.layout.entrant_dialog_notification_preferences);
-        dialog.setCanceledOnTouchOutside(true);
-
-        // Set window properties for full screen blur
-        if (dialog.getWindow() != null) {
-            dialog.getWindow().setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
-            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            WindowManager.LayoutParams layoutParams = dialog.getWindow().getAttributes();
-            layoutParams.dimAmount = 0f;
-            dialog.getWindow().setAttributes(layoutParams);
-            dialog.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
-        }
-
-        // Capture screenshot and blur it for the background
-        Bitmap screenshot = captureScreenshot();
-        if (screenshot != null) {
-            Bitmap blurredBitmap = blurBitmap(screenshot, 25f);
-            if (blurredBitmap != null) {
-                android.view.View blurBackground = dialog.findViewById(R.id.dialogBlurBackground);
-                if (blurBackground != null) {
-                    blurBackground.setBackground(new BitmapDrawable(getResources(), blurredBitmap));
-                }
-            }
-        }
-
-        // Make the background clickable to dismiss
-        android.view.View blurBackground = dialog.findViewById(R.id.dialogBlurBackground);
-        if (blurBackground != null) {
-            blurBackground.setOnClickListener(v -> dialog.dismiss());
-        }
-
-        // Get switches
-        com.google.android.material.switchmaterial.SwitchMaterial switchInvited = dialog.findViewById(R.id.switchInvited);
-        com.google.android.material.switchmaterial.SwitchMaterial switchNotInvited = dialog.findViewById(R.id.switchNotInvited);
-        AppCompatButton btnSave = dialog.findViewById(R.id.btnDialogSave);
-
-        // Load current preferences
-        loadNotificationPreferences(switchInvited, switchNotInvited);
-
-        // Set up save button
-        if (btnSave != null) {
-            btnSave.setOnClickListener(v -> {
-                if (switchInvited != null && switchNotInvited != null) {
-                    boolean invitedEnabled = switchInvited.isChecked();
-                    boolean notInvitedEnabled = switchNotInvited.isChecked();
-                    saveNotificationPreferences(invitedEnabled, notInvitedEnabled);
-                    dialog.dismiss();
-                }
-            });
-        }
-
-        dialog.show();
-
-        // Apply animations after dialog is shown
-        androidx.cardview.widget.CardView card = dialog.findViewById(R.id.dialogCardView);
-        if (blurBackground != null && card != null) {
-            android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(getContext(), R.anim.entrant_dialog_fade_in);
-            android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(getContext(), R.anim.entrant_dialog_zoom_in);
-
-            blurBackground.startAnimation(fadeIn);
-            card.startAnimation(zoomIn);
-        }
-    }
-
-    /**
-     * Loads notification preferences from Firestore and updates the switches.
-     */
-    private void loadNotificationPreferences(com.google.android.material.switchmaterial.SwitchMaterial switchInvited,
-                                           com.google.android.material.switchmaterial.SwitchMaterial switchNotInvited) {
-        FirebaseUser currentUser = mAuth.getCurrentUser();
-        if (currentUser == null || switchInvited == null || switchNotInvited == null) {
-            return;
-        }
-
-        db.collection("users").document(currentUser.getUid())
-                .get()
-                .addOnSuccessListener(documentSnapshot -> {
-                    if (documentSnapshot != null && documentSnapshot.exists()) {
-                        // Default to true if not set (receive all notifications)
-                        Boolean invitedEnabled = documentSnapshot.getBoolean("notificationPreferenceInvited");
-                        Boolean notInvitedEnabled = documentSnapshot.getBoolean("notificationPreferenceNotInvited");
-
-                        boolean invited = invitedEnabled != null ? invitedEnabled : true;
-                        boolean notInvited = notInvitedEnabled != null ? notInvitedEnabled : true;
-
-                        switchInvited.setChecked(invited);
-                        switchNotInvited.setChecked(notInvited);
-                    } else {
-                        // Default to both enabled
-                        switchInvited.setChecked(true);
-                        switchNotInvited.setChecked(true);
-                    }
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Failed to load notification preferences", e);
-                    // Default to both enabled on error
-                    if (switchInvited != null) {
-                        switchInvited.setChecked(true);
-                    }
-                    if (switchNotInvited != null) {
-                        switchNotInvited.setChecked(true);
-                    }
-                });
-    }
-
-    /**
-     * Saves notification preferences to Firestore.
-     */
-    private void saveNotificationPreferences(boolean invitedEnabled, boolean notInvitedEnabled) {
-        FirebaseUser currentUser = mAuth.getCurrentUser();
-        if (currentUser == null) {
-            ToastUtil.showShort(getContext(), "Please log in to save preferences");
-            return;
-        }
-
-        Map<String, Object> updates = new java.util.HashMap<>();
-        updates.put("notificationPreferenceInvited", invitedEnabled);
-        updates.put("notificationPreferenceNotInvited", notInvitedEnabled);
-
-        db.collection("users").document(currentUser.getUid())
-                .update(updates)
-                .addOnSuccessListener(aVoid -> {
-                    Log.d(TAG, "Notification preferences saved: invited=" + invitedEnabled + ", notInvited=" + notInvitedEnabled);
-                    ToastUtil.showShort(getContext(), "Notification preferences saved");
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Failed to save notification preferences", e);
-                    ToastUtil.showShort(getContext(), "Failed to save preferences. Please try again.");
-                });
-    }
-
-    /**
-     * Temporarily added test method to send a notification to the current user.
-     * This creates a notification request for Cloud Functions AND shows a local notification immediately.
-     */
-    private void sendTestNotificationToSelf() {
-        FirebaseUser currentUser = mAuth.getCurrentUser();
-        if (currentUser == null) {
-            ToastUtil.showShort(getContext(), "Please log in to send test notification");
-            Log.e(TAG, "Cannot send test notification: User not logged in");
-            return;
-        }
-
-        String uid = currentUser.getUid();
-        long timestamp = System.currentTimeMillis();
-        String testEventId = "test_event_" + timestamp;
-        String testEventTitle = "Test Event";
-        String testTitle = "Test Notification";
-        String testMessage = "This is a test notification sent to yourself. You can use this to test the notifications page.";
-
-        Log.d(TAG, "Starting test notification for user: " + uid);
-        Log.d(TAG, "Event ID: " + testEventId);
-        Log.d(TAG, "Title: " + testTitle);
-        Log.d(TAG, "Message: " + testMessage);
-        Log.d(TAG, "Timestamp: " + timestamp);
-
-        ToastUtil.showShort(getContext(), "Sending test notification...");
-
-        showLocalNotificationImmediately(testTitle, testMessage, testEventId);
-        
-        db.collection("users").document(uid).get()
-                .addOnSuccessListener(userDoc -> {
-                    if (!userDoc.exists()) {
-                        Log.e(TAG, "User document does not exist for UID: " + uid);
-                        ToastUtil.showShort(getContext(), "User document not found");
-                        return;
-                    }
-
-                    String fcmToken = userDoc.getString("fcmToken");
-                    Object notificationsEnabledObj = userDoc.get("notificationsEnabled");
-                    boolean notificationsEnabled = true;
-                    if (notificationsEnabledObj instanceof Boolean) {
-                        notificationsEnabled = (Boolean) notificationsEnabledObj;
-                    } else if (notificationsEnabledObj instanceof String) {
-                        notificationsEnabled = Boolean.parseBoolean((String) notificationsEnabledObj);
-                    }
-
-                    Log.d(TAG, "User FCM Token exists: " + (fcmToken != null && !fcmToken.isEmpty()));
-                    Log.d(TAG, "User FCM Token length: " + (fcmToken != null ? fcmToken.length() : 0));
-                    Log.d(TAG, "Notifications enabled: " + notificationsEnabled);
-
-                    if (fcmToken == null || fcmToken.isEmpty()) {
-                        Log.w(TAG, "FCM token is missing - Cloud Function notification may not work");
-                        Log.w(TAG, "Local notification should still be visible");
-                    }
-
-                    Map<String, Object> notificationRequest = new HashMap<>();
-                    notificationRequest.put("eventId", testEventId);
-                    notificationRequest.put("eventTitle", testEventTitle);
-                    notificationRequest.put("organizerId", uid);
-                    notificationRequest.put("userIds", Arrays.asList(uid));
-                    notificationRequest.put("groupType", "general");
-                    notificationRequest.put("message", testMessage);
-                    notificationRequest.put("title", testTitle);
-                    notificationRequest.put("status", "PENDING");
-                    notificationRequest.put("createdAt", timestamp);
-                    notificationRequest.put("processed", false);
-
-                    Log.d(TAG, "Creating notification request in Firestore...");
-                    db.collection("notificationRequests").add(notificationRequest)
-                            .addOnSuccessListener(docRef -> {
-                                String requestId = docRef.getId();
-                                Log.d(TAG, "Notification request created with ID: " + requestId);
-                                Log.d(TAG, "Document path: notificationRequests/" + requestId);
-                                Log.d(TAG, "Cloud Function should trigger automatically");
-                                Log.d(TAG, "Check Firebase Functions logs for processing details");
-                                
-                                ToastUtil.showShort(getContext(), "Test notification sent! Check phone notification bar.");
-                                
-                                docRef.addSnapshotListener((snapshot, e) -> {
-                                    if (e != null) {
-                                        Log.e(TAG, "Error listening to notification request", e);
-                                        return;
-                                    }
-                                    if (snapshot != null && snapshot.exists()) {
-                                        Boolean processed = snapshot.getBoolean("processed");
-                                        Long sentCount = snapshot.getLong("sentCount");
-                                        String error = snapshot.getString("error");
-                                        
-                                        if (Boolean.TRUE.equals(processed)) {
-                                            Log.d(TAG, "Notification request processed. Sent count: " + (sentCount != null ? sentCount : 0));
-                                            if (error != null) {
-                                                Log.w(TAG, "Error from Cloud Function: " + error);
-                                            } else {
-                                                Log.d(TAG, "Notification sent successfully via Cloud Function");
-                                            }
-                                        }
-                                    }
-                                });
-                            })
-                            .addOnFailureListener(e -> {
-                                Log.e(TAG, "Failed to create notification request: " + e.getMessage(), e);
-                                ToastUtil.showShort(getContext(), "Failed to create notification request: " + e.getMessage());
-                            });
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Failed to check user document", e);
-                    ToastUtil.showShort(getContext(), "Failed to verify user settings");
-                });
-    }
-
-    private void showLocalNotificationImmediately(String title, String message, String eventId) {
-        if (getContext() == null) {
-            Log.e(TAG, "Context is null, cannot show local notification");
-            return;
-        }
-
-        Log.d(TAG, "Showing local notification: " + title);
-
-        NotificationChannelManager.createNotificationChannel(getContext());
-        
-        NotificationManager notificationManager = getContext().getSystemService(NotificationManager.class);
-        if (notificationManager == null) {
-            Log.e(TAG, "NotificationManager is null");
-            return;
-        }
-
-        Intent intent = new Intent(getContext(), com.example.eventease.ui.entrant.notifications.NotificationsActivity.class);
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        PendingIntent pendingIntent = PendingIntent.getActivity(
-                getContext(),
-                0,
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
-        );
-
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(getContext(), NotificationChannelManager.CHANNEL_ID)
-                .setSmallIcon(R.drawable.entrant_ic_notification_bell)
-                .setContentTitle(title)
-                .setContentText(message)
-                .setStyle(new NotificationCompat.BigTextStyle().bigText(message))
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setAutoCancel(true)
-                .setContentIntent(pendingIntent)
-                .setSound(android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION));
-
-        int notificationId = (int) System.currentTimeMillis();
-        try {
-            notificationManager.notify(notificationId, builder.build());
-            Log.d(TAG, "Local notification displayed with ID: " + notificationId);
-        } catch (Exception e) {
-            Log.e(TAG, "Failed to show local notification", e);
-        }
-    }
-
-    private void checkForNewNotifications() {
-        FirebaseUser currentUser = mAuth.getCurrentUser();
-        if (currentUser == null || getContext() == null) {
-            return;
-        }
-
-        String uid = currentUser.getUid();
-        SharedPreferences prefs = getContext().getSharedPreferences("EventEasePrefs", Context.MODE_PRIVATE);
-        long lastSeenTime = prefs.getLong("lastNotificationSeenTime", 0);
-        
-        android.util.Log.d(TAG, "Setting up real-time notification badge listener for user: " + uid);
-        android.util.Log.d(TAG, "Initial last seen time: " + lastSeenTime);
-
-        if (notificationBadgeListener != null) {
-            notificationBadgeListener.remove();
-        }
-
-        notificationBadgeListener = db.collection("notificationRequests")
-                .addSnapshotListener((querySnapshot, e) -> {
-                    if (e != null) {
-                        android.util.Log.e(TAG, "Error in notification badge listener", e);
-                        return;
-                    }
-                    
-                    if (querySnapshot == null) {
-                        android.util.Log.w(TAG, "Query snapshot is null");
-                        return;
-                    }
-                    
-                    if (getView() == null) {
-                        android.util.Log.w(TAG, "View is null, cannot update badge");
-                        return;
-                    }
-
-                    android.util.Log.d(TAG, "Real-time update: notificationRequests changed, checking " + querySnapshot.size() + " documents");
-
-                    SharedPreferences currentPrefs = getContext() != null ? 
-                        getContext().getSharedPreferences("EventEasePrefs", Context.MODE_PRIVATE) : null;
-                    if (currentPrefs == null) {
-                        android.util.Log.w(TAG, "Cannot get SharedPreferences");
-                        return;
-                    }
-                    
-                    long currentLastSeenTime = currentPrefs.getLong("lastNotificationSeenTime", 0);
-                    android.util.Log.d(TAG, "Current last seen time from prefs: " + currentLastSeenTime);
-
-                    boolean hasNewNotifications = false;
-                    int matchingCount = 0;
-                    for (com.google.firebase.firestore.QueryDocumentSnapshot doc : querySnapshot) {
-                        Object userIdsObj = doc.get("userIds");
-                        Long createdAt = doc.getLong("createdAt");
-                        
-                        if (createdAt != null && createdAt > currentLastSeenTime && userIdsObj instanceof List) {
-                            @SuppressWarnings("unchecked")
-                            List<String> userIds = (List<String>) userIdsObj;
-                            if (userIds.contains(uid)) {
-                                hasNewNotifications = true;
-                                matchingCount++;
-                                android.util.Log.d(TAG, "Found new notificationRequest: " + doc.getId() + 
-                                    " created at " + createdAt + " (newer than " + currentLastSeenTime + ")");
-                            }
-                        }
-                    }
-
-                    android.util.Log.d(TAG, "Found " + matchingCount + " new notificationRequests for this user");
-
-                    final boolean hasNotificationRequests = hasNewNotifications;
-                    
-                    db.collection("invitations")
-                            .whereEqualTo("uid", uid)
-                            .whereEqualTo("status", "PENDING")
-                            .get()
-                            .addOnSuccessListener(invitationSnapshot -> {
-                                android.util.Log.d(TAG, "Checking " + invitationSnapshot.size() + " pending invitations");
-                                
-                                boolean hasNewInvitations = false;
-                                int newInvCount = 0;
-                                for (com.google.firebase.firestore.DocumentSnapshot invDoc : invitationSnapshot.getDocuments()) {
-                                    Long issuedAt = invDoc.getLong("issuedAt");
-                                    if (issuedAt != null && issuedAt > currentLastSeenTime) {
-                                        hasNewInvitations = true;
-                                        newInvCount++;
-                                        android.util.Log.d(TAG, "Found new invitation: " + invDoc.getId() + 
-                                            " issued at " + issuedAt + " (newer than " + currentLastSeenTime + ")");
-                                    }
-                                }
-                                
-                                android.util.Log.d(TAG, "Found " + newInvCount + " new invitations");
-                                
-                                boolean shouldShowBadge = hasNotificationRequests || hasNewInvitations;
-                                
-                                android.util.Log.d(TAG, "Badge decision: shouldShowBadge=" + shouldShowBadge + 
-                                    " (notificationRequests=" + hasNotificationRequests + 
-                                    ", invitations=" + hasNewInvitations + ")");
-                                
-                                if (getView() != null && notificationBadge != null) {
-                                    if (getActivity() != null) {
-                                        getActivity().runOnUiThread(() -> {
-                                            if (notificationBadge != null) {
-                                                notificationBadge.setVisibility(shouldShowBadge ? View.VISIBLE : View.GONE);
-                                                android.util.Log.d(TAG, "Badge visibility updated to: " + 
-                                                    (shouldShowBadge ? "VISIBLE" : "GONE"));
-                                            }
-                                        });
-                                    }
-                                } else {
-                                    android.util.Log.w(TAG, "Cannot update badge - view or badge is null");
-                                }
-                            })
-                            .addOnFailureListener(e2 -> {
-                                android.util.Log.e(TAG, "Failed to check invitations", e2);
-                                if (getView() != null && notificationBadge != null && hasNotificationRequests) {
-                                    if (getActivity() != null) {
-                                        getActivity().runOnUiThread(() -> {
-                                            if (notificationBadge != null) {
-                                                notificationBadge.setVisibility(View.VISIBLE);
-                                                android.util.Log.d(TAG, "Badge set to VISIBLE (invitation check failed)");
-                                            }
-                                        });
-                                    }
-                                }
-                            });
-                });
     }
 }

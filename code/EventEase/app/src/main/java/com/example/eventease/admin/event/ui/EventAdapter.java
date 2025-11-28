@@ -97,9 +97,26 @@ public class EventAdapter extends RecyclerView.Adapter<EventAdapter.EventViewHol
         }
 
         // Pass the callback forward to EventDetailActivity
-        holder.itemView.setOnClickListener(v ->
-                EventDetailActivity.start(v.getContext(), event, onDeleteCallback)
-        );
+        holder.itemView.setOnClickListener(v -> {
+            if (event == null) {
+                return;
+            }
+            
+            Context context = v.getContext();
+            if (context == null) {
+                return;
+            }
+            
+            try {
+                EventDetailActivity.start(context, event, onDeleteCallback);
+            } catch (Exception e) {
+                android.util.Log.e("EventAdapter", "Error starting EventDetailActivity: " + e.getMessage(), e);
+                // Try to show error to user if possible
+                if (context instanceof android.app.Activity) {
+                    android.widget.Toast.makeText(context, "Unable to open event details", android.widget.Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
     }
 
     @Override public int getItemCount() { return items.size(); }

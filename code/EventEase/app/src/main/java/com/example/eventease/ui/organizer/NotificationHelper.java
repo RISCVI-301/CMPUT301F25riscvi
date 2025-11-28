@@ -4,8 +4,6 @@ import android.util.Log;
 
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -115,20 +113,28 @@ public class NotificationHelper {
             return;
         }
         
-        // Get current user (organizer)
-        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
-        if (currentUser == null) {
-            if (callback != null) {
-                callback.onError("User not authenticated");
-            }
-            return;
-        }
-        String organizerId = currentUser.getUid();
-        
         DocumentReference eventRef = db.collection("events").document(eventId);
         
-        // Get all entrants from the specified subcollection
-        eventRef.collection(subcollectionName).get()
+        // Get organizerId from event document (already stored there)
+        eventRef.get().addOnSuccessListener(eventDoc -> {
+            if (!eventDoc.exists()) {
+                Log.e(TAG, "Event not found: " + eventId);
+                if (callback != null) {
+                    callback.onError("Event not found");
+                }
+                return;
+            }
+            
+            String organizerId = eventDoc.getString("organizerId");
+            if (organizerId == null || organizerId.isEmpty()) {
+                Log.w(TAG, "No organizerId in event document, this should not happen");
+                organizerId = "unknown";
+            }
+            
+            String finalOrganizerId = organizerId;
+            
+            // Get all entrants from the specified subcollection
+            eventRef.collection(subcollectionName).get()
                 .addOnSuccessListener(snapshot -> {
                     if (snapshot == null || snapshot.isEmpty()) {
                         Log.d(TAG, "No entrants in " + subcollectionName + " to send notifications to");
@@ -159,54 +165,38 @@ public class NotificationHelper {
                     if (notificationMessage == null || notificationMessage.trim().isEmpty()) {
                         notificationMessage = getDefaultMessage(groupType, eventTitle);
                     }
-
-                    String notificationTitle = getDefaultTitle(groupType, eventTitle);
                     
-                    // Make final copy for lambda
-                    final String finalNotificationMessage = notificationMessage;
+                    // Create notification request in Firestore
+                    // Cloud Functions will pick this up and send FCM notifications
+                    Map<String, Object> notificationRequest = new HashMap<>();
+                    notificationRequest.put("eventId", eventId);
+                    notificationRequest.put("eventTitle", eventTitle != null ? eventTitle : "Event");
+                    notificationRequest.put("organizerId", finalOrganizerId);
+                    notificationRequest.put("userIds", userIds);
+                    notificationRequest.put("groupType", groupType);
+                    notificationRequest.put("message", notificationMessage);
+                    notificationRequest.put("title", getDefaultTitle(groupType, eventTitle));
+                    notificationRequest.put("status", "PENDING");
+                    notificationRequest.put("createdAt", System.currentTimeMillis());
+                    notificationRequest.put("processed", false);
                     
-                    // Filter users based on notification preferences before creating request
-                    filterUsersByNotificationPreferences(userIds, notificationTitle, groupType, filteredUserIds -> {
-                        if (filteredUserIds.isEmpty()) {
-                            Log.d(TAG, "All users have opted out of this notification type");
-                            if (callback != null) {
-                                callback.onComplete(0);
-                            }
-                            return;
-                        }
-                        
-                        // Create notification request in Firestore
-                        // Cloud Functions will pick this up and send FCM notifications
-                        Map<String, Object> notificationRequest = new HashMap<>();
-                        notificationRequest.put("eventId", eventId);
-                        notificationRequest.put("eventTitle", eventTitle != null ? eventTitle : "Event");
-                        notificationRequest.put("organizerId", organizerId);
-                        notificationRequest.put("userIds", filteredUserIds);
-                        notificationRequest.put("groupType", groupType);
-                        notificationRequest.put("message", finalNotificationMessage);
-                        notificationRequest.put("title", notificationTitle);
-                        notificationRequest.put("status", "PENDING");
-                        notificationRequest.put("createdAt", System.currentTimeMillis());
-                        notificationRequest.put("processed", false);
-                        
-                        // Write to notificationRequests collection
-                        db.collection("notificationRequests").add(notificationRequest)
-                                .addOnSuccessListener(docRef -> {
-                                    Log.d(TAG, "Notification request created for " + filteredUserIds.size() + " users in " + groupType + " group");
-                                    Log.d(TAG, "Request ID: " + docRef.getId());
-                                    
-                                    // Return success - Cloud Functions will handle actual sending
-                                    if (callback != null) {
-                                        callback.onComplete(filteredUserIds.size());
-                                    }
-                                })
-                                .addOnFailureListener(e -> {
-                                    Log.e(TAG, "Failed to create notification request", e);
-                                    if (callback != null) {
-                                        callback.onError("Failed to create notification request: " + e.getMessage());
-                                    }
-                                });
-                    });
+                    // Write to notificationRequests collection
+                    db.collection("notificationRequests").add(notificationRequest)
+                            .addOnSuccessListener(docRef -> {
+                                Log.d(TAG, "Notification request created for " + userIds.size() + " users in " + groupType + " group");
+                                Log.d(TAG, "Request ID: " + docRef.getId());
+                                
+                                // Return success - Cloud Functions will handle actual sending
+                                if (callback != null) {
+                                    callback.onComplete(userIds.size());
+                                }
+                            })
+                            .addOnFailureListener(e -> {
+                                Log.e(TAG, "Failed to create notification request", e);
+                                if (callback != null) {
+                                    callback.onError("Failed to create notification request: " + e.getMessage());
+                                }
+                            });
                 })
                 .addOnFailureListener(e -> {
                     Log.e(TAG, "Failed to load entrants from " + subcollectionName, e);
@@ -214,6 +204,12 @@ public class NotificationHelper {
                         callback.onError("Failed to load entrants: " + e.getMessage());
                     }
                 });
+        }).addOnFailureListener(e -> {
+            Log.e(TAG, "Failed to load event document", e);
+            if (callback != null) {
+                callback.onError("Failed to load event: " + e.getMessage());
+            }
+        });
     }
     
     /**
@@ -225,7 +221,7 @@ public class NotificationHelper {
             case "waitlist":
                 return "Update: " + eventName;
             case "selected":
-                return "You've been selected!";
+                return "You've been selected! 🎉";
             case "cancelled":
                 return "Update: " + eventName;
             case "nonSelected":
@@ -309,29 +305,61 @@ public class NotificationHelper {
                     return;
                 }
                 
-                // Get current user (organizer)
-                FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
-                if (currentUser == null) {
-                    if (callback != null) {
-                        callback.onError("User not authenticated");
-                    }
-                    return;
-                }
-                String organizerId = currentUser.getUid();
-                
-                sendNotificationsToFilteredUsers(filteredUserIds, title, message, eventId, eventTitle, organizerId, callback);
+                // Get organizerId from event document (more reliable than current user)
+                db.collection("events").document(eventId).get()
+                        .addOnSuccessListener(eventDoc -> {
+                            String organizerId = null;
+                            if (eventDoc.exists()) {
+                                organizerId = eventDoc.getString("organizerId");
+                            }
+                            
+                            // Event should always have organizerId stored when created
+                            if (organizerId == null || organizerId.isEmpty()) {
+                                Log.e(TAG, "No organizerId in event document");
+                                if (callback != null) {
+                                    callback.onError("Event has no organizer ID");
+                                }
+                                return;
+                            }
+                            
+                            Log.d(TAG, "Sending notifications (filtered) with organizerId: " + organizerId);
+                            sendNotificationsToFilteredUsers(filteredUserIds, title, message, eventId, eventTitle, organizerId, callback);
+                        })
+                        .addOnFailureListener(e -> {
+                            Log.e(TAG, "Failed to get event document for organizerId", e);
+                            if (callback != null) {
+                                callback.onError("Failed to get event details");
+                            }
+                        });
             });
         } else {
-            // Don't filter - send to all (e.g., for selection notifications before anyone has declined)
-            FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
-            if (currentUser == null) {
-                if (callback != null) {
-                    callback.onError("User not authenticated");
-                }
-                return;
-            }
-            String organizerId = currentUser.getUid();
-            sendNotificationsToFilteredUsers(userIds, title, message, eventId, eventTitle, organizerId, callback);
+            // Don't filter - send to all (e.g., for selection/replacement notifications before anyone has declined)
+            // Get organizerId from event document (more reliable than current user)
+            db.collection("events").document(eventId).get()
+                    .addOnSuccessListener(eventDoc -> {
+                        String organizerId = null;
+                        if (eventDoc.exists()) {
+                            organizerId = eventDoc.getString("organizerId");
+                        }
+                        
+                        // Event should always have organizerId stored when created
+                        if (organizerId == null || organizerId.isEmpty()) {
+                            Log.e(TAG, "No organizerId in event document");
+                            if (callback != null) {
+                                callback.onError("Event has no organizer ID");
+                            }
+                            return;
+                        }
+                        
+                        Log.d(TAG, "Sending notifications with organizerId: " + organizerId);
+                        sendNotificationsToFilteredUsers(userIds, title, message, eventId, eventTitle, organizerId, callback);
+                    })
+                    .addOnFailureListener(e -> {
+                        Log.e(TAG, "Failed to get event document for organizerId", e);
+                        if (callback != null) {
+                            callback.onError("Failed to get event details");
+                        }
+                    });
         }
     }
     
@@ -409,6 +437,10 @@ public class NotificationHelper {
     private void sendNotificationsToFilteredUsers(List<String> userIds, String title, String message,
                                                  String eventId, String eventTitle, String organizerId,
                                                  NotificationCallback callback) {
+        // Check for duplicates for ALL notification types to prevent duplicate notifications
+        // Note: Selection notifications are now handled by Cloud Function, but we still check
+        // for duplicates here in case manual notifications are sent
+        
         // Check for recent duplicate notification requests (within last 5 minutes)
         long fiveMinutesAgo = System.currentTimeMillis() - (5 * 60 * 1000);
         db.collection("notificationRequests")
@@ -426,160 +458,13 @@ public class NotificationHelper {
                         return;
                     }
                     
-                    // Determine groupType from title for filtering
-                    String groupTypeForFilter = "general";
-                    if (title != null) {
-                        String titleLower = title.toLowerCase();
-                        if (titleLower.contains("replacement")) {
-                            groupTypeForFilter = "replacement";
-                        } else if (titleLower.contains("selected") || titleLower.contains("chosen")) {
-                            groupTypeForFilter = "selection";
-                        } else if (titleLower.contains("deadline") || titleLower.contains("missed")) {
-                            groupTypeForFilter = "deadline";
-                        } else if (titleLower.contains("sorry") || titleLower.contains("not selected")) {
-                            groupTypeForFilter = "sorry";
-                        }
-                    }
-                    
-                    // Filter users based on notification preferences before creating request
-                    filterUsersByNotificationPreferences(userIds, title, groupTypeForFilter, filteredUserIds -> {
-                        if (filteredUserIds.isEmpty()) {
-                            Log.d(TAG, "All users have opted out of this notification type");
-                            if (callback != null) {
-                                callback.onComplete(0);
-                            }
-                            return;
-                        }
-                        
-                        // No duplicate found, create notification request with filtered users
-                        createNotificationRequest(filteredUserIds, title, message, eventId, eventTitle, organizerId, callback);
-                    });
+                    // No duplicate found, create notification request
+                    createNotificationRequest(userIds, title, message, eventId, eventTitle, organizerId, callback);
                 })
                 .addOnFailureListener(e -> {
                     Log.e(TAG, "Failed to check for duplicate notification requests, creating anyway", e);
-                    // On error, determine groupType and filter
-                    String groupTypeForFilter = "general";
-                    if (title != null) {
-                        String titleLower = title.toLowerCase();
-                        if (titleLower.contains("selected") || titleLower.contains("chosen")) {
-                            groupTypeForFilter = "selection";
-                        } else if (titleLower.contains("sorry") || titleLower.contains("not selected")) {
-                            groupTypeForFilter = "sorry";
-                        }
-                    }
-                    filterUsersByNotificationPreferences(userIds, title, groupTypeForFilter, filteredUserIds -> {
-                        createNotificationRequest(filteredUserIds, title, message, eventId, eventTitle, organizerId, callback);
-                    });
-                });
-    }
-    
-    /**
-     * Filters users based on their notification preferences.
-     * 
-     * @param userIds List of user IDs to filter
-     * @param notificationTitle The notification title (used to determine notification type)
-     * @param groupType Optional group type (selected, nonSelected, etc.) - takes precedence over title
-     * @param callback Callback with filtered user IDs
-     */
-    private void filterUsersByNotificationPreferences(List<String> userIds, String notificationTitle,
-                                                     String groupType, java.util.function.Consumer<List<String>> callback) {
-        if (userIds == null || userIds.isEmpty()) {
-            callback.accept(new java.util.ArrayList<>());
-            return;
-        }
-        
-        // Determine notification type from groupType first, then fall back to title
-        boolean isInvitedNotification = false;
-        boolean isNotInvitedNotification = false;
-        
-        if (groupType != null) {
-            // Use groupType to determine notification type
-            if (groupType.equals("selected") || groupType.equals("selection")) {
-                isInvitedNotification = true;
-            } else if (groupType.equals("nonSelected") || groupType.equals("sorry")) {
-                isNotInvitedNotification = true;
-            }
-        }
-        
-        // If groupType didn't determine it, try title
-        if (!isInvitedNotification && !isNotInvitedNotification && notificationTitle != null) {
-            String titleLower = notificationTitle.toLowerCase();
-            // Check for invited/selected notifications
-            if (titleLower.contains("selected") || titleLower.contains("chosen") || 
-                titleLower.contains("invited") || titleLower.contains("congratulations") ||
-                titleLower.contains("won")) {
-                isInvitedNotification = true;
-            }
-            // Check for not invited/not selected notifications
-            else if (titleLower.contains("not selected") || titleLower.contains("not chosen") ||
-                     titleLower.contains("sorry") || titleLower.contains("unfortunately") ||
-                     titleLower.contains("not invited")) {
-                isNotInvitedNotification = true;
-            }
-        }
-        
-        // If we can't determine the type, send to all (default behavior)
-        if (!isInvitedNotification && !isNotInvitedNotification) {
-            Log.d(TAG, "Could not determine notification type, sending to all users");
-            callback.accept(userIds);
-            return;
-        }
-        
-        // Make final copies for lambda
-        final boolean finalIsInvitedNotification = isInvitedNotification;
-        final boolean finalIsNotInvitedNotification = isNotInvitedNotification;
-        
-        // Fetch user preferences from Firestore
-        // Batch read user documents to check preferences
-        List<com.google.android.gms.tasks.Task<DocumentSnapshot>> tasks = new java.util.ArrayList<>();
-        for (String userId : userIds) {
-            tasks.add(db.collection("users").document(userId).get());
-        }
-        
-        com.google.android.gms.tasks.Tasks.whenAllComplete(tasks)
-                .addOnSuccessListener(taskList -> {
-                    List<String> filtered = new java.util.ArrayList<>();
-                    
-                    for (com.google.android.gms.tasks.Task<?> task : taskList) {
-                        if (task.isSuccessful() && task.getResult() != null) {
-                            DocumentSnapshot doc = (DocumentSnapshot) task.getResult();
-                            String userId = doc.getId();
-                            
-                            if (finalIsInvitedNotification) {
-                                // Check if user wants invited notifications
-                                Boolean preference = doc.getBoolean("notificationPreferenceInvited");
-                                // Default to true if not set
-                                if (preference == null || preference) {
-                                    filtered.add(userId);
-                                } else {
-                                    Log.d(TAG, "User " + userId + " has opted out of invited notifications");
-                                }
-                            } else if (finalIsNotInvitedNotification) {
-                                // Check if user wants not invited notifications
-                                Boolean preference = doc.getBoolean("notificationPreferenceNotInvited");
-                                // Default to true if not set
-                                if (preference == null || preference) {
-                                    filtered.add(userId);
-                                } else {
-                                    Log.d(TAG, "User " + userId + " has opted out of not invited notifications");
-                                }
-                            }
-                        } else {
-                            // On error, include user (better to send than miss)
-                            int index = tasks.indexOf(task);
-                            if (index >= 0 && index < userIds.size()) {
-                                filtered.add(userIds.get(index));
-                            }
-                        }
-                    }
-                    
-                    Log.d(TAG, "Filtered " + userIds.size() + " users to " + filtered.size() + " based on preferences");
-                    callback.accept(filtered);
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Failed to check notification preferences, sending to all", e);
-                    // On error, send to all (better to send than miss)
-                    callback.accept(userIds);
+                    // On error, create the request (better to send than miss)
+                    createNotificationRequest(userIds, title, message, eventId, eventTitle, organizerId, callback);
                 });
     }
     

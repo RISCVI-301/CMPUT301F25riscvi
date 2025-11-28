@@ -12,8 +12,6 @@ import androidx.fragment.app.Fragment;
 import androidx.navigation.Navigation;
 import com.bumptech.glide.Glide;
 import com.google.android.material.imageview.ShapeableImageView;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.example.eventease.R;
@@ -27,7 +25,6 @@ public class EditProfileFragment extends Fragment {
     private EditText phoneField;
     private ShapeableImageView profileImage;
     private FirebaseFirestore db;
-    private FirebaseAuth mAuth;
     
     private ProfileImageHelper imageHelper;
     private ProfileUpdateHelper updateHelper;
@@ -48,7 +45,6 @@ public class EditProfileFragment extends Fragment {
         View root = inflater.inflate(R.layout.entrant_fragment_edit_profile, container, false);
         
         // Initialize Firebase
-        mAuth = FirebaseAuth.getInstance();
         db = FirebaseFirestore.getInstance();
         
         // Initialize views
@@ -77,10 +73,12 @@ public class EditProfileFragment extends Fragment {
             new ImageSourceDialog(requireActivity(), imageHelper));
         
         root.findViewById(R.id.saveButton).setOnClickListener(v -> saveChanges());
-        root.findViewById(R.id.changeEmailButton).setOnClickListener(v -> 
-            new ChangeEmailDialog(requireActivity()));
-        root.findViewById(R.id.changePasswordButton).setOnClickListener(v -> 
-            new ChangePasswordDialog(requireActivity()));
+        
+        // Device auth - email/password changes not needed
+        View changeEmailBtn = root.findViewById(R.id.changeEmailButton);
+        View changePasswordBtn = root.findViewById(R.id.changePasswordButton);
+        if (changeEmailBtn != null) changeEmailBtn.setVisibility(View.GONE);
+        if (changePasswordBtn != null) changePasswordBtn.setVisibility(View.GONE);
         
         return root;
     }
@@ -88,17 +86,12 @@ public class EditProfileFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-        // After user confirms the verification link, Auth email changes.
-        // Keep Firestore in sync with the latest Auth email.
-        updateHelper.syncEmailToFirestore();
-        // Ensure user stays logged in after email change
-        SessionManager.ensureUserLoggedIn(mAuth, requireContext());
+        // Device auth - no email sync needed
     }
     
     private void loadUserData() {
-        FirebaseUser currentUser = mAuth.getCurrentUser();
-        if (currentUser != null) {
-            String uid = currentUser.getUid();
+        String uid = com.example.eventease.auth.AuthHelper.getUid(requireContext());
+        if (uid != null && !uid.isEmpty()) {
             DocumentReference userRef = db.collection("users").document(uid);
             
             userRef.get().addOnSuccessListener(documentSnapshot -> {

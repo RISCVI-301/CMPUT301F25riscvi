@@ -4,6 +4,7 @@ import android.app.DatePickerDialog;
 import android.app.Dialog;
 import android.app.TimePickerDialog;
 import android.content.ContentValues;
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Color;
@@ -16,9 +17,11 @@ import android.os.Handler;
 import android.os.Looper;
 import android.text.TextUtils;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
+import android.view.inputmethod.EditorInfo;
 import android.widget.*;
 import android.provider.MediaStore;
 import androidx.activity.result.ActivityResultLauncher;
@@ -27,11 +30,14 @@ import androidx.annotation.LayoutRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 
 import com.bumptech.glide.Glide;
 import com.example.eventease.R;
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.chip.Chip;
+import com.google.android.material.chip.ChipGroup;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
@@ -83,12 +89,14 @@ import java.util.UUID;
  */
 public class OrganizerCreateEventActivity extends AppCompatActivity {
     private static final String TAG = "CreateEvent";
+    private static final int MAX_TAGS = 5;
     // --- UI Elements ---
     private ImageButton btnBack, btnPickPoster;
     private ImageView posterPreview;
     private androidx.cardview.widget.CardView posterPreviewCard;
     private com.google.android.material.button.MaterialButton btnCropPoster;
-    private EditText etTitle, etDescription, etGuidelines, etLocation, etCapacity, etSampleSize;
+    private EditText etTitle, etDescription, etGuidelines, etLocation, etCapacity, etSampleSize, etTags;
+    private ChipGroup chipGroupTags;
     private TextView tvSampleSize;
     private Button btnStart, btnEnd, btnDeadline, btnEventStart, btnSave;
     private Switch swGeo, swQr;
@@ -101,6 +109,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
     private Uri posterUri = null;
     private String organizerId;
     private boolean isResolvingOrganizerId;
+    private final ArrayList<String> interests = new ArrayList<>();
     
     // Image cropping
     private android.graphics.Matrix imageMatrix;
@@ -170,6 +179,8 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         etCapacity = findViewById(R.id.etCapacity);
         etSampleSize = findViewById(R.id.etSampleSize);
         tvSampleSize = findViewById(R.id.tvSampleSize);
+        etTags = findViewById(R.id.etTags);
+        chipGroupTags = findViewById(R.id.chipGroupTags);
         btnStart = findViewById(R.id.btnStart);
         btnEnd = findViewById(R.id.btnEnd);
         btnDeadline = findViewById(R.id.btnDeadline);
@@ -180,6 +191,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         rgEntrants = findViewById(R.id.rgEntrants);
         rbAny = findViewById(R.id.rbAny);
         rbSpecific = findViewById(R.id.rbSpecific);
+        setupTagInput();
 
         organizerId = getIntent().getStringExtra(OrganizerMyEventActivity.EXTRA_ORGANIZER_ID);
         if (organizerId == null || organizerId.trim().isEmpty()) {
@@ -217,6 +229,86 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
             btnCropPoster.setOnClickListener(v -> showCropDialog());
         }
         btnSave.setOnClickListener(v -> beginSaveEvent());
+    }
+
+    private void setupTagInput() {
+        if (etTags == null) {
+            return;
+        }
+        etTags.setOnEditorActionListener((v, actionId, event) -> {
+            if (actionId == EditorInfo.IME_ACTION_DONE
+                    || actionId == EditorInfo.IME_ACTION_GO
+                    || actionId == EditorInfo.IME_ACTION_NEXT) {
+                addTagFromInput();
+                return true;
+            }
+            if (event != null && event.getKeyCode() == KeyEvent.KEYCODE_ENTER
+                    && event.getAction() == KeyEvent.ACTION_DOWN) {
+                addTagFromInput();
+                return true;
+            }
+            return false;
+        });
+        etTags.setOnKeyListener((v, keyCode, event) -> {
+            if (keyCode == KeyEvent.KEYCODE_ENTER && event.getAction() == KeyEvent.ACTION_DOWN) {
+                addTagFromInput();
+                return true;
+            }
+            return false;
+        });
+    }
+
+    private void addTagFromInput() {
+        if (etTags == null) {
+            return;
+        }
+        String raw = safe(etTags.getText());
+        if (raw.isEmpty()) {
+            return;
+        }
+        addTag(raw);
+        etTags.setText("");
+    }
+
+    private void addTag(String tag) {
+        if (TextUtils.isEmpty(tag)) {
+            return;
+        }
+        String normalized = tag.trim();
+        if (normalized.isEmpty()) {
+            return;
+        }
+        if (interests.size() >= MAX_TAGS) {
+            toast("You can add up to " + MAX_TAGS + " tags");
+            return;
+        }
+        for (String existing : interests) {
+            if (existing.equalsIgnoreCase(normalized)) {
+                return;
+            }
+        }
+        interests.add(normalized);
+        addChipForTag(normalized);
+    }
+
+    private void addChipForTag(String tag) {
+        if (chipGroupTags == null) {
+            return;
+        }
+        Chip chip = new Chip(this);
+        chip.setText(tag);
+        chip.setTextColor(ContextCompat.getColor(this, R.color.ee_text_light));
+        chip.setChipBackgroundColorResource(R.color.ee_card);
+        chip.setCloseIconVisible(true);
+        chip.setCloseIconResource(android.R.drawable.ic_menu_close_clear_cancel);
+        chip.setCloseIconTintResource(R.color.ee_text_light);
+        chip.setClickable(false);
+        chip.setCheckable(false);
+        chip.setOnCloseIconClickListener(v -> {
+            interests.removeIf(s -> s.equalsIgnoreCase(tag));
+            chipGroupTags.removeView(chip);
+        });
+        chipGroupTags.addView(chip);
     }
     /**
      * Displays a DatePickerDialog followed by a TimePickerDialog to allow the user
@@ -369,21 +461,8 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
      * signing in anonymously if necessary, before proceeding to validation.
      */
     private void beginSaveEvent() {
-        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        if (user == null) {
-            btnSave.setEnabled(false);
-            btnSave.setText("Signing in…");
-            FirebaseAuth.getInstance().signInAnonymously()
-                    .addOnSuccessListener(r -> doValidateAndSave())
-                    .addOnFailureListener(e -> {
-                        btnSave.setEnabled(true);
-                        btnSave.setText("SAVE CHANGES");
-                        toast("Sign-in failed: " + e.getMessage());
-                        Log.e(TAG, "Anon sign-in failed", e);
-                    });
-        } else {
-            doValidateAndSave();
-        }
+        // Device auth - no need to sign in, just save
+        doValidateAndSave();
     }
 
     private void resolveOrganizerId(@Nullable Runnable onReady) {
@@ -396,24 +475,30 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         if (isResolvingOrganizerId) {
             return;
         }
-        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        if (user == null) {
-            toast("Please sign in again.");
+        
+        // Get device ID as organizer ID
+        com.example.eventease.auth.DeviceAuthManager authManager = 
+            new com.example.eventease.auth.DeviceAuthManager(this);
+        String deviceId = authManager.getUid();
+        
+        if (deviceId == null || deviceId.isEmpty()) {
+            toast("Could not get device ID");
             return;
         }
+        
         isResolvingOrganizerId = true;
         FirebaseFirestore.getInstance()
                 .collection("users")
-                .document(user.getUid())
+                .document(deviceId)
                 .get()
                 .addOnSuccessListener(doc -> {
-                    organizerId = doc != null ? doc.getString("organizerId") : null;
-                    if (organizerId == null || organizerId.trim().isEmpty()) {
-                        organizerId = doc != null ? doc.getId() : user.getUid();
-                    }
+                    // Use device ID as organizer ID
+                    organizerId = deviceId;
                     isResolvingOrganizerId = false;
-                    if (organizerId == null || organizerId.trim().isEmpty()) {
-                        toast("Organizer profile not configured yet.");
+                    
+                    if (!doc.exists()) {
+                        Log.w(TAG, "User document doesn't exist for device: " + deviceId);
+                        toast("Please complete your profile setup first");
                     } else if (onReady != null) {
                         onReady.run();
                     }
@@ -428,6 +513,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
      * to upload the event poster and save the event details.
      */
     private void doValidateAndSave() {
+        addTagFromInput();
         String title = safe(etTitle.getText());
         if (title.isEmpty()) { etTitle.setError("Event name is required"); etTitle.requestFocus(); return; }
         if (title.length() > 80) { etTitle.setError("Max 80 characters"); etTitle.requestFocus(); return; }
@@ -512,13 +598,43 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
      * @param chosenSampleSize The validated sample size (number of initial invitations).
      */
     private void doUploadAndSave(String title, int chosenCapacity, int chosenSampleSize) {
+        // Get device ID for device-based authentication
+        com.example.eventease.auth.DeviceAuthManager deviceAuth = 
+            new com.example.eventease.auth.DeviceAuthManager(this);
+        String deviceId = deviceAuth.getUid();
+        
+        // Sign in anonymously to get Firebase Auth token for Storage rules
+        FirebaseAuth.getInstance().signInAnonymously()
+            .addOnSuccessListener(authResult -> {
+                // Now proceed with upload
+                performUpload(title, chosenCapacity, chosenSampleSize, deviceId, authResult.getUser().getUid());
+            })
+            .addOnFailureListener(e -> {
+                Log.e(TAG, "Failed to sign in anonymously for upload", e);
+                // Try uploading anyway with device ID (might work if Storage rules allow)
+                performUpload(title, chosenCapacity, chosenSampleSize, deviceId, deviceId);
+            });
+    }
+    
+    private void performUpload(String title, int chosenCapacity, int chosenSampleSize, String deviceId, String authUid) {
         final String id = UUID.randomUUID().toString();
         final StorageReference ref = FirebaseStorage.getInstance()
                 .getReference("posters/" + id + ".jpg");
 
-        StorageMetadata meta = new StorageMetadata.Builder()
-                .setContentType("image/jpeg")
-                .build();
+        // Create metadata with user information for proper permissions
+        StorageMetadata.Builder metaBuilder = new StorageMetadata.Builder()
+                .setContentType("image/jpeg");
+        
+        // Add custom metadata with user ID to help with Storage rules
+        metaBuilder.setCustomMetadata("uploadedBy", authUid);
+        if (deviceId != null && !deviceId.isEmpty()) {
+            metaBuilder.setCustomMetadata("deviceId", deviceId);
+        }
+        if (organizerId != null && !organizerId.isEmpty()) {
+            metaBuilder.setCustomMetadata("organizerId", organizerId);
+        }
+
+        final StorageMetadata meta = metaBuilder.build();
 
         // Apply crop transformation if image was cropped
         if (posterUri != null && imageMatrix != null && !imageMatrix.isIdentity()) {
@@ -541,10 +657,18 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                                             if (!task.isSuccessful()) throw task.getException();
                                             return ref.getDownloadUrl();
                                         })
-                                        .addOnSuccessListener(download -> writeEventDoc(id, title, chosenCapacity, chosenSampleSize, download.toString()))
+                                        .addOnSuccessListener(download -> {
+                                            Log.d(TAG, "Poster upload successful (fallback), URL: " + download.toString());
+                                            writeEventDoc(id, title, chosenCapacity, chosenSampleSize, download.toString());
+                                        })
                                         .addOnFailureListener(e -> {
-                                            Log.e(TAG, "Poster upload failed", e);
-                                            toast("Upload failed: " + e.getMessage());
+                                            Log.e(TAG, "Poster upload failed (fallback)", e);
+                                            String errorMsg = e.getMessage();
+                                            if (errorMsg != null && errorMsg.contains("permission")) {
+                                                toast("Upload failed: Please check Firebase Storage permissions. Ensure you're signed in.");
+                                            } else {
+                                                toast("Upload failed: " + errorMsg);
+                                            }
                                             btnSave.setEnabled(true);
                                             btnSave.setText("SAVE CHANGES");
                                         });
@@ -561,10 +685,18 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                         if (!task.isSuccessful()) throw task.getException();
                         return ref.getDownloadUrl();
                     })
-                    .addOnSuccessListener(download -> writeEventDoc(id, title, chosenCapacity, chosenSampleSize, download.toString()))
+                    .addOnSuccessListener(download -> {
+                        Log.d(TAG, "Poster upload successful (no crop), URL: " + download.toString());
+                        writeEventDoc(id, title, chosenCapacity, chosenSampleSize, download.toString());
+                    })
                     .addOnFailureListener(e -> {
-                        Log.e(TAG, "Poster upload failed", e);
-                        toast("Upload failed: " + e.getMessage());
+                        Log.e(TAG, "Poster upload failed (no crop)", e);
+                        String errorMsg = e.getMessage();
+                        if (errorMsg != null && errorMsg.contains("permission")) {
+                            toast("Upload failed: Please check Firebase Storage permissions. Ensure you're signed in.");
+                        } else {
+                            toast("Upload failed: " + errorMsg);
+                        }
                         btnSave.setEnabled(true);
                         btnSave.setText("SAVE CHANGES");
                     });
@@ -659,10 +791,18 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                         if (!task.isSuccessful()) throw task.getException();
                         return ref.getDownloadUrl();
                     })
-                    .addOnSuccessListener(download -> writeEventDoc(id, title, chosenCapacity, chosenSampleSize, download.toString()))
+                    .addOnSuccessListener(download -> {
+                        Log.d(TAG, "Cropped poster upload successful, URL: " + download.toString());
+                        writeEventDoc(id, title, chosenCapacity, chosenSampleSize, download.toString());
+                    })
                     .addOnFailureListener(e -> {
-                        Log.e(TAG, "Poster upload failed", e);
-                        toast("Upload failed: " + e.getMessage());
+                        Log.e(TAG, "Cropped poster upload failed", e);
+                        String errorMsg = e.getMessage();
+                        if (errorMsg != null && errorMsg.contains("permission")) {
+                            toast("Upload failed: Please check Firebase Storage permissions. Ensure you're signed in.");
+                        } else {
+                            toast("Failed to process image: " + errorMsg);
+                        }
                         btnSave.setEnabled(true);
                         btnSave.setText("SAVE CHANGES");
                     });
@@ -702,6 +842,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         doc.put("notes", TextUtils.isEmpty(description) ? null : description);
         doc.put("guidelines", TextUtils.isEmpty(guidelines) ? null : guidelines);
         doc.put("location", TextUtils.isEmpty(location) ? null : location);
+        doc.put("interests", new ArrayList<>(interests));
         doc.put("registrationStart", regStartEpochMs);
         doc.put("registrationEnd", regEndEpochMs);
         doc.put("deadlineEpochMs", deadlineEpochMs);
@@ -715,7 +856,9 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         doc.put("organizerId", organizerId);
         doc.put("createdAt", System.currentTimeMillis());
         doc.put("createdAtEpochMs", System.currentTimeMillis());
-        doc.put("qrPayload", generateQr ? ("event:" + id) : null);
+        // Always generate QR payload for sharing (regardless of QR switch setting)
+        String qrPayload = "eventease://event/" + id;
+        doc.put("qrPayload", qrPayload);
         FirebaseFirestore.getInstance()
                 .collection("events")
                 .document(id)
@@ -723,7 +866,8 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                 .addOnSuccessListener(v -> {
                     btnSave.setEnabled(true);
                     btnSave.setText("SAVE CHANGES");
-                    showSuccessDialog(id, title, generateQr ? ("event:" + id) : null);
+                    // Always show QR dialog after creating event
+                    showQrPreparationDialog(title, qrPayload);
                 })
                 .addOnFailureListener(e -> {
                     Log.e(TAG, "Firestore write failed", e);
@@ -731,14 +875,6 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                     btnSave.setEnabled(true);
                     btnSave.setText("SAVE CHANGES");
                 });
-    }
-
-    private void showSuccessDialog(String id, String title, @Nullable String qrPayload) {
-        if (qrPayload == null) {
-            showEventOptionsDialog(title);
-        } else {
-            showQrPreparationDialog(title, qrPayload);
-        }
     }
 
     private void showQrPreparationDialog(String title, String qrPayload) {
@@ -759,28 +895,6 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         }, 1200);
     }
 
-    private void showEventOptionsDialog(String title) {
-        Dialog dialog = createCardDialog(R.layout.dialog_event_options);
-        TextView titleView = dialog.findViewById(R.id.tvEventTitle);
-        TextView subtitleView = dialog.findViewById(R.id.tvEventSubtitle);
-        MaterialButton btnViewEvents = dialog.findViewById(R.id.btnViewEvents);
-
-        if (titleView != null) {
-            titleView.setText("Event Created Successfully");
-        }
-        if (subtitleView != null) {
-            subtitleView.setText("\"" + title + "\" is ready to share.");
-        }
-
-        if (btnViewEvents != null) {
-            btnViewEvents.setOnClickListener(v -> {
-                dialog.dismiss();
-                goToMyEvents();
-            });
-        }
-
-        dialog.show();
-    }
 
     private void showQrDialog(String title, String qrPayload) {
         Dialog dialog = createCardDialog(R.layout.dialog_qr_preview);
@@ -788,6 +902,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         ImageView imgQr = dialog.findViewById(R.id.imgQr);
         MaterialButton btnShare = dialog.findViewById(R.id.btnShare);
         MaterialButton btnSave = dialog.findViewById(R.id.btnSave);
+        MaterialButton btnCopyLink = dialog.findViewById(R.id.btnCopyLink);
         MaterialButton btnViewEvents = dialog.findViewById(R.id.btnViewEvents);
 
         if (titleView != null) {
@@ -826,10 +941,18 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
             });
         }
 
+        if (btnCopyLink != null) {
+            btnCopyLink.setOnClickListener(v -> {
+                android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                android.content.ClipData clip = android.content.ClipData.newPlainText("Event Link", qrPayload);
+                clipboard.setPrimaryClip(clip);
+                toast("Link copied to clipboard!");
+            });
+        }
+
         if (btnViewEvents != null) {
             btnViewEvents.setOnClickListener(v -> {
                 dialog.dismiss();
-                goToMyEvents();
             });
         }
 
@@ -942,6 +1065,13 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         etGuidelines.setText("");
         etLocation.setText("");
         etCapacity.setText("");
+        if (etTags != null) {
+            etTags.setText("");
+        }
+        interests.clear();
+        if (chipGroupTags != null) {
+            chipGroupTags.removeAllViews();
+        }
         rgEntrants.check(R.id.rbAny);
         etCapacity.setVisibility(View.GONE);
         etCapacity.setEnabled(false);

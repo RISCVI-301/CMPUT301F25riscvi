@@ -1,72 +1,35 @@
 package com.example.eventease.ui.entrant.profile;
 
 import android.content.Context;
-import android.content.SharedPreferences;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
 
 /**
  * Helper class for managing user session and Remember Me functionality.
- * Ensures users stay logged in after email/password changes.
+ * NOTE: With device ID authentication, users are always "logged in" on their device.
+ * This class is kept for backward compatibility but methods are now no-ops.
  */
 public class SessionManager {
     
-    private static final String PREFS_NAME = "EventEasePrefs";
-    private static final String KEY_REMEMBER_ME = "rememberMe";
-    private static final String KEY_SAVED_UID = "savedUid";
-    
     /**
      * Ensures Remember Me is set to keep user logged in.
-     * Uses UID for persistence (works even if email/password changes).
+     * NOTE: With device auth, users are always "logged in" - this is a no-op.
      * 
      * @param context the context for SharedPreferences
      */
     public static void ensureRememberMeSet(Context context) {
-        if (context == null) return;
-        
-        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
-        if (currentUser == null) return;
-        
-        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        String savedUid = prefs.getString(KEY_SAVED_UID, null);
-        boolean rememberMe = prefs.getBoolean(KEY_REMEMBER_ME, false);
-        
-        // If Remember Me is not set or UID doesn't match, set it with current UID
-        if (!rememberMe || savedUid == null || !savedUid.equals(currentUser.getUid())) {
-            prefs.edit()
-                .putBoolean(KEY_REMEMBER_ME, true)
-                .putString(KEY_SAVED_UID, currentUser.getUid())
-                .apply();
-        }
+        // Device auth - users are always "logged in" on their device
+        // No action needed
     }
     
     /**
      * Ensures user stays logged in after email change.
-     * Reloads user to ensure auth state is fresh.
+     * NOTE: With device auth, no email changes needed - this is a no-op.
      * 
-     * @param auth the FirebaseAuth instance
+     * @param auth (ignored - kept for compatibility)
      * @param context the context for session management
      */
-    public static void ensureUserLoggedIn(FirebaseAuth auth, Context context) {
-        FirebaseUser currentUser = auth.getCurrentUser();
-        if (currentUser == null) return;
-        
-        // Reload user to ensure auth state is fresh after email change
-        currentUser.reload().addOnSuccessListener(unused -> {
-            // User is still authenticated, ensure Remember Me is set
-            ensureRememberMeSet(context);
-        }).addOnFailureListener(e -> {
-            // If reload fails, user might have been logged out
-            // Try to keep them logged in by checking if we can get the user
-            if (auth.getCurrentUser() == null) {
-                // User was logged out, but we can't re-authenticate here
-                // This should not happen after email change, but handle gracefully
-                android.util.Log.w("SessionManager", "User appears to be logged out after email change");
-            } else {
-                // User still exists, ensure Remember Me is set
-                ensureRememberMeSet(context);
-            }
-        });
+    public static void ensureUserLoggedIn(Object auth, Context context) {
+        // Device auth - users are always "logged in" on their device
+        // No action needed
     }
 }
 
