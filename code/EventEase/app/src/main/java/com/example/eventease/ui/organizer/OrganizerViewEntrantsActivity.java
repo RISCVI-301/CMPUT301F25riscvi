@@ -1373,12 +1373,16 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
             // Moving TO SelectedEntrants from NonSelected/Cancelled - check sample size limit
             eventRef.get()
                     .addOnSuccessListener(eventDoc -> {
-                        int sampleSize = 0;
+                        int sampleSize;
                         if (eventDoc != null && eventDoc.exists()) {
                             Long sampleSizeObj = eventDoc.getLong("sampleSize");
                             if (sampleSizeObj != null) {
                                 sampleSize = sampleSizeObj.intValue();
+                            } else {
+                                sampleSize = 0;
                             }
+                        } else {
+                            sampleSize = 0;
                         }
 
                         final int sampleLimit = sampleSize;

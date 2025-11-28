@@ -39,6 +39,8 @@ import com.google.android.material.button.MaterialButton;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 import com.google.firebase.FirebaseApp;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageMetadata;
@@ -596,13 +598,43 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
      * @param chosenSampleSize The validated sample size (number of initial invitations).
      */
     private void doUploadAndSave(String title, int chosenCapacity, int chosenSampleSize) {
+        // Get device ID for device-based authentication
+        com.example.eventease.auth.DeviceAuthManager deviceAuth = 
+            new com.example.eventease.auth.DeviceAuthManager(this);
+        String deviceId = deviceAuth.getUid();
+        
+        // Sign in anonymously to get Firebase Auth token for Storage rules
+        FirebaseAuth.getInstance().signInAnonymously()
+            .addOnSuccessListener(authResult -> {
+                // Now proceed with upload
+                performUpload(title, chosenCapacity, chosenSampleSize, deviceId, authResult.getUser().getUid());
+            })
+            .addOnFailureListener(e -> {
+                Log.e(TAG, "Failed to sign in anonymously for upload", e);
+                // Try uploading anyway with device ID (might work if Storage rules allow)
+                performUpload(title, chosenCapacity, chosenSampleSize, deviceId, deviceId);
+            });
+    }
+    
+    private void performUpload(String title, int chosenCapacity, int chosenSampleSize, String deviceId, String authUid) {
         final String id = UUID.randomUUID().toString();
         final StorageReference ref = FirebaseStorage.getInstance()
                 .getReference("posters/" + id + ".jpg");
 
-        StorageMetadata meta = new StorageMetadata.Builder()
-                .setContentType("image/jpeg")
-                .build();
+        // Create metadata with user information for proper permissions
+        StorageMetadata.Builder metaBuilder = new StorageMetadata.Builder()
+                .setContentType("image/jpeg");
+        
+        // Add custom metadata with user ID to help with Storage rules
+        metaBuilder.setCustomMetadata("uploadedBy", authUid);
+        if (deviceId != null && !deviceId.isEmpty()) {
+            metaBuilder.setCustomMetadata("deviceId", deviceId);
+        }
+        if (organizerId != null && !organizerId.isEmpty()) {
+            metaBuilder.setCustomMetadata("organizerId", organizerId);
+        }
+
+        final StorageMetadata meta = metaBuilder.build();
 
         // Apply crop transformation if image was cropped
         if (posterUri != null && imageMatrix != null && !imageMatrix.isIdentity()) {
@@ -625,10 +657,18 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                                             if (!task.isSuccessful()) throw task.getException();
                                             return ref.getDownloadUrl();
                                         })
-                                        .addOnSuccessListener(download -> writeEventDoc(id, title, chosenCapacity, chosenSampleSize, download.toString()))
+                                        .addOnSuccessListener(download -> {
+                                            Log.d(TAG, "Poster upload successful (fallback), URL: " + download.toString());
+                                            writeEventDoc(id, title, chosenCapacity, chosenSampleSize, download.toString());
+                                        })
                                         .addOnFailureListener(e -> {
-                                            Log.e(TAG, "Poster upload failed", e);
-                                            toast("Upload failed: " + e.getMessage());
+                                            Log.e(TAG, "Poster upload failed (fallback)", e);
+                                            String errorMsg = e.getMessage();
+                                            if (errorMsg != null && errorMsg.contains("permission")) {
+                                                toast("Upload failed: Please check Firebase Storage permissions. Ensure you're signed in.");
+                                            } else {
+                                                toast("Upload failed: " + errorMsg);
+                                            }
                                             btnSave.setEnabled(true);
                                             btnSave.setText("SAVE CHANGES");
                                         });
@@ -645,10 +685,18 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                         if (!task.isSuccessful()) throw task.getException();
                         return ref.getDownloadUrl();
                     })
-                    .addOnSuccessListener(download -> writeEventDoc(id, title, chosenCapacity, chosenSampleSize, download.toString()))
+                    .addOnSuccessListener(download -> {
+                        Log.d(TAG, "Poster upload successful (no crop), URL: " + download.toString());
+                        writeEventDoc(id, title, chosenCapacity, chosenSampleSize, download.toString());
+                    })
                     .addOnFailureListener(e -> {
-                        Log.e(TAG, "Poster upload failed", e);
-                        toast("Upload failed: " + e.getMessage());
+                        Log.e(TAG, "Poster upload failed (no crop)", e);
+                        String errorMsg = e.getMessage();
+                        if (errorMsg != null && errorMsg.contains("permission")) {
+                            toast("Upload failed: Please check Firebase Storage permissions. Ensure you're signed in.");
+                        } else {
+                            toast("Upload failed: " + errorMsg);
+                        }
                         btnSave.setEnabled(true);
                         btnSave.setText("SAVE CHANGES");
                     });
@@ -743,10 +791,18 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                         if (!task.isSuccessful()) throw task.getException();
                         return ref.getDownloadUrl();
                     })
-                    .addOnSuccessListener(download -> writeEventDoc(id, title, chosenCapacity, chosenSampleSize, download.toString()))
+                    .addOnSuccessListener(download -> {
+                        Log.d(TAG, "Cropped poster upload successful, URL: " + download.toString());
+                        writeEventDoc(id, title, chosenCapacity, chosenSampleSize, download.toString());
+                    })
                     .addOnFailureListener(e -> {
-                        Log.e(TAG, "Poster upload failed", e);
-                        toast("Upload failed: " + e.getMessage());
+                        Log.e(TAG, "Cropped poster upload failed", e);
+                        String errorMsg = e.getMessage();
+                        if (errorMsg != null && errorMsg.contains("permission")) {
+                            toast("Upload failed: Please check Firebase Storage permissions. Ensure you're signed in.");
+                        } else {
+                            toast("Failed to process image: " + errorMsg);
+                        }
                         btnSave.setEnabled(true);
                         btnSave.setText("SAVE CHANGES");
                     });
@@ -800,8 +856,9 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         doc.put("organizerId", organizerId);
         doc.put("createdAt", System.currentTimeMillis());
         doc.put("createdAtEpochMs", System.currentTimeMillis());
-        // Use custom scheme format that works better with QR scanners
-        doc.put("qrPayload", generateQr ? ("eventease://event/" + id) : null);
+        // Always generate QR payload for sharing (regardless of QR switch setting)
+        String qrPayload = "eventease://event/" + id;
+        doc.put("qrPayload", qrPayload);
         FirebaseFirestore.getInstance()
                 .collection("events")
                 .document(id)
@@ -809,8 +866,8 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                 .addOnSuccessListener(v -> {
                     btnSave.setEnabled(true);
                     btnSave.setText("SAVE CHANGES");
-                    toast("Event created successfully!");
-                    goToMyEvents();
+                    // Always show QR dialog after creating event
+                    showQrPreparationDialog(title, qrPayload);
                 })
                 .addOnFailureListener(e -> {
                     Log.e(TAG, "Firestore write failed", e);
@@ -818,14 +875,6 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                     btnSave.setEnabled(true);
                     btnSave.setText("SAVE CHANGES");
                 });
-    }
-
-    private void showSuccessDialog(String id, String title, @Nullable String qrPayload) {
-        if (qrPayload == null) {
-            showEventOptionsDialog(title);
-        } else {
-            showQrPreparationDialog(title, qrPayload);
-        }
     }
 
     private void showQrPreparationDialog(String title, String qrPayload) {
@@ -846,28 +895,6 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         }, 1200);
     }
 
-    private void showEventOptionsDialog(String title) {
-        Dialog dialog = createCardDialog(R.layout.dialog_event_options);
-        TextView titleView = dialog.findViewById(R.id.tvEventTitle);
-        TextView subtitleView = dialog.findViewById(R.id.tvEventSubtitle);
-        MaterialButton btnViewEvents = dialog.findViewById(R.id.btnViewEvents);
-
-        if (titleView != null) {
-            titleView.setText("Event Created Successfully");
-        }
-        if (subtitleView != null) {
-            subtitleView.setText("\"" + title + "\" is ready to share.");
-        }
-
-        if (btnViewEvents != null) {
-            btnViewEvents.setOnClickListener(v -> {
-                dialog.dismiss();
-                goToMyEvents();
-            });
-        }
-
-        dialog.show();
-    }
 
     private void showQrDialog(String title, String qrPayload) {
         Dialog dialog = createCardDialog(R.layout.dialog_qr_preview);

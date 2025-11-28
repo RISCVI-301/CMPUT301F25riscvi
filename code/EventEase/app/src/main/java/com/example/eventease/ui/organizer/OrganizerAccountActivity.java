@@ -18,6 +18,7 @@ import com.bumptech.glide.Glide;
 import com.example.eventease.R;
 import com.example.eventease.ui.entrant.profile.ProfileDeletionHelper;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -346,17 +347,37 @@ public class OrganizerAccountActivity extends AppCompatActivity {
     }
 
     private void deleteUserDocumentAndAuth(String uid) {
-        DocumentReference userRef = FirebaseFirestore.getInstance().collection("users").document(uid);
-        userRef.delete()
-            .addOnSuccessListener(aVoid -> {
-                // Device auth - clear cache to trigger profile setup on next launch
-                new com.example.eventease.auth.DeviceAuthManager(OrganizerAccountActivity.this).clearCache();
-                Toast.makeText(this, "Profile deleted successfully", Toast.LENGTH_SHORT).show();
-                finish();
+        // Sign in anonymously to get Firebase Auth token for Firestore rules
+        FirebaseAuth.getInstance().signInAnonymously()
+            .addOnSuccessListener(authResult -> {
+                // Now delete with authenticated context
+                DocumentReference userRef = FirebaseFirestore.getInstance().collection("users").document(uid);
+                userRef.delete()
+                    .addOnSuccessListener(aVoid -> {
+                        // Device auth - clear cache to trigger profile setup on next launch
+                        new com.example.eventease.auth.DeviceAuthManager(OrganizerAccountActivity.this).clearCache();
+                        Toast.makeText(this, "Profile deleted successfully", Toast.LENGTH_SHORT).show();
+                        finish();
+                    })
+                    .addOnFailureListener(e -> {
+                        Log.e(TAG, "Failed to delete user document", e);
+                        Toast.makeText(this, "Failed to delete profile: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    });
             })
             .addOnFailureListener(e -> {
-                Log.e(TAG, "Failed to delete user document", e);
-                Toast.makeText(this, "Failed to delete profile: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                Log.e(TAG, "Failed to sign in anonymously", e);
+                // Try deleting anyway (might work if rules allow)
+                DocumentReference userRef = FirebaseFirestore.getInstance().collection("users").document(uid);
+                userRef.delete()
+                    .addOnSuccessListener(aVoid -> {
+                        new com.example.eventease.auth.DeviceAuthManager(OrganizerAccountActivity.this).clearCache();
+                        Toast.makeText(this, "Profile deleted successfully", Toast.LENGTH_SHORT).show();
+                        finish();
+                    })
+                    .addOnFailureListener(deleteError -> {
+                        Log.e(TAG, "Failed to delete user document", deleteError);
+                        Toast.makeText(this, "Failed to delete profile: " + deleteError.getMessage(), Toast.LENGTH_LONG).show();
+                    });
             });
     }
 }

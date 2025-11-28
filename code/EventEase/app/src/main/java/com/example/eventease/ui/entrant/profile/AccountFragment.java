@@ -34,6 +34,7 @@ import com.bumptech.glide.Glide;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
 import com.google.android.material.imageview.ShapeableImageView;
+import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -784,21 +785,43 @@ public class AccountFragment extends Fragment {
     }
 
     private void deleteUserDocumentAndAuth(String uid) {
-        // Delete user document from Firestore
-        DocumentReference userRef = db.collection("users").document(uid);
-        userRef.delete()
-            .addOnSuccessListener(aVoid -> {
-                // Device auth - clear cache to trigger profile setup on next launch
-                com.example.eventease.auth.DeviceAuthManager authManager = 
-                    new com.example.eventease.auth.DeviceAuthManager(requireContext());
-                authManager.clearCache();
-                clearPreferences();
-                ToastUtil.showShort(getContext(), "Profile deleted successfully");
-                launchProfileSetupScreen();
+        // Sign in anonymously to get Firebase Auth token for Firestore rules
+        com.google.firebase.auth.FirebaseAuth.getInstance().signInAnonymously()
+            .addOnSuccessListener(authResult -> {
+                // Now delete with authenticated context
+                DocumentReference userRef = db.collection("users").document(uid);
+                userRef.delete()
+                    .addOnSuccessListener(aVoid -> {
+                        // Device auth - clear cache to trigger profile setup on next launch
+                        com.example.eventease.auth.DeviceAuthManager authManager = 
+                            new com.example.eventease.auth.DeviceAuthManager(requireContext());
+                        authManager.clearCache();
+                        clearPreferences();
+                        ToastUtil.showShort(getContext(), "Profile deleted successfully");
+                        launchProfileSetupScreen();
+                    })
+                    .addOnFailureListener(e -> {
+                        android.util.Log.e("AccountFragment", "Failed to delete user document", e);
+                        ToastUtil.showLong(getContext(), "Failed to delete profile: " + e.getMessage());
+                    });
             })
             .addOnFailureListener(e -> {
-                android.util.Log.e("AccountFragment", "Failed to delete user document", e);
-                ToastUtil.showLong(getContext(), "Failed to delete profile: " + e.getMessage());
+                android.util.Log.e("AccountFragment", "Failed to sign in anonymously", e);
+                // Try deleting anyway (might work if rules allow)
+                DocumentReference userRef = db.collection("users").document(uid);
+                userRef.delete()
+                    .addOnSuccessListener(aVoid -> {
+                        com.example.eventease.auth.DeviceAuthManager authManager = 
+                            new com.example.eventease.auth.DeviceAuthManager(requireContext());
+                        authManager.clearCache();
+                        clearPreferences();
+                        ToastUtil.showShort(getContext(), "Profile deleted successfully");
+                        launchProfileSetupScreen();
+                    })
+                    .addOnFailureListener(deleteError -> {
+                        android.util.Log.e("AccountFragment", "Failed to delete user document", deleteError);
+                        ToastUtil.showLong(getContext(), "Failed to delete profile: " + deleteError.getMessage());
+                    });
             });
     }
 

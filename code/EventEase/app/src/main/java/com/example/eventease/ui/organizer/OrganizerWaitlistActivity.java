@@ -26,6 +26,14 @@ import com.google.firebase.firestore.WriteBatch;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
 
+import androidx.annotation.LayoutRes;
+import androidx.core.content.FileProvider;
+
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.WriterException;
+import com.google.zxing.common.BitMatrix;
+import com.google.zxing.qrcode.QRCodeWriter;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.HashMap;
@@ -33,8 +41,23 @@ import java.util.Map;
 import java.util.Calendar;
 import java.text.SimpleDateFormat;
 import java.util.Locale;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
 import android.app.DatePickerDialog;
 import android.app.TimePickerDialog;
+import android.app.Dialog;
+import android.content.ContentValues;
+import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
+import android.os.Build;
+import android.os.Environment;
+import android.provider.MediaStore;
+import android.view.ViewGroup;
+import android.view.Window;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -131,6 +154,12 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
                 mapIntent.putExtra("eventId", currentEventId);
                 startActivity(mapIntent);
             });
+        }
+
+        // Set up share button to show QR code
+        ImageView shareButton = findViewById(R.id.share_button);
+        if (shareButton != null) {
+            shareButton.setOnClickListener(v -> showEventQRDialog());
         }
 
         signInAndLoadData();
@@ -742,6 +771,201 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
                                 Toast.makeText(this, "Failed to update deadlines: " + e2.getMessage(), Toast.LENGTH_LONG).show();
                             });
                 });
+    }
+
+    /**
+     * Shows the Event QR code dialog
+     */
+    private void showEventQRDialog() {
+        if (currentEventId == null || currentEventId.isEmpty()) {
+            Toast.makeText(this, "Event ID not available", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Fetch event data to get qrPayload
+        db.collection("events").document(currentEventId).get()
+                .addOnSuccessListener(documentSnapshot -> {
+                    if (!documentSnapshot.exists()) {
+                        Toast.makeText(this, "Event not found", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    String eventTitle = documentSnapshot.getString("title");
+                    String storedQrPayload = documentSnapshot.getString("qrPayload");
+
+                    // Use stored qrPayload if available, otherwise generate it
+                    final String qrPayload;
+                    if (storedQrPayload != null && !storedQrPayload.isEmpty()) {
+                        qrPayload = storedQrPayload;
+                    } else {
+                        // Generate QR payload if not stored (use custom scheme format)
+                        qrPayload = "eventease://event/" + currentEventId;
+                    }
+
+                    final String eventTitleText = eventTitle != null ? eventTitle : "Event";
+
+                    // Show QR dialog
+                    showQrDialog(eventTitleText, qrPayload);
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to fetch event data", e);
+                    Toast.makeText(this, "Failed to load event data", Toast.LENGTH_SHORT).show();
+                });
+    }
+
+    private void showQrDialog(String title, String qrPayload) {
+        android.app.Dialog dialog = createCardDialog(R.layout.dialog_qr_preview);
+        TextView titleView = dialog.findViewById(R.id.tvEventTitle);
+        ImageView imgQr = dialog.findViewById(R.id.imgQr);
+        MaterialButton btnShare = dialog.findViewById(R.id.btnShare);
+        MaterialButton btnSave = dialog.findViewById(R.id.btnSave);
+        MaterialButton btnCopyLink = dialog.findViewById(R.id.btnCopyLink);
+        MaterialButton btnViewEvents = dialog.findViewById(R.id.btnViewEvents);
+
+        if (titleView != null) {
+            titleView.setText(title);
+        }
+
+        final android.graphics.Bitmap qrBitmap = generateQrBitmap(qrPayload);
+        if (imgQr != null) {
+            if (qrBitmap != null) {
+                imgQr.setImageBitmap(qrBitmap);
+            } else {
+                imgQr.setImageResource(R.drawable.ic_event_poster_placeholder);
+            }
+        }
+
+        if (btnShare != null) {
+            btnShare.setOnClickListener(v -> {
+                if (qrBitmap != null) {
+                    shareQrBitmap(qrBitmap, qrPayload);
+                } else {
+                    shareQrText(qrPayload);
+                }
+            });
+        }
+
+        if (btnSave != null) {
+            btnSave.setOnClickListener(v -> {
+                if (qrBitmap != null) {
+                    boolean saved = saveQrToGallery(qrBitmap, title);
+                    if (saved) {
+                        Toast.makeText(this, "Saved to gallery", Toast.LENGTH_SHORT).show();
+                    }
+                } else {
+                    Toast.makeText(this, "QR not ready yet.", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+
+        if (btnCopyLink != null) {
+            btnCopyLink.setOnClickListener(v -> {
+                android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+                android.content.ClipData clip = android.content.ClipData.newPlainText("Event Link", qrPayload);
+                clipboard.setPrimaryClip(clip);
+                Toast.makeText(OrganizerWaitlistActivity.this, "Link copied to clipboard!", Toast.LENGTH_SHORT).show();
+            });
+        }
+
+        if (btnViewEvents != null) {
+            btnViewEvents.setOnClickListener(v -> dialog.dismiss());
+        }
+
+        dialog.show();
+    }
+
+    /**
+     * Creates a card-style dialog
+     */
+    private android.app.Dialog createCardDialog(int layoutRes) {
+        android.app.Dialog dialog = new android.app.Dialog(this);
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
+        dialog.setContentView(layoutRes);
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+            dialog.getWindow().setLayout(android.view.ViewGroup.LayoutParams.MATCH_PARENT, android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+        dialog.setCanceledOnTouchOutside(false);
+        return dialog;
+    }
+
+    private android.graphics.Bitmap generateQrBitmap(String payload) {
+        try {
+            com.google.zxing.qrcode.QRCodeWriter writer = new com.google.zxing.qrcode.QRCodeWriter();
+            com.google.zxing.common.BitMatrix matrix = writer.encode(payload, com.google.zxing.BarcodeFormat.QR_CODE, 512, 512);
+            int width = matrix.getWidth();
+            int height = matrix.getHeight();
+            android.graphics.Bitmap bmp = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888);
+            for (int x = 0; x < width; x++) {
+                for (int y = 0; y < height; y++) {
+                    bmp.setPixel(x, y, matrix.get(x, y) ? android.graphics.Color.BLACK : android.graphics.Color.WHITE);
+                }
+            }
+            return bmp;
+        } catch (com.google.zxing.WriterException e) {
+            Log.e(TAG, "QR code generation failed", e);
+            return null;
+        }
+    }
+
+    private void shareQrBitmap(android.graphics.Bitmap bitmap, String payload) {
+        try {
+            java.io.File cacheDir = new java.io.File(getCacheDir(), "qr");
+            if (!cacheDir.exists() && !cacheDir.mkdirs()) {
+                throw new java.io.IOException("Unable to create cache directory");
+            }
+            java.io.File file = new java.io.File(cacheDir, "qr_" + System.currentTimeMillis() + ".png");
+            try (java.io.FileOutputStream out = new java.io.FileOutputStream(file)) {
+                bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out);
+            }
+
+            Uri uri = androidx.core.content.FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", file);
+            android.content.Intent shareIntent = new android.content.Intent(android.content.Intent.ACTION_SEND);
+            shareIntent.setType("image/png");
+            shareIntent.putExtra(android.content.Intent.EXTRA_STREAM, uri);
+            shareIntent.putExtra(android.content.Intent.EXTRA_TEXT, "Scan this QR to view the event: " + payload);
+            shareIntent.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(android.content.Intent.createChooser(shareIntent, "Share QR code"));
+        } catch (java.io.IOException e) {
+            Log.e(TAG, "Failed to share QR bitmap", e);
+            Toast.makeText(this, "Unable to share QR. Try again.", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void shareQrText(String payload) {
+        android.content.Intent shareIntent = new android.content.Intent(android.content.Intent.ACTION_SEND);
+        shareIntent.setType("text/plain");
+        shareIntent.putExtra(android.content.Intent.EXTRA_TEXT, payload);
+        startActivity(android.content.Intent.createChooser(shareIntent, "Share event link"));
+    }
+
+    private boolean saveQrToGallery(android.graphics.Bitmap bitmap, String title) {
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q) {
+            Toast.makeText(this, "Saving to gallery requires Android 10 or newer. Use Share instead.", Toast.LENGTH_SHORT).show();
+            return false;
+        }
+
+        String fileName = "EventEase_" + System.currentTimeMillis() + ".png";
+        try {
+            android.content.ContentValues values = new android.content.ContentValues();
+            values.put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, fileName);
+            values.put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "image/png");
+            values.put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_PICTURES + "/EventEase");
+
+            Uri uri = getContentResolver().insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+            if (uri == null) {
+                throw new java.io.IOException("Unable to create MediaStore entry");
+            }
+            try (java.io.OutputStream out = getContentResolver().openOutputStream(uri)) {
+                if (out == null) throw new java.io.IOException("Unable to open output stream");
+                bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out);
+            }
+            return true;
+        } catch (java.io.IOException e) {
+            Log.e(TAG, "Failed to save QR to gallery", e);
+            Toast.makeText(this, "Unable to save QR. Try again.", Toast.LENGTH_SHORT).show();
+            return false;
+        }
     }
 
 }
