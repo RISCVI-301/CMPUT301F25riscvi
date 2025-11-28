@@ -214,17 +214,55 @@ public class FirebaseAdmittedRepository implements AdmittedRepository {
             
             for (QueryDocumentSnapshot eventDoc : eventsSnapshot) {
                 eventDocs.add(eventDoc);
-                DocumentReference admittedRef = eventDoc.getReference()
-                    .collection("AdmittedEntrants")
-                    .document(uid);
-                Task<Boolean> admissionTask = admittedRef.get().continueWith(admittedTask -> {
-                    boolean isAdmitted = admittedTask.isSuccessful() && 
-                                        admittedTask.getResult() != null && 
-                                        admittedTask.getResult().exists();
-                    if (isAdmitted) {
-                        Log.d(TAG, "User is admitted to event: " + eventDoc.getId());
+                DocumentReference eventRef = eventDoc.getReference();
+                DocumentReference admittedRef = eventRef.collection("AdmittedEntrants").document(uid);
+                DocumentReference selectedRef = eventRef.collection("SelectedEntrants").document(uid);
+                
+                // CRITICAL: Check both SelectedEntrants AND AdmittedEntrants
+                // User must be in BOTH collections to show in upcoming events
+                Task<Boolean> admittedTask = admittedRef.get().continueWith(task -> {
+                    return task.isSuccessful() && task.getResult() != null && task.getResult().exists();
+                });
+                
+                Task<Boolean> selectedTask = selectedRef.get().continueWith(task -> {
+                    return task.isSuccessful() && task.getResult() != null && task.getResult().exists();
+                });
+                
+                Task<Boolean> admissionTask = Tasks.whenAllComplete(admittedTask, selectedTask)
+                    .continueWith(allTasks -> {
+                        if (!allTasks.isSuccessful() || allTasks.getResult() == null) {
+                            return false;
+                        }
+                        
+                        boolean isAdmitted = false;
+                        boolean isSelected = false;
+                        
+                        try {
+                            @SuppressWarnings("unchecked")
+                            Task<Boolean> admittedResult = (Task<Boolean>) allTasks.getResult().get(0);
+                            if (admittedResult.isSuccessful() && admittedResult.getResult() != null) {
+                                isAdmitted = Boolean.TRUE.equals(admittedResult.getResult());
+                            }
+                        } catch (Exception e) {
+                            Log.w(TAG, "Error checking admitted status", e);
+                        }
+                        
+                        try {
+                            @SuppressWarnings("unchecked")
+                            Task<Boolean> selectedResult = (Task<Boolean>) allTasks.getResult().get(1);
+                            if (selectedResult.isSuccessful() && selectedResult.getResult() != null) {
+                                isSelected = Boolean.TRUE.equals(selectedResult.getResult());
+                            }
+                        } catch (Exception e) {
+                            Log.w(TAG, "Error checking selected status", e);
+                        }
+                        
+                        // CRITICAL: User must be in BOTH SelectedEntrants AND AdmittedEntrants
+                        boolean both = isAdmitted && isSelected;
+                        if (both) {
+                            Log.d(TAG, "User is in both SelectedEntrants and AdmittedEntrants for event: " + eventDoc.getId());
                     }
-                    return isAdmitted;
+                        return both;
                 });
                 admittedTasks.add(admissionTask);
             }

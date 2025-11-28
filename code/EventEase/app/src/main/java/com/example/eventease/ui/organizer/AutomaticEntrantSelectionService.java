@@ -16,6 +16,10 @@ import java.util.concurrent.Executors;
 /**
  * Service that automatically processes entrant selection when event registration periods end.
  * 
+ * <p><b>DISABLED:</b> This service is currently disabled to avoid race conditions with the Cloud Function.
+ * We now rely exclusively on the Cloud Function (processAutomaticEntrantSelection) which runs every 1 minute
+ * via Cloud Scheduler. The Cloud Function is more reliable as it works even when the app is closed.
+ * 
  * <p>This service automatically checks for events whose registration period has ended
  * and triggers the selection process to randomly select entrants from the waitlist.
  * It runs as a background listener to ensure selections happen automatically when
@@ -23,6 +27,8 @@ import java.util.concurrent.Executors;
  * 
  * <p>The service selects entrants (not events) - it picks random entrants from
  * the waitlist for events that have reached their registration deadline.
+ * 
+ * <p>To re-enable: Uncomment the call in MainActivity.java line 243
  */
 public class AutomaticEntrantSelectionService extends JobService {
     private static final String TAG = "AutoEntrantSelection";

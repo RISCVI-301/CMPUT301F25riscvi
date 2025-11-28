@@ -42,12 +42,26 @@ public class ReplacementHelper {
     }
 
     private void performReplacement(String eventId, String eventTitle, int count) {
-        // Get event details for deadline calculation
-        db.collection("events").document(eventId).get()
+        // Get event details for deadline calculation and sample size
+        DocumentReference eventRef = db.collection("events").document(eventId);
+        eventRef.get()
                 .addOnSuccessListener(eventDoc -> {
-                    // Use correct Firestore field names
-                    Long eventDeadline = eventDoc != null ? eventDoc.getLong("deadlineEpochMs") : null;
-                    Long eventStart = eventDoc != null ? eventDoc.getLong("eventStart") : null;
+                    if (eventDoc == null || !eventDoc.exists()) {
+                        Log.e(TAG, "Event not found: " + eventId);
+                        return;
+                    }
+                    
+                    // Get sample size
+                    int sampleSize = 0;
+                    Long sampleSizeObj = eventDoc.getLong("sampleSize");
+                    if (sampleSizeObj != null) {
+                        sampleSize = sampleSizeObj.intValue();
+                    }
+                    final int finalSampleSize = sampleSize;
+                    
+                    // Use correct Firestore field names for deadline
+                    Long eventDeadline = eventDoc.getLong("deadlineEpochMs");
+                    Long eventStart = eventDoc.getLong("eventStart");
                     
                     // Calculate deadline for replacement invitations
                     long currentTime = System.currentTimeMillis();
@@ -65,8 +79,23 @@ public class ReplacementHelper {
                     
                     final long deadlineToAccept = calculatedDeadline;
 
+                    // CRITICAL: Check current selected count before proceeding
+                    eventRef.collection("SelectedEntrants").get()
+                                .addOnSuccessListener(selectedSnapshot -> {
+                                    int currentSelectedCount = selectedSnapshot != null ? selectedSnapshot.size() : 0;
+                                    int availableSpots = finalSampleSize > 0 ? (finalSampleSize - currentSelectedCount) : count;
+                                    
+                                    Log.d(TAG, "Replacement check: currentSelected=" + currentSelectedCount + ", sampleSize=" + finalSampleSize + ", availableSpots=" + availableSpots + ", requested=" + count);
+                                    
+                                    if (finalSampleSize > 0 && availableSpots <= 0) {
+                                        Log.w(TAG, "Cannot replace: Already at sample size limit (" + currentSelectedCount + "/" + finalSampleSize + ")");
+                                        return;
+                                    }
+                                    
+                                    int actualCount = finalSampleSize > 0 ? Math.min(availableSpots, count) : count;
+
                     // Fetch waitlisted entrants
-                    db.collection("events").document(eventId).collection("WaitlistedEntrants").get()
+                                    eventRef.collection("WaitlistedEntrants").get()
                             .addOnSuccessListener(waitlistSnapshot -> {
                                 if (waitlistSnapshot == null || waitlistSnapshot.isEmpty()) {
                                     Log.d(TAG, "No waitlisted entrants available");
@@ -74,15 +103,14 @@ public class ReplacementHelper {
                                 }
 
                                 List<DocumentSnapshot> waitlistDocs = waitlistSnapshot.getDocuments();
-                                if (waitlistDocs.size() < count) {
-                                    Log.d(TAG, "Not enough waitlisted entrants available");
+                                                if (waitlistDocs.size() < actualCount) {
+                                                    Log.d(TAG, "Not enough waitlisted entrants available (need " + actualCount + ", have " + waitlistDocs.size() + ")");
                                     return;
                                 }
 
-                                // Randomly select entrants
-                                List<DocumentSnapshot> selectedForReplacement = randomlySelect(waitlistDocs, count);
+                                                // Randomly select entrants (limited to availableSpots)
+                                                List<DocumentSnapshot> selectedForReplacement = randomlySelect(waitlistDocs, actualCount);
                                 
-                                DocumentReference eventRef = db.collection("events").document(eventId);
                                 WriteBatch batch = db.batch();
                                 List<String> userIds = new ArrayList<>();
 
@@ -117,9 +145,26 @@ public class ReplacementHelper {
                                     }
                                 }
 
+                                                // CRITICAL: Final verification before commit
+                                                int finalTotal = currentSelectedCount + selectedForReplacement.size();
+                                                if (finalSampleSize > 0 && finalTotal > finalSampleSize) {
+                                                    Log.e(TAG, "CRITICAL: Final count (" + finalTotal + ") would exceed sampleSize (" + finalSampleSize + ")! Truncating.");
+                                                    int maxToAdd = finalSampleSize - currentSelectedCount;
+                                                    if (maxToAdd > 0) {
+                                                        selectedForReplacement = selectedForReplacement.subList(0, maxToAdd);
+                                                        userIds.clear();
+                                                        for (DocumentSnapshot doc : selectedForReplacement) {
+                                                            userIds.add(doc.getId());
+                                                        }
+                                                    } else {
+                                                        Log.e(TAG, "Cannot add any more - already at sample size!");
+                                                        return;
+                                    }
+                                }
+
                                 batch.commit()
                                         .addOnSuccessListener(v -> {
-                                            Log.d(TAG, "Successfully auto-replaced " + count + " entrant(s)");
+                                                            Log.d(TAG, "Successfully auto-replaced " + userIds.size() + " entrant(s) (sampleSize: " + finalSampleSize + ", total selected: " + (currentSelectedCount + userIds.size()) + ")");
                                             
                                             // Send notifications
                                             String eventTitleStr = eventTitle != null ? eventTitle : "the event";
@@ -131,6 +176,10 @@ public class ReplacementHelper {
                             })
                             .addOnFailureListener(e -> {
                                 Log.e(TAG, "Failed to load waitlisted entrants for replacement", e);
+                                            });
+                                    })
+                                    .addOnFailureListener(e -> {
+                                        Log.e(TAG, "Failed to load selected entrants count", e);
                             });
                 })
                 .addOnFailureListener(e -> {

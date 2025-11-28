@@ -230,17 +230,21 @@ public class MainActivity extends AppCompatActivity {
                         // Initialize FCM token manager
                         FCMTokenManager.getInstance().initialize();
                         
-                        // Initialize InvitationNotificationListener for local notifications
-                        // (Cloud Functions may also send notifications, but local listener ensures
-                        // notifications work even if Cloud Functions fail, and has cooldown to prevent duplicates)
-                        if (invitationListener == null) {
-                            FCMTokenManager.getInstance().initialize(MainActivity.this);
-                            invitationListener = new InvitationNotificationListener(this);
-                            invitationListener.startListening();
-                        }
+                        // DISABLED: InvitationNotificationListener
+                        // Cloud Functions already send personalized FCM notifications when invitations are created.
+                        // Local notifications from InvitationNotificationListener were causing duplicates.
+                        // We rely exclusively on Cloud Functions for notifications to ensure consistency.
+                        // if (invitationListener == null) {
+                        //     FCMTokenManager.getInstance().initialize(MainActivity.this);
+                        //     invitationListener = new InvitationNotificationListener(this);
+                        //     invitationListener.startListening();
+                        // }
                         
-                        // Setup automatic entrant selection listener (only once)
-                        AutomaticEntrantSelectionService.setupAutomaticSelectionListener();
+                        // DISABLED: Automatic entrant selection listener
+                        // We rely on Cloud Function (processAutomaticEntrantSelection) instead
+                        // to avoid race conditions and ensure reliability even when app is closed.
+                        // Cloud Function runs every 1 minute via Cloud Scheduler.
+                        // AutomaticEntrantSelectionService.setupAutomaticSelectionListener();
                         
                         // Setup automatic deadline processor service (only once)
                         com.example.eventease.ui.organizer.AutomaticDeadlineProcessorService.setupDeadlineProcessorListener();
@@ -339,22 +343,108 @@ public class MainActivity extends AppCompatActivity {
         // This will create the channel with HIGH importance (after our fix)
         com.example.eventease.notifications.NotificationChannelManager.createNotificationChannel(this);
         
+        // Verify notification channel is properly set up
+        verifyNotificationSetup();
+        
         FCMTokenManager.getInstance().initialize(this);
         
-        // Only create invitation listener if it doesn't already exist
-        // (It may already be created in the navigation listener)
-        if (invitationListener == null) {
-        invitationListener = new InvitationNotificationListener(this);
-        invitationListener.startListening();
+        // DISABLED: InvitationNotificationListener
+        // Cloud Functions already send personalized FCM notifications when invitations are created.
+        // Local notifications from InvitationNotificationListener were causing duplicates.
+        // We rely exclusively on Cloud Functions for notifications to ensure consistency.
+        // if (invitationListener == null) {
+        //     invitationListener = new InvitationNotificationListener(this);
+        //     invitationListener.startListening();
+        // }
+    }
+    
+    /**
+     * Verifies that notification setup is correct and logs diagnostic information.
+     * This helps debug notification issues, especially on emulators.
+     */
+    private void verifyNotificationSetup() {
+        Log.d("MainActivity", "=== Verifying Notification Setup ===");
+        
+        // Check notification permission
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            boolean hasPermission = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) 
+                    == PackageManager.PERMISSION_GRANTED;
+            Log.d("MainActivity", "POST_NOTIFICATIONS permission: " + (hasPermission ? "GRANTED" : "DENIED"));
+        } else {
+            Log.d("MainActivity", "Android < 13, permission granted via manifest");
         }
+        
+        // Check notification manager
+        android.app.NotificationManager nm = getSystemService(android.app.NotificationManager.class);
+        if (nm == null) {
+            Log.e("MainActivity", "NotificationManager is NULL - notifications will not work!");
+            return;
+        }
+        
+        // Check if notifications are enabled for the app
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            boolean appNotificationsEnabled = nm.areNotificationsEnabled();
+            Log.d("MainActivity", "App notifications enabled: " + appNotificationsEnabled);
+            if (!appNotificationsEnabled) {
+                Log.w("MainActivity", "⚠ WARNING: Notifications are disabled for this app!");
+                Log.w("MainActivity", "  User needs to enable in: Settings → Apps → EventEase → Notifications");
+            }
+        }
+        
+        // Check notification channel (Android O+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            android.app.NotificationChannel channel = nm.getNotificationChannel("event_invitations");
+            if (channel == null) {
+                Log.e("MainActivity", "⚠ WARNING: Notification channel 'event_invitations' does not exist!");
+                Log.e("MainActivity", "  Attempting to create it now...");
+                com.example.eventease.notifications.NotificationChannelManager.createNotificationChannel(this);
+                // Re-check after creation
+                channel = nm.getNotificationChannel("event_invitations");
+            }
+            
+            if (channel != null) {
+                int importance = channel.getImportance();
+                Log.d("MainActivity", "Notification channel 'event_invitations':");
+                Log.d("MainActivity", "  - Importance: " + importance + " (0=NONE, 1=MIN, 2=LOW, 3=DEFAULT, 4=HIGH)");
+                Log.d("MainActivity", "  - Enabled: " + (importance != android.app.NotificationManager.IMPORTANCE_NONE));
+                Log.d("MainActivity", "  - Sound: " + (channel.getSound() != null ? channel.getSound().toString() : "none"));
+                Log.d("MainActivity", "  - Vibration: " + channel.shouldVibrate());
+                Log.d("MainActivity", "  - Lights: " + channel.shouldShowLights());
+                
+                if (importance == android.app.NotificationManager.IMPORTANCE_NONE) {
+                    Log.e("MainActivity", "⚠ CRITICAL: Notification channel is BLOCKED (importance = NONE)!");
+                    Log.e("MainActivity", "  Notifications will NOT be displayed!");
+                    Log.e("MainActivity", "  Solution: Settings → Apps → EventEase → Notifications → Event Invitations");
+                } else if (importance < android.app.NotificationManager.IMPORTANCE_HIGH) {
+                    Log.w("MainActivity", "⚠ WARNING: Notification channel has low importance (" + importance + ")");
+                    Log.w("MainActivity", "  Notifications may not show as heads-up notifications");
+                }
+            }
+        }
+        
+        // Check FCM token
+        com.google.firebase.messaging.FirebaseMessaging.getInstance().getToken()
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful()) {
+                        String token = task.getResult();
+                        Log.d("MainActivity", "FCM Token: " + (token != null ? token.substring(0, Math.min(20, token.length())) + "..." : "NULL"));
+                        Log.d("MainActivity", "FCM Token length: " + (token != null ? token.length() : 0));
+                    } else {
+                        Log.e("MainActivity", "Failed to get FCM token: " + (task.getException() != null ? task.getException().getMessage() : "Unknown error"));
+                        Log.e("MainActivity", "  This may indicate Google Play Services is not available (common on emulators)");
+                    }
+                });
+        
+        Log.d("MainActivity", "=== Notification Setup Verification Complete ===");
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (invitationListener != null) {
-            invitationListener.stopListening();
-        }
+        // DISABLED: InvitationNotificationListener is no longer used
+        // if (invitationListener != null) {
+        //     invitationListener.stopListening();
+        // }
     }
 
     @Override

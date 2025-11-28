@@ -287,6 +287,7 @@ public class FirebaseInvitationRepository implements InvitationRepository {
             DocumentReference selectedDoc = eventRef.collection("SelectedEntrants").document(uid);
             DocumentReference nonSelectedDoc = eventRef.collection("NonSelectedEntrants").document(uid);
             DocumentReference cancelledDoc = eventRef.collection("CancelledEntrants").document(uid);
+        DocumentReference invitationRef = db.collection("invitations").document(invitationId);
             
             Log.d(TAG, "Fetching user document...");
             return db.collection("users").document(uid).get().continueWithTask(userTask -> {
@@ -296,14 +297,6 @@ public class FirebaseInvitationRepository implements InvitationRepository {
                 
                 DocumentSnapshot userDoc = userTask.isSuccessful() ? userTask.getResult() : null;
                 Map<String, Object> cancelledData = buildCancelledEntry(uid, userDoc);
-            
-            // Delete invitation document and notificationRequests entry
-            return deleteInvitationAndNotificationRequests(invitationId, eventId, uid)
-                    .continueWithTask(deleteTask -> {
-                        if (!deleteTask.isSuccessful()) {
-                            Log.e(TAG, "Failed to delete invitation and notification requests", deleteTask.getException());
-                            return Tasks.forException(deleteTask.getException());
-                        }
                 
                 Log.d(TAG, "Building batch operations:");
                 Log.d(TAG, "  1. Update invitation status to DECLINED");
@@ -313,6 +306,15 @@ public class FirebaseInvitationRepository implements InvitationRepository {
                 Log.d(TAG, "  5. Delete from NonSelectedEntrants");
                 
                 WriteBatch batch = db.batch();
+            
+            // CRITICAL: Update invitation status to DECLINED (don't delete - needed for queries)
+            // This is consistent with InvitationDeadlineProcessor which also updates status
+            Map<String, Object> invitationUpdates = new HashMap<>();
+            invitationUpdates.put("status", "DECLINED");
+            invitationUpdates.put("declinedAt", System.currentTimeMillis());
+            batch.update(invitationRef, invitationUpdates);
+            
+            // Move user to CancelledEntrants
                 batch.set(cancelledDoc, cancelledData, SetOptions.merge());
                 // CRITICAL: Remove from ALL other collections to ensure mutual exclusivity
                 batch.delete(waitlistDoc);
@@ -321,8 +323,12 @@ public class FirebaseInvitationRepository implements InvitationRepository {
             
             Log.d(TAG, "Committing batch...");
             return batch.commit()
-                    .continueWith(commitTask -> {
-                        if (commitTask.isSuccessful()) {
+                    .continueWithTask(commitTask -> {
+                        if (!commitTask.isSuccessful()) {
+                            Log.e(TAG, "❌ FAILED: Batch commit failed!", commitTask.getException());
+                            return Tasks.forException(commitTask.getException());
+                        }
+                        
                             Log.d(TAG, "✅ SUCCESS: Batch committed successfully!");
                             Log.d(TAG, "  ✓ Invitation status → DECLINED");
                             Log.d(TAG, "  ✓ User added to → CancelledEntrants");
@@ -330,16 +336,20 @@ public class FirebaseInvitationRepository implements InvitationRepository {
                             Log.d(TAG, "  ✓ User deleted from → SelectedEntrants");
                             Log.d(TAG, "  ✓ User deleted from → NonSelectedEntrants");
                             
+                        // Update in-memory invitation status
                             Invitation inv = byId.get(invitationId);
                             if (inv != null) {
                                 inv.setStatus(Status.DECLINED);
                             }
                             notifyUid(uid);
                             
-                            // NOTE: Automatic replacement is disabled - organizer must manually replace via button
+                        // Clean up notificationRequests (non-critical, log errors but don't fail)
+                        return deleteNotificationRequests(eventId, uid)
+                                .continueWith(cleanupTask -> {
+                                    if (!cleanupTask.isSuccessful()) {
+                                        Log.w(TAG, "⚠️ Warning: Failed to clean up notification requests, but user was successfully moved to CancelledEntrants", cleanupTask.getException());
                         } else {
-                            Log.e(TAG, "❌ FAILED: Batch commit failed!");
-                            Log.e(TAG, "Error: " + commitTask.getException().getMessage(), commitTask.getException());
+                                        Log.d(TAG, "✓ Cleaned up notification requests");
                                     }
                                     return null;
                                 });
@@ -349,6 +359,7 @@ public class FirebaseInvitationRepository implements InvitationRepository {
     
     /**
      * Deletes the invitation document and any related notificationRequests entries.
+     * Used by accept() method which deletes invitations when accepted.
      */
     private Task<Void> deleteInvitationAndNotificationRequests(String invitationId, String eventId, String uid) {
         // Delete invitation document
@@ -393,6 +404,48 @@ public class FirebaseInvitationRepository implements InvitationRepository {
                         }
                     } else {
                         Log.w(TAG, "Failed to query notificationRequests or no results found");
+                    }
+                    
+                    return Tasks.forResult(null);
+                });
+    }
+    
+    /**
+     * Deletes only notificationRequests entries (not invitations).
+     * Used by decline() method which updates invitation status instead of deleting.
+     */
+    private Task<Void> deleteNotificationRequests(String eventId, String uid) {
+        return db.collection("notificationRequests")
+                .whereEqualTo("eventId", eventId)
+                .whereArrayContains("userIds", uid)
+                .get()
+                .continueWithTask(queryTask -> {
+                    if (!queryTask.isSuccessful() || queryTask.getResult() == null) {
+                        return Tasks.forResult(null);
+                    }
+                    
+                    QuerySnapshot snapshot = queryTask.getResult();
+                    if (snapshot.isEmpty()) {
+                        return Tasks.forResult(null);
+                    }
+                    
+                    WriteBatch batch = db.batch();
+                    int deleteCount = 0;
+                    for (DocumentSnapshot doc : snapshot.getDocuments()) {
+                        batch.delete(doc.getReference());
+                        deleteCount++;
+                    }
+                    
+                    if (deleteCount > 0) {
+                        Log.d(TAG, "Deleting " + deleteCount + " notificationRequests entries for eventId: " + eventId + ", uid: " + uid);
+                        return batch.commit().continueWith(commitTask -> {
+                            if (commitTask.isSuccessful()) {
+                                Log.d(TAG, "Successfully deleted notificationRequests entries");
+                            } else {
+                                Log.e(TAG, "Failed to delete notificationRequests entries", commitTask.getException());
+                            }
+                            return null;
+                        });
                     }
                     
                     return Tasks.forResult(null);

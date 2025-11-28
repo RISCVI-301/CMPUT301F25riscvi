@@ -44,6 +44,7 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.cardview.widget.CardView;
 
@@ -519,7 +520,7 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
                 });
     }
 
-    private void moveSelectedEntrantToCancelled(String userId, @Nullable Map<String, Object> data) {
+    private void moveSelectedEntrantToCancelled(String userId, Map<String, Object> data) {
         if (eventId == null || eventId.isEmpty()) {
             Toast.makeText(this, "Event ID not found", Toast.LENGTH_SHORT).show();
             return;
@@ -531,7 +532,7 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
         moveEntrantBetweenCollections(userId, payload, "SelectedEntrants", "CancelledEntrants");
     }
 
-    private void moveSelectedEntrantToNotSelected(String userId, @Nullable Map<String, Object> data) {
+    private void moveSelectedEntrantToNotSelected(String userId, Map<String, Object> data) {
         if (eventId == null || eventId.isEmpty()) {
             Toast.makeText(this, "Event ID not found", Toast.LENGTH_SHORT).show();
             return;
@@ -1091,6 +1092,22 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
                                                             finalSelectedForReplacement = selectedForReplacement.subList(0, canAdd);
                                                         }
                                                         
+                                                        // CRITICAL: Final verification before batch commit
+                                                        int finalTotalCount = currentSelectedCount + finalSelectedForReplacement.size();
+                                                        if (finalTotalCount > finalSampleSize) {
+                                                            Log.e(TAG, "CRITICAL: Final count (" + finalTotalCount + ") would exceed sampleSize (" + finalSampleSize + ")! Adjusting.");
+                                                            int maxToAdd = finalSampleSize - currentSelectedCount;
+                                                            if (maxToAdd > 0) {
+                                                                finalSelectedForReplacement = finalSelectedForReplacement.subList(0, maxToAdd);
+                                                                Log.w(TAG, "Adjusted replacement count to " + maxToAdd + " to respect sample size");
+                                                            } else {
+                                                                Toast.makeText(this, 
+                                                                    "Cannot add any more - already at sample size limit",
+                                                                    Toast.LENGTH_LONG).show();
+                                                                return;
+                                                            }
+                                                        }
+                                                        
                                                         WriteBatch finalBatch = db.batch();
                                                         
                                                         // Move selected entrants from NonSelectedEntrants to SelectedEntrants
@@ -1101,7 +1118,14 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
                                                             
                                                             if (data != null) {
                                                                 int index = finalUserIds.size();
-                                                                Log.d(TAG, "Replacement: Moving user " + userId + " from NonSelected to Selected (will make " + (currentSelectedCount + index) + "/" + finalSampleSize + " selected)");
+                                                                int willBeTotal = currentSelectedCount + index;
+                                                                Log.d(TAG, "Replacement: Moving user " + userId + " from NonSelected to Selected (will make " + willBeTotal + "/" + finalSampleSize + " selected)");
+                                                                
+                                                                // CRITICAL: Final check per user - ensure we don't exceed
+                                                                if (willBeTotal > finalSampleSize) {
+                                                                    Log.e(TAG, "CRITICAL: Stopping replacement - would exceed sample size at user " + userId);
+                                                                    break; // Stop adding more users
+                                                                }
                                                                 
                                                                 // CRITICAL: Ensure mutual exclusivity - user can only exist in ONE collection
                                                                 // Move to SelectedEntrants
@@ -1125,16 +1149,19 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
                                                             }
                                                         }
                                                         
+                                                        // CRITICAL: Create final copy of user IDs for lambda (must be final or effectively final)
+                                                        final List<String> finalUserIdsForLambda = new ArrayList<>(finalUserIds);
+                                                        
                                                         // Commit final batch
                                                         finalBatch.commit()
                                                                 .addOnSuccessListener(v -> {
                                                                     Toast.makeText(this, 
-                                                                            "Successfully selected " + finalUserIds.size() + " entrant" + (finalUserIds.size() == 1 ? "" : "s") + " for replacement",
+                                                                            "Successfully selected " + finalUserIdsForLambda.size() + " entrant" + (finalUserIdsForLambda.size() == 1 ? "" : "s") + " for replacement",
                                                                             Toast.LENGTH_LONG).show();
                                                                     
                                                                     // Send notifications with deadline
                                                                     String eventTitleStr = eventTitle != null ? eventTitle : "the event";
-                                                                    sendReplacementNotifications(finalUserIds, eventTitleStr, deadlineToAccept);
+                                                                    sendReplacementNotifications(finalUserIdsForLambda, eventTitleStr, deadlineToAccept);
                                                                     
                                                                     // Reload entrants
                                                                     loadEntrantsFromFirestore();
@@ -1339,7 +1366,11 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
 
     private void attemptMoveWithCapacity(DocumentReference eventRef, String userId, Map<String, Object> data,
                                          String fromCollection, String toCollection) {
+        // CRITICAL: Only check sample size when moving TO SelectedEntrants from another collection
+        // Moving TO CancelledEntrants or NonSelectedEntrants is always allowed (even if sample size is met)
+        // Moving FROM SelectedEntrants to another collection is always allowed (frees up a spot)
         if ("SelectedEntrants".equals(toCollection) && !"SelectedEntrants".equals(fromCollection)) {
+            // Moving TO SelectedEntrants from NonSelected/Cancelled - check sample size limit
             eventRef.get()
                     .addOnSuccessListener(eventDoc -> {
                         int sampleSize = 0;
@@ -1350,20 +1381,56 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
                             }
                         }
 
-                        if (sampleSize <= 0) {
+                        final int sampleLimit = sampleSize;
+                        if (sampleLimit <= 0) {
+                            // No sample size limit, allow the move
                             performMoveBatch(eventRef, userId, data, fromCollection, toCollection);
                             return;
                         }
 
+                        // Check current selected count
                         eventRef.collection("SelectedEntrants").get()
                                 .addOnSuccessListener(selectedSnap -> {
                                     int currentSelected = selectedSnap != null ? selectedSnap.size() : 0;
-                                    if (currentSelected >= sampleSize) {
+                                    
+                                    // CRITICAL: Check if user is already in SelectedEntrants (shouldn't happen, but safety check)
+                                    boolean isAlreadySelected = false;
+                                    if (selectedSnap != null) {
+                                        for (DocumentSnapshot doc : selectedSnap.getDocuments()) {
+                                            if (doc.getId().equals(userId)) {
+                                                isAlreadySelected = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    
+                                    // If user is already selected, allow the move (it's just updating data)
+                                    if (isAlreadySelected) {
+                                        Log.d(TAG, "User already in SelectedEntrants, allowing move (data update)");
+                                        performMoveBatch(eventRef, userId, data, fromCollection, toCollection);
+                                        return;
+                                    }
+                                    
+                                    // CRITICAL: Check if adding this user would exceed sample size
+                                    if (currentSelected >= sampleLimit) {
                                         Toast.makeText(this,
-                                                "Sample size limit reached. Cannot add more selected entrants.",
+                                                String.format("Sample size limit reached (%d/%d). Cannot add more selected entrants. You can move existing selected entrants to Cancelled or Not Selected.",
+                                                    currentSelected, sampleLimit),
                                                 Toast.LENGTH_LONG).show();
                                         return;
                                     }
+                                    
+                                    // CRITICAL: Final check - ensure we won't exceed after adding
+                                    int finalCount = currentSelected + 1;
+                                    if (finalCount > sampleLimit) {
+                                        Toast.makeText(this,
+                                                String.format("Cannot add: Would exceed sample size (%d > %d).",
+                                                    finalCount, sampleLimit),
+                                                Toast.LENGTH_LONG).show();
+                                        return;
+                                    }
+                                    
+                                    // Sample size check passed, allow the move
                                     performMoveBatch(eventRef, userId, data, fromCollection, toCollection);
                                 })
                                 .addOnFailureListener(e -> {
@@ -1376,6 +1443,8 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
                         Toast.makeText(this, "Failed to load event details", Toast.LENGTH_SHORT).show();
                     });
         } else {
+            // Moving TO CancelledEntrants or NonSelectedEntrants - always allowed
+            // OR moving FROM SelectedEntrants - always allowed (frees up a spot)
             performMoveBatch(eventRef, userId, data, fromCollection, toCollection);
         }
     }
@@ -1385,14 +1454,19 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
         DocumentReference fromRef = eventRef.collection(fromCollection).document(userId);
         DocumentReference toRef = eventRef.collection(toCollection).document(userId);
 
+        // CRITICAL: Get references to ALL collections to ensure mutual exclusivity
         DocumentReference waitlistRef = eventRef.collection("WaitlistedEntrants").document(userId);
         DocumentReference selectedRef = eventRef.collection("SelectedEntrants").document(userId);
         DocumentReference nonSelectedRef = eventRef.collection("NonSelectedEntrants").document(userId);
         DocumentReference cancelledRef = eventRef.collection("CancelledEntrants").document(userId);
 
         WriteBatch batch = db.batch();
+        
+        // Add to target collection
         batch.set(toRef, entrantData);
 
+        // CRITICAL: Ensure mutual exclusivity - delete from ALL other collections
+        // This ensures user exists in only ONE collection (Selected, NonSelected, or Cancelled)
         if (!"WaitlistedEntrants".equals(toCollection)) {
             batch.delete(waitlistRef);
         }
@@ -1406,17 +1480,21 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
             batch.delete(cancelledRef);
         }
 
+        // Also delete from source collection if different from target
         if (!fromCollection.equals(toCollection)) {
             batch.delete(fromRef);
         }
 
+        Log.d(TAG, "Moving entrant " + userId + " from " + fromCollection + " to " + toCollection);
+
         batch.commit()
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(this, "Entrant moved successfully", Toast.LENGTH_SHORT).show();
+                    Log.d(TAG, "Successfully moved entrant " + userId + " from " + fromCollection + " to " + toCollection);
                     loadEntrantsFromFirestore();
                 })
                 .addOnFailureListener(e -> {
-                    Log.e(TAG, "Failed to move entrant", e);
+                    Log.e(TAG, "Failed to move entrant from " + fromCollection + " to " + toCollection, e);
                     Toast.makeText(this, "Failed to move entrant: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                 });
     }

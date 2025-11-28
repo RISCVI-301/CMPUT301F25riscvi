@@ -269,8 +269,10 @@ public class MyEventsFragment extends Fragment {
                         int admittedCount = allMyEvents.size();
                         
                         // Process waitlisted/selected events
-                        // Show events if user is in waitlist OR selected (regardless of time)
+                        // Show events if user is in waitlist OR selected OR not selected (until invitations sent)
+                        // CRITICAL: After event starts, these events should only show in previous events
                         long currentTime = System.currentTimeMillis();
+                        long oneMinuteInMs = 60 * 1000; // 1 minute in milliseconds
                         
                         List<Event> waitlistedSelected = new ArrayList<>();
                         List<Event> acceptedNotYetShown = new ArrayList<>();
@@ -282,30 +284,52 @@ public class MyEventsFragment extends Fragment {
                                     continue;
                                 }
                                 
+                                // CRITICAL: Check if event has started - if so, skip from waitlisted/selected
+                                // Events that have started should only appear in previous events
+                                long eventStart = e.getStartsAtEpochMs();
+                                if (eventStart > 0 && currentTime >= eventStart) {
+                                    android.util.Log.d("MyEventsFragment", "Event " + e.getTitle() + " has already started (startTime: " + eventStart + ", currentTime: " + currentTime + ") - skipping from waitlisted/selected (will show in previous events)");
+                                    continue;
+                                }
+                                
                                 Boolean joined = Tasks.await(waitlistRepo.isJoined(e.getId(), uid));
                                 Boolean inSelected = Tasks.await(isInSelectedEntrants(e.getId(), uid));
                                 Boolean inNonSelected = Tasks.await(isInNonSelectedEntrants(e.getId(), uid));
+                                Boolean inCancelled = Tasks.await(isInCancelledEntrants(e.getId(), uid));
                                 Boolean admitted = Tasks.await(admittedRepo.isAdmitted(e.getId(), uid));
                                 Boolean hasAcceptedInvitation = Tasks.await(hasAcceptedInvitation(e.getId(), uid));
                                 Boolean hasDeclinedInvitation = Tasks.await(hasDeclinedInvitation(e.getId(), uid));
                                 
-                                android.util.Log.d("MyEventsFragment", "Event " + e.getTitle() + " - Joined: " + joined + ", Selected: " + inSelected + ", NonSelected: " + inNonSelected + ", Admitted: " + admitted + ", Accepted: " + hasAcceptedInvitation + ", Declined: " + hasDeclinedInvitation);
+                                android.util.Log.d("MyEventsFragment", "Event " + e.getTitle() + " - Joined: " + joined + ", Selected: " + inSelected + ", NonSelected: " + inNonSelected + ", Cancelled: " + inCancelled + ", Admitted: " + admitted + ", Accepted: " + hasAcceptedInvitation + ", Declined: " + hasDeclinedInvitation);
                                 
-                                // If user has accepted invitation, show in "Upcoming" section
-                                if (Boolean.TRUE.equals(hasAcceptedInvitation) || Boolean.TRUE.equals(admitted)) {
+                                // CRITICAL: Show in upcoming only if user is in BOTH SelectedEntrants AND AdmittedEntrants
+                                // AND event hasn't started yet
+                                if (Boolean.TRUE.equals(inSelected) && Boolean.TRUE.equals(admitted)) {
                                     acceptedNotYetShown.add(e);
                                     eventIds.add(e.getId());
+                                    android.util.Log.d("MyEventsFragment", "Event " + e.getTitle() + " - User is in both Selected and Admitted, showing in upcoming");
                                 }
-                                // If user declined/rejected, skip (will show in PreviousEventsFragment)
-                                else if (Boolean.TRUE.equals(hasDeclinedInvitation)) {
-                                    android.util.Log.d("MyEventsFragment", "User declined event " + e.getTitle() + " - skipping (will show in previous events)");
-                                    // Skip - declined events should show in PreviousEventsFragment
+                                // If user declined/rejected or in cancelled, skip (will show in PreviousEventsFragment)
+                                else if (Boolean.TRUE.equals(hasDeclinedInvitation) || Boolean.TRUE.equals(inCancelled)) {
+                                    android.util.Log.d("MyEventsFragment", "User declined/cancelled event " + e.getTitle() + " - skipping (will show in previous events)");
+                                    // Skip - declined/cancelled events should show in PreviousEventsFragment
                                 }
-                                // Show if in waitlist OR non-selected OR selected (pending), AND NOT admitted
-                                else if ((Boolean.TRUE.equals(joined) || Boolean.TRUE.equals(inNonSelected) || Boolean.TRUE.equals(inSelected)) && !Boolean.TRUE.equals(admitted)) {
-                                    // Show in waitlist section - these are events user is waiting on
+                                // CRITICAL: Show in waitlist if user is in selected OR not selected (until event start - 1 minute)
+                                // For not selected: if current time >= event start - 1 minute, they should be in cancelled (handled by cloud function)
+                                else if (Boolean.TRUE.equals(inSelected) || Boolean.TRUE.equals(inNonSelected) || Boolean.TRUE.equals(joined)) {
+                                    // Check if not selected and should be moved to cancelled (event start - 1 minute has passed)
+                                    if (Boolean.TRUE.equals(inNonSelected)) {
+                                        if (eventStart > 0 && currentTime >= (eventStart - oneMinuteInMs)) {
+                                            // Event start - 1 minute has passed, not selected should be in cancelled
+                                            // Skip showing in waitlist (will show in previous)
+                                            android.util.Log.d("MyEventsFragment", "Event " + e.getTitle() + " - Not selected and event start - 1 minute has passed, skipping (should be in cancelled)");
+                                            continue;
+                                        }
+                                    }
+                                    // Show in waitlist section - these are events user is waiting on (and event hasn't started)
                                     waitlistedSelected.add(e);
                                     eventIds.add(e.getId());
+                                    android.util.Log.d("MyEventsFragment", "Event " + e.getTitle() + " - Showing in waitlist (selected: " + inSelected + ", not selected: " + inNonSelected + ", joined: " + joined + ")");
                                 }
                             } catch (Exception ex) {
                                 android.util.Log.e("MyEventsFragment", "Error checking waitlist for event " + e.getId(), ex);
@@ -401,6 +425,18 @@ public class MyEventsFragment extends Fragment {
         return db.collection("events")
                 .document(eventId)
                 .collection("NonSelectedEntrants")
+                .document(uid)
+                .get()
+                .continueWith(task -> {
+                    return task.isSuccessful() && task.getResult() != null && task.getResult().exists();
+                });
+    }
+    
+    private Task<Boolean> isInCancelledEntrants(String eventId, String uid) {
+        com.google.firebase.firestore.FirebaseFirestore db = com.google.firebase.firestore.FirebaseFirestore.getInstance();
+        return db.collection("events")
+                .document(eventId)
+                .collection("CancelledEntrants")
                 .document(uid)
                 .get()
                 .continueWith(task -> {

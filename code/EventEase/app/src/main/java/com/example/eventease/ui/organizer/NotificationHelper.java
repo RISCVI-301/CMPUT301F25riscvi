@@ -437,17 +437,11 @@ public class NotificationHelper {
     private void sendNotificationsToFilteredUsers(List<String> userIds, String title, String message,
                                                  String eventId, String eventTitle, String organizerId,
                                                  NotificationCallback callback) {
-        // Skip duplicate check for replacement/selection notifications (each is for different users)
-        boolean isReplacementOrSelection = title != null && 
-            (title.toLowerCase().contains("replacement") || title.toLowerCase().contains("selected"));
+        // Check for duplicates for ALL notification types to prevent duplicate notifications
+        // Note: Selection notifications are now handled by Cloud Function, but we still check
+        // for duplicates here in case manual notifications are sent
         
-        if (isReplacementOrSelection) {
-            Log.d(TAG, "Replacement/Selection notification - skipping duplicate check");
-            createNotificationRequest(userIds, title, message, eventId, eventTitle, organizerId, callback);
-            return;
-        }
-        
-        // Check for recent duplicate notification requests (within last 5 minutes) for non-replacement
+        // Check for recent duplicate notification requests (within last 5 minutes)
         long fiveMinutesAgo = System.currentTimeMillis() - (5 * 60 * 1000);
         db.collection("notificationRequests")
                 .whereEqualTo("eventId", eventId)
