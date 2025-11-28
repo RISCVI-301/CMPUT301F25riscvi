@@ -74,11 +74,16 @@ public class AdminProfileAdapter extends RecyclerView.Adapter<AdminProfileAdapte
             holder.btnRemoveOrganizer.setVisibility(View.GONE);
         }
 
-        // For now, clicking Remove Organizer does nothing
-        holder.btnRemoveOrganizer.setOnClickListener(null);
         holder.btnRemoveOrganizer.setOnClickListener(v -> {
-            // No-op for now
+            new AlertDialog.Builder(v.getContext())
+                    .setMessage("Do you want to remove organizer role?")
+                    .setPositiveButton("Yes", (dialog, which) ->
+                            Toast.makeText(v.getContext(),
+                                    "Remove organizer clicked", Toast.LENGTH_SHORT).show())
+                    .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss())
+                    .show();
         });
+
 
         // Set delete button click listener - use stored profile to avoid stale data
         holder.btnDelete.setOnClickListener(null);
