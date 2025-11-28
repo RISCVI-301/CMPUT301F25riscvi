@@ -328,12 +328,17 @@ public class EventSelectionHelper {
             }
             
             DocumentReference selectedRef = eventRef.collection("SelectedEntrants").document(userId);
-            // Keep users in WaitlistedEntrants collection (don't delete)
-            // DocumentReference waitlistRef = eventRef.collection("WaitlistedEntrants").document(userId);
+            DocumentReference waitlistRef = eventRef.collection("WaitlistedEntrants").document(userId);
+            DocumentReference nonSelectedRef = eventRef.collection("NonSelectedEntrants").document(userId);
+            DocumentReference cancelledRef = eventRef.collection("CancelledEntrants").document(userId);
             
+            // CRITICAL: Ensure mutual exclusivity - user can only exist in ONE collection
             batch.set(selectedRef, data);
-            // batch.delete(waitlistRef); // Keep in waitlist
-            batchCount += 1; // Only 1 operation now
+            // Remove from ALL other collections
+            batch.delete(waitlistRef);
+            batch.delete(nonSelectedRef);
+            batch.delete(cancelledRef);
+            batchCount += 4; // Set + 3 deletes
             
             if (batchCount >= MAX_BATCH_SIZE) {
                 final WriteBatch currentBatch = batch;
@@ -343,10 +348,12 @@ public class EventSelectionHelper {
             }
         }
         
-        // DON'T decrement waitlistCount - users stay in WaitlistedEntrants
-        // batch.update(eventRef, "waitlistCount", 
-        //     com.google.firebase.firestore.FieldValue.increment(-finalSelectedDocs.size()));
-        // batchCount++;
+        // Update waitlistCount since users are removed from WaitlistedEntrants
+        if (batchCount < MAX_BATCH_SIZE) {
+            batch.update(eventRef, "waitlistCount", 
+                com.google.firebase.firestore.FieldValue.increment(-finalSelectedDocs.size()));
+            batchCount++;
+        }
         
         if (batchCount > 0) {
             batchTasks.add(batch.commit());
@@ -815,11 +822,17 @@ public class EventSelectionHelper {
                                     }
                                     
                                     DocumentReference nonSelectedRef = eventRef.collection("NonSelectedEntrants").document(userId);
-                                    // Keep users in WaitlistedEntrants collection (don't delete)
+                                    DocumentReference waitlistRef = eventRef.collection("WaitlistedEntrants").document(userId);
+                                    DocumentReference selectedRef = eventRef.collection("SelectedEntrants").document(userId);
+                                    DocumentReference cancelledRef = eventRef.collection("CancelledEntrants").document(userId);
                                     
+                                    // CRITICAL: Ensure mutual exclusivity - user can only exist in ONE collection
                                     batch.set(nonSelectedRef, data);
-                                    // batch.delete(waitlistRef); // Keep in waitlist
-                                    batchCount += 1; // Only 1 operation now
+                                    // Remove from ALL other collections
+                                    batch.delete(waitlistRef);
+                                    batch.delete(selectedRef);
+                                    batch.delete(cancelledRef);
+                                    batchCount += 4; // Set + 3 deletes
                                     
                                     if (batchCount >= MAX_BATCH_SIZE) {
                                         final WriteBatch currentBatch = batch;

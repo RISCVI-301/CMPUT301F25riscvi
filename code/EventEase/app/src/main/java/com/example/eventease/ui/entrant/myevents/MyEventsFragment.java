@@ -284,20 +284,26 @@ public class MyEventsFragment extends Fragment {
                                 
                                 Boolean joined = Tasks.await(waitlistRepo.isJoined(e.getId(), uid));
                                 Boolean inSelected = Tasks.await(isInSelectedEntrants(e.getId(), uid));
+                                Boolean inNonSelected = Tasks.await(isInNonSelectedEntrants(e.getId(), uid));
                                 Boolean admitted = Tasks.await(admittedRepo.isAdmitted(e.getId(), uid));
                                 Boolean hasAcceptedInvitation = Tasks.await(hasAcceptedInvitation(e.getId(), uid));
+                                Boolean hasDeclinedInvitation = Tasks.await(hasDeclinedInvitation(e.getId(), uid));
                                 
-                                android.util.Log.d("MyEventsFragment", "Event " + e.getTitle() + " - Joined: " + joined + ", Selected: " + inSelected + ", Admitted: " + admitted + ", Accepted: " + hasAcceptedInvitation);
+                                android.util.Log.d("MyEventsFragment", "Event " + e.getTitle() + " - Joined: " + joined + ", Selected: " + inSelected + ", NonSelected: " + inNonSelected + ", Admitted: " + admitted + ", Accepted: " + hasAcceptedInvitation + ", Declined: " + hasDeclinedInvitation);
                                 
                                 // If user has accepted invitation, show in "Upcoming" section
-                                if (Boolean.TRUE.equals(hasAcceptedInvitation)) {
+                                if (Boolean.TRUE.equals(hasAcceptedInvitation) || Boolean.TRUE.equals(admitted)) {
                                     acceptedNotYetShown.add(e);
                                     eventIds.add(e.getId());
                                 }
-                                // Otherwise, show if in waitlist OR selected, AND NOT admitted
-                                else if ((Boolean.TRUE.equals(joined) || Boolean.TRUE.equals(inSelected)) && !Boolean.TRUE.equals(admitted)) {
-                                    // Don't hide events based on time - show all waitlisted/selected events
-                                    // Users need to see their invitations regardless of how soon the event is
+                                // If user declined/rejected, skip (will show in PreviousEventsFragment)
+                                else if (Boolean.TRUE.equals(hasDeclinedInvitation)) {
+                                    android.util.Log.d("MyEventsFragment", "User declined event " + e.getTitle() + " - skipping (will show in previous events)");
+                                    // Skip - declined events should show in PreviousEventsFragment
+                                }
+                                // Show if in waitlist OR non-selected OR selected (pending), AND NOT admitted
+                                else if ((Boolean.TRUE.equals(joined) || Boolean.TRUE.equals(inNonSelected) || Boolean.TRUE.equals(inSelected)) && !Boolean.TRUE.equals(admitted)) {
+                                    // Show in waitlist section - these are events user is waiting on
                                     waitlistedSelected.add(e);
                                     eventIds.add(e.getId());
                                 }
@@ -371,6 +377,34 @@ public class MyEventsFragment extends Fragment {
                         return !task.getResult().isEmpty();
                     }
                     return false;
+                });
+    }
+    
+    private Task<Boolean> hasDeclinedInvitation(String eventId, String uid) {
+        com.google.firebase.firestore.FirebaseFirestore db = com.google.firebase.firestore.FirebaseFirestore.getInstance();
+        return db.collection("invitations")
+                .whereEqualTo("eventId", eventId)
+                .whereEqualTo("uid", uid)
+                .whereEqualTo("status", "DECLINED")
+                .limit(1)
+                .get()
+                .continueWith(task -> {
+                    if (task.isSuccessful() && task.getResult() != null) {
+                        return !task.getResult().isEmpty();
+                    }
+                    return false;
+                });
+    }
+    
+    private Task<Boolean> isInNonSelectedEntrants(String eventId, String uid) {
+        com.google.firebase.firestore.FirebaseFirestore db = com.google.firebase.firestore.FirebaseFirestore.getInstance();
+        return db.collection("events")
+                .document(eventId)
+                .collection("NonSelectedEntrants")
+                .document(uid)
+                .get()
+                .continueWith(task -> {
+                    return task.isSuccessful() && task.getResult() != null && task.getResult().exists();
                 });
     }
 

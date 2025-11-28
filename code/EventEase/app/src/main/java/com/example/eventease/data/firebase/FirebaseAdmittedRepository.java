@@ -88,15 +88,22 @@ public class FirebaseAdmittedRepository implements AdmittedRepository {
             DocumentSnapshot userDoc = userTask.isSuccessful() ? userTask.getResult() : null;
             Map<String, Object> admittedData = buildAdmittedEntry(uid, userDoc);
             
+            // CRITICAL: Remove from ALL other collections when admitting
+            DocumentReference nonSelectedDoc = eventRef.collection("NonSelectedEntrants").document(uid);
+            DocumentReference cancelledDoc = eventRef.collection("CancelledEntrants").document(uid);
+            
             WriteBatch batch = db.batch();
             
             batch.set(admittedDoc, admittedData, SetOptions.merge());
+            // Remove from ALL other collections to ensure user exists in only ONE collection
             batch.delete(waitlistDoc);
             batch.delete(selectedDoc);
+            batch.delete(nonSelectedDoc);
+            batch.delete(cancelledDoc);
             
             return batch.commit()
                     .addOnSuccessListener(aVoid -> {
-                        Log.d(TAG, "SUCCESS: User " + uid + " admitted to event, moved to AdmittedEntrants");
+                        Log.d(TAG, "SUCCESS: User " + uid + " admitted to event, moved to AdmittedEntrants and removed from all other collections");
                     })
                     .addOnFailureListener(e -> {
                         Log.e(TAG, "FAILED to admit user " + uid + " to event", e);
