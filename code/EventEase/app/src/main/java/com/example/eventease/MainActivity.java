@@ -390,8 +390,8 @@ public class MainActivity extends AppCompatActivity {
         // Only create invitation listener if it doesn't already exist
         // (It may already be created in the navigation listener)
         if (invitationListener == null) {
-            invitationListener = new InvitationNotificationListener(this);
-            invitationListener.startListening();
+        invitationListener = new InvitationNotificationListener(this);
+        invitationListener.startListening();
         }
     }
 

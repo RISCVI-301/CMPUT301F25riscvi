@@ -115,9 +115,9 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
         listCancelled.setAdapter(cancelledAdapter);
 
         // Add click listeners for moving entrants between categories
-        listSelected.setOnItemClickListener((parent, view, position, id) -> {
+        listSelected.setOnItemClickListener((parent, view1, position, id) -> {
             String entrantName = selectedList.get(position);
-            showMoveEntrantDialog(entrantName, "SelectedEntrants", position);
+            showSelectedEntrantActions(entrantName);
         });
 
         listNotSelected.setOnItemClickListener((parent, view, position, id) -> {
@@ -471,6 +471,75 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
             name = "(unknown)";
         }
         return name;
+    }
+
+    private void showSelectedEntrantActions(String entrantName) {
+        if (eventId == null || eventId.isEmpty()) {
+            Toast.makeText(this, "Event ID not found", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        DocumentReference eventRef = db.collection("events").document(eventId);
+        eventRef.collection("SelectedEntrants").get()
+                .addOnSuccessListener(snapshot -> {
+                    DocumentSnapshot targetDoc = null;
+                    if (snapshot != null) {
+                        for (DocumentSnapshot doc : snapshot.getDocuments()) {
+                            if (entrantName.equals(safeName(doc))) {
+                                targetDoc = doc;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (targetDoc == null) {
+                        Toast.makeText(this, "Entrant not found", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    String userId = targetDoc.getId();
+                    Map<String, Object> data = targetDoc.getData() != null ? new HashMap<>(targetDoc.getData()) : new HashMap<>();
+
+                    CharSequence[] options = new CharSequence[]{"Move to Not Selected", "Move to Cancelled", "Close"};
+                    new MaterialAlertDialogBuilder(this)
+                            .setTitle("Selected Entrant")
+                            .setMessage("Choose an action for " + entrantName)
+                            .setItems(options, (dialog, which) -> {
+                                if (which == 0) {
+                                    moveSelectedEntrantToNotSelected(userId, data);
+                                } else if (which == 1) {
+                                    moveSelectedEntrantToCancelled(userId, data);
+                                }
+                            })
+                            .show();
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to load selected entrant", e);
+                    Toast.makeText(this, "Failed to load entrant details", Toast.LENGTH_SHORT).show();
+                });
+    }
+
+    private void moveSelectedEntrantToCancelled(String userId, @Nullable Map<String, Object> data) {
+        if (eventId == null || eventId.isEmpty()) {
+            Toast.makeText(this, "Event ID not found", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        db.collection("events").document(eventId)
+                .collection("AdmittedEntrants").document(userId).delete();
+        Map<String, Object> payload = data != null ? new HashMap<>(data) : new HashMap<>();
+        payload.put("cancelledAt", System.currentTimeMillis());
+        moveEntrantBetweenCollections(userId, payload, "SelectedEntrants", "CancelledEntrants");
+    }
+
+    private void moveSelectedEntrantToNotSelected(String userId, @Nullable Map<String, Object> data) {
+        if (eventId == null || eventId.isEmpty()) {
+            Toast.makeText(this, "Event ID not found", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        db.collection("events").document(eventId)
+                .collection("AdmittedEntrants").document(userId).delete();
+        Map<String, Object> payload = data != null ? new HashMap<>(data) : new HashMap<>();
+        moveEntrantBetweenCollections(userId, payload, "SelectedEntrants", "NonSelectedEntrants");
     }
 
     private void showFinalEntrantListDialog() {
@@ -1244,101 +1313,103 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
     /**
      * Moves an entrant from one collection to another.
      */
-    private void moveEntrantBetweenCollections(String userId, Map<String, Object> entrantData,
-                                                String fromCollection, String toCollection) {
+    private void moveEntrantBetweenCollections(String userId, @Nullable Map<String, Object> entrantData,
+                                               String fromCollection, String toCollection) {
         if (eventId == null || eventId.isEmpty() || userId == null) {
             Toast.makeText(this, "Invalid data", Toast.LENGTH_SHORT).show();
             return;
         }
 
         DocumentReference eventRef = db.collection("events").document(eventId);
+
+        if (entrantData == null) {
+            db.collection("users").document(userId).get()
+                    .addOnSuccessListener(userDoc -> {
+                        Map<String, Object> data = buildUserDataMap(userDoc, userId);
+                        attemptMoveWithCapacity(eventRef, userId, data, fromCollection, toCollection);
+                    })
+                    .addOnFailureListener(e -> {
+                        Log.e(TAG, "Failed to fetch user data", e);
+                        Toast.makeText(this, "Failed to fetch user data", Toast.LENGTH_SHORT).show();
+                    });
+        } else {
+            attemptMoveWithCapacity(eventRef, userId, entrantData, fromCollection, toCollection);
+        }
+    }
+
+    private void attemptMoveWithCapacity(DocumentReference eventRef, String userId, Map<String, Object> data,
+                                         String fromCollection, String toCollection) {
+        if ("SelectedEntrants".equals(toCollection) && !"SelectedEntrants".equals(fromCollection)) {
+            eventRef.get()
+                    .addOnSuccessListener(eventDoc -> {
+                        int sampleSize = 0;
+                        if (eventDoc != null && eventDoc.exists()) {
+                            Long sampleSizeObj = eventDoc.getLong("sampleSize");
+                            if (sampleSizeObj != null) {
+                                sampleSize = sampleSizeObj.intValue();
+                            }
+                        }
+
+                        if (sampleSize <= 0) {
+                            performMoveBatch(eventRef, userId, data, fromCollection, toCollection);
+                            return;
+                        }
+
+                        eventRef.collection("SelectedEntrants").get()
+                                .addOnSuccessListener(selectedSnap -> {
+                                    int currentSelected = selectedSnap != null ? selectedSnap.size() : 0;
+                                    if (currentSelected >= sampleSize) {
+                                        Toast.makeText(this,
+                                                "Sample size limit reached. Cannot add more selected entrants.",
+                                                Toast.LENGTH_LONG).show();
+                                        return;
+                                    }
+                                    performMoveBatch(eventRef, userId, data, fromCollection, toCollection);
+                                })
+                                .addOnFailureListener(e -> {
+                                    Log.e(TAG, "Failed to check selected entrants", e);
+                                    Toast.makeText(this, "Failed to verify selected entrants", Toast.LENGTH_SHORT).show();
+                                });
+                    })
+                    .addOnFailureListener(e -> {
+                        Log.e(TAG, "Failed to load event for capacity check", e);
+                        Toast.makeText(this, "Failed to load event details", Toast.LENGTH_SHORT).show();
+                    });
+        } else {
+            performMoveBatch(eventRef, userId, data, fromCollection, toCollection);
+        }
+    }
+
+    private void performMoveBatch(DocumentReference eventRef, String userId, Map<String, Object> entrantData,
+                                  String fromCollection, String toCollection) {
         DocumentReference fromRef = eventRef.collection(fromCollection).document(userId);
         DocumentReference toRef = eventRef.collection(toCollection).document(userId);
-        
-        // CRITICAL: Ensure mutual exclusivity - remove from ALL collections before adding to target
+
         DocumentReference waitlistRef = eventRef.collection("WaitlistedEntrants").document(userId);
         DocumentReference selectedRef = eventRef.collection("SelectedEntrants").document(userId);
         DocumentReference nonSelectedRef = eventRef.collection("NonSelectedEntrants").document(userId);
         DocumentReference cancelledRef = eventRef.collection("CancelledEntrants").document(userId);
 
         WriteBatch batch = db.batch();
-        
-        if (entrantData != null) {
-            batch.set(toRef, entrantData);
-            // CRITICAL: Remove from ALL other collections to ensure user exists in only ONE collection
-            // But don't delete from the target collection (that's where we're moving TO)
-            if (!"WaitlistedEntrants".equals(toCollection)) {
-                batch.delete(waitlistRef);
-            }
-            if (!"SelectedEntrants".equals(toCollection)) {
-                batch.delete(selectedRef);
-            }
-            if (!"NonSelectedEntrants".equals(toCollection)) {
-                batch.delete(nonSelectedRef);
-            }
-            if (!"CancelledEntrants".equals(toCollection)) {
-                batch.delete(cancelledRef);
-            }
-        } else {
-            // If no data, fetch from users collection
-            db.collection("users").document(userId).get()
-                    .addOnSuccessListener(userDoc -> {
-                        Map<String, Object> userData = new HashMap<>();
-                        if (userDoc != null && userDoc.exists()) {
-                            String name = userDoc.getString("fullName");
-                            if (name == null || name.trim().isEmpty()) {
-                                name = userDoc.getString("name");
-                            }
-                            if (name == null || name.trim().isEmpty()) {
-                                String first = userDoc.getString("firstName");
-                                String last = userDoc.getString("lastName");
-                                name = ((first != null ? first : "") + " " + (last != null ? last : "")).trim();
-                            }
-                            if (name != null && !name.trim().isEmpty()) {
-                                userData.put("name", name);
-                            }
-                            String email = userDoc.getString("email");
-                            if (email != null && !email.trim().isEmpty()) {
-                                userData.put("email", email);
-                            }
-                            userData.put("userId", userId);
-                        }
-                        
-                        WriteBatch moveBatch = db.batch();
-                        moveBatch.set(toRef, userData);
-                        // CRITICAL: Remove from ALL other collections to ensure user exists in only ONE collection
-                        // But don't delete from the target collection (that's where we're moving TO)
-                        if (!"WaitlistedEntrants".equals(toCollection)) {
-                            moveBatch.delete(waitlistRef);
-                        }
-                        if (!"SelectedEntrants".equals(toCollection)) {
-                            moveBatch.delete(selectedRef);
-                        }
-                        if (!"NonSelectedEntrants".equals(toCollection)) {
-                            moveBatch.delete(nonSelectedRef);
-                        }
-                        if (!"CancelledEntrants".equals(toCollection)) {
-                            moveBatch.delete(cancelledRef);
-                        }
-                        moveBatch.commit()
-                                .addOnSuccessListener(aVoid -> {
-                                    Toast.makeText(this, "Entrant moved successfully", Toast.LENGTH_SHORT).show();
-                                    loadEntrantsFromFirestore();
-                                })
-                                .addOnFailureListener(e -> {
-                                    Log.e(TAG, "Failed to move entrant", e);
-                                    Toast.makeText(this, "Failed to move entrant: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                                });
-                    })
-                    .addOnFailureListener(e -> {
-                        Log.e(TAG, "Failed to fetch user data", e);
-                        Toast.makeText(this, "Failed to fetch user data", Toast.LENGTH_SHORT).show();
-                    });
-            return;
+        batch.set(toRef, entrantData);
+
+        if (!"WaitlistedEntrants".equals(toCollection)) {
+            batch.delete(waitlistRef);
         }
-        
-        batch.delete(fromRef);
-        
+        if (!"SelectedEntrants".equals(toCollection)) {
+            batch.delete(selectedRef);
+        }
+        if (!"NonSelectedEntrants".equals(toCollection)) {
+            batch.delete(nonSelectedRef);
+        }
+        if (!"CancelledEntrants".equals(toCollection)) {
+            batch.delete(cancelledRef);
+        }
+
+        if (!fromCollection.equals(toCollection)) {
+            batch.delete(fromRef);
+        }
+
         batch.commit()
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(this, "Entrant moved successfully", Toast.LENGTH_SHORT).show();
@@ -1348,5 +1419,31 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
                     Log.e(TAG, "Failed to move entrant", e);
                     Toast.makeText(this, "Failed to move entrant: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                 });
+    }
+
+    private Map<String, Object> buildUserDataMap(@Nullable DocumentSnapshot userDoc, String userId) {
+        Map<String, Object> userData = new HashMap<>();
+        if (userDoc != null && userDoc.exists()) {
+            String name = userDoc.getString("fullName");
+            if (name == null || name.trim().isEmpty()) {
+                name = userDoc.getString("name");
+            }
+            if (name == null || name.trim().isEmpty()) {
+                String first = userDoc.getString("firstName");
+                String last = userDoc.getString("lastName");
+                name = ((first != null ? first : "") + " " + (last != null ? last : "")).trim();
+            }
+            if (name != null && !name.trim().isEmpty()) {
+                userData.put("name", name);
+            }
+            String email = userDoc.getString("email");
+            if (email != null && !email.trim().isEmpty()) {
+                userData.put("email", email);
+            }
+            userData.put("userId", userId);
+        } else {
+            userData.put("userId", userId);
+        }
+        return userData;
     }
 }

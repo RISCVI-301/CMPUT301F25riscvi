@@ -282,20 +282,20 @@ public class FirebaseInvitationRepository implements InvitationRepository {
     public Task<Void> decline(String invitationId, String eventId, String uid) {
         Log.d(TAG, "Decline called with invitationId: " + invitationId + ", eventId: " + eventId + ", uid: " + uid);
         
-        DocumentReference eventRef = db.collection("events").document(eventId);
-        DocumentReference waitlistDoc = eventRef.collection("WaitlistedEntrants").document(uid);
-        DocumentReference selectedDoc = eventRef.collection("SelectedEntrants").document(uid);
-        DocumentReference nonSelectedDoc = eventRef.collection("NonSelectedEntrants").document(uid);
-        DocumentReference cancelledDoc = eventRef.collection("CancelledEntrants").document(uid);
-        
-        Log.d(TAG, "Fetching user document...");
-        return db.collection("users").document(uid).get().continueWithTask(userTask -> {
-            if (!userTask.isSuccessful()) {
-                Log.e(TAG, "Failed to fetch user document", userTask.getException());
-            }
+            DocumentReference eventRef = db.collection("events").document(eventId);
+            DocumentReference waitlistDoc = eventRef.collection("WaitlistedEntrants").document(uid);
+            DocumentReference selectedDoc = eventRef.collection("SelectedEntrants").document(uid);
+            DocumentReference nonSelectedDoc = eventRef.collection("NonSelectedEntrants").document(uid);
+            DocumentReference cancelledDoc = eventRef.collection("CancelledEntrants").document(uid);
             
-            DocumentSnapshot userDoc = userTask.isSuccessful() ? userTask.getResult() : null;
-            Map<String, Object> cancelledData = buildCancelledEntry(uid, userDoc);
+            Log.d(TAG, "Fetching user document...");
+            return db.collection("users").document(uid).get().continueWithTask(userTask -> {
+                if (!userTask.isSuccessful()) {
+                    Log.e(TAG, "Failed to fetch user document", userTask.getException());
+                }
+                
+                DocumentSnapshot userDoc = userTask.isSuccessful() ? userTask.getResult() : null;
+                Map<String, Object> cancelledData = buildCancelledEntry(uid, userDoc);
             
             // Delete invitation document and notificationRequests entry
             return deleteInvitationAndNotificationRequests(invitationId, eventId, uid)
@@ -304,47 +304,42 @@ public class FirebaseInvitationRepository implements InvitationRepository {
                             Log.e(TAG, "Failed to delete invitation and notification requests", deleteTask.getException());
                             return Tasks.forException(deleteTask.getException());
                         }
-                        
-                        Log.d(TAG, "Building batch operations:");
-                        Log.d(TAG, "  1. Update invitation status to DECLINED");
-                        Log.d(TAG, "  2. Add to CancelledEntrants");
-                        Log.d(TAG, "  3. Delete from WaitlistedEntrants");
-                        Log.d(TAG, "  4. Delete from SelectedEntrants");
-                        Log.d(TAG, "  5. Delete from NonSelectedEntrants");
-                        
-                        Map<String, Object> invitationUpdates = new HashMap<>();
-                        invitationUpdates.put("status", "DECLINED");
-                        invitationUpdates.put("declinedAt", System.currentTimeMillis());
-                        
-                        WriteBatch batch = db.batch();
-                        batch.update(db.collection("invitations").document(invitationId), invitationUpdates);
-                        batch.set(cancelledDoc, cancelledData, SetOptions.merge());
-                        // CRITICAL: Remove from ALL other collections to ensure mutual exclusivity
-                        batch.delete(waitlistDoc);
-                        batch.delete(selectedDoc);
-                        batch.delete(nonSelectedDoc);
-                        
-                        Log.d(TAG, "Committing batch...");
-                        return batch.commit()
-                                .continueWith(commitTask -> {
-                                    if (commitTask.isSuccessful()) {
-                                        Log.d(TAG, "✅ SUCCESS: Batch committed successfully!");
-                                        Log.d(TAG, "  ✓ Invitation status → DECLINED");
-                                        Log.d(TAG, "  ✓ User added to → CancelledEntrants");
-                                        Log.d(TAG, "  ✓ User deleted from → WaitlistedEntrants");
-                                        Log.d(TAG, "  ✓ User deleted from → SelectedEntrants");
-                                        Log.d(TAG, "  ✓ User deleted from → NonSelectedEntrants");
-                                        
-                                        Invitation inv = byId.get(invitationId);
-                                        if (inv != null) {
-                                            inv.setStatus(Status.DECLINED);
-                                        }
-                                        notifyUid(uid);
-                                        
-                                        // NOTE: Automatic replacement is disabled - organizer must manually replace via button
-                                    } else {
-                                        Log.e(TAG, "❌ FAILED: Batch commit failed!");
-                                        Log.e(TAG, "Error: " + commitTask.getException().getMessage(), commitTask.getException());
+                
+                Log.d(TAG, "Building batch operations:");
+                Log.d(TAG, "  1. Update invitation status to DECLINED");
+                Log.d(TAG, "  2. Add to CancelledEntrants");
+                Log.d(TAG, "  3. Delete from WaitlistedEntrants");
+                Log.d(TAG, "  4. Delete from SelectedEntrants");
+                Log.d(TAG, "  5. Delete from NonSelectedEntrants");
+                
+                WriteBatch batch = db.batch();
+                batch.set(cancelledDoc, cancelledData, SetOptions.merge());
+                // CRITICAL: Remove from ALL other collections to ensure mutual exclusivity
+                batch.delete(waitlistDoc);
+                batch.delete(selectedDoc);
+                batch.delete(nonSelectedDoc);
+            
+            Log.d(TAG, "Committing batch...");
+            return batch.commit()
+                    .continueWith(commitTask -> {
+                        if (commitTask.isSuccessful()) {
+                            Log.d(TAG, "✅ SUCCESS: Batch committed successfully!");
+                            Log.d(TAG, "  ✓ Invitation status → DECLINED");
+                            Log.d(TAG, "  ✓ User added to → CancelledEntrants");
+                            Log.d(TAG, "  ✓ User deleted from → WaitlistedEntrants");
+                            Log.d(TAG, "  ✓ User deleted from → SelectedEntrants");
+                            Log.d(TAG, "  ✓ User deleted from → NonSelectedEntrants");
+                            
+                            Invitation inv = byId.get(invitationId);
+                            if (inv != null) {
+                                inv.setStatus(Status.DECLINED);
+                            }
+                            notifyUid(uid);
+                            
+                            // NOTE: Automatic replacement is disabled - organizer must manually replace via button
+                        } else {
+                            Log.e(TAG, "❌ FAILED: Batch commit failed!");
+                            Log.e(TAG, "Error: " + commitTask.getException().getMessage(), commitTask.getException());
                                     }
                                     return null;
                                 });

@@ -434,6 +434,14 @@ public class DiscoverFragment extends Fragment {
                 android.util.Log.d("DiscoverFragment", "Event " + event.getTitle() + " (id: " + event.getId() + ") has already started/passed, excluding from discover");
                 continue;
             }
+
+            // Filter out events whose registration period has ended
+            long registrationEnd = event.getRegistrationEnd();
+            if (registrationEnd > 0 && currentTime > registrationEnd) {
+                android.util.Log.d("DiscoverFragment", "Event " + event.getTitle() + " (id: " + event.getId() + ") registration ended at "
+                        + new Date(registrationEnd) + ", excluding from discover");
+                continue;
+            }
             
             events.add(event);
         }

@@ -95,15 +95,20 @@ public class FirebaseAdmittedRepository implements AdmittedRepository {
             WriteBatch batch = db.batch();
             
             batch.set(admittedDoc, admittedData, SetOptions.merge());
-            // Remove from ALL other collections to ensure user exists in only ONE collection
+            // Remove from collections that should no longer contain the entrant
             batch.delete(waitlistDoc);
-            batch.delete(selectedDoc);
             batch.delete(nonSelectedDoc);
             batch.delete(cancelledDoc);
             
+            // Keep entrant in SelectedEntrants but mark them as accepted so organizer can still see them
+            Map<String, Object> selectedUpdates = new HashMap<>();
+            selectedUpdates.put("status", "ACCEPTED");
+            selectedUpdates.put("acceptedAt", FieldValue.serverTimestamp());
+            batch.set(selectedDoc, selectedUpdates, SetOptions.merge());
+            
             return batch.commit()
                     .addOnSuccessListener(aVoid -> {
-                        Log.d(TAG, "SUCCESS: User " + uid + " admitted to event, moved to AdmittedEntrants and removed from all other collections");
+                        Log.d(TAG, "SUCCESS: User " + uid + " admitted to event. Record kept in SelectedEntrants with status=ACCEPTED");
                     })
                     .addOnFailureListener(e -> {
                         Log.e(TAG, "FAILED to admit user " + uid + " to event", e);

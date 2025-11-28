@@ -444,8 +444,8 @@ public class AccountFragment extends Fragment {
                     Log.e(TAG, "Failed to save notification preferences", e);
                     ToastUtil.showShort(getContext(), "Failed to save preferences. Please try again.");
                 });
-    }
-    
+        }
+        
     /**
      * Checks for new notifications and updates the badge visibility.
      * Listens to notificationRequests and invitations collections in real-time.
@@ -553,8 +553,8 @@ public class AccountFragment extends Fragment {
                                                 Log.d(TAG, "Badge visibility updated to: " + 
                                                     (shouldShowBadge ? "VISIBLE" : "GONE"));
                                             }
-                                        });
-                                    }
+            });
+        }
                                 }
                             })
                             .addOnFailureListener(error -> {
@@ -565,7 +565,7 @@ public class AccountFragment extends Fragment {
                                         getActivity().runOnUiThread(() -> {
                                             if (notificationBadge != null) {
                                                 notificationBadge.setVisibility(hasNotificationRequests ? View.VISIBLE : View.GONE);
-                                            }
+        }
                                         });
                                     }
                                 }

@@ -85,10 +85,23 @@ public class FirebaseEventRepository implements EventRepository {
                         }
                     }
                     
+                    long nowMs = now != null ? now.getTime() : System.currentTimeMillis();
                     // Filter open events
                     List<Event> result = new ArrayList<>();
-                    for (Event e : events.values()) {
-                        if (e.getStartAt() == null || e.getStartAt().after(now)) {
+                    Iterator<Map.Entry<String, Event>> iterator = events.entrySet().iterator();
+                    while (iterator.hasNext()) {
+                        Map.Entry<String, Event> entry = iterator.next();
+                        Event e = entry.getValue();
+
+                        // Remove cached events whose registration window has ended
+                        long registrationEnd = e.getRegistrationEnd();
+                        if (registrationEnd > 0 && nowMs > registrationEnd) {
+                            iterator.remove();
+                            continue;
+                        }
+
+                        Date startDate = e.getStartAt();
+                        if (startDate == null || startDate.after(now)) {
                             result.add(e);
                         }
                     }
