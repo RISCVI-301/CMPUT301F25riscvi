@@ -19,6 +19,12 @@ import com.example.eventease.R;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.FirebaseFirestoreException;
+import com.google.firebase.firestore.ListenerRegistration;
+import com.google.firebase.firestore.Source;
+import android.text.TextUtils;
 import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
 import android.renderscript.Allocation;
@@ -87,6 +93,8 @@ public class EventDetailActivity extends AppCompatActivity {
     private AuthManager authManager;
     private com.example.eventease.data.EventRepository eventRepo;
     private com.example.eventease.data.ListenerRegistration waitlistCountReg;
+    private ListenerRegistration eventListenerReg;
+    private FirebaseFirestore firestore;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -111,6 +119,7 @@ public class EventDetailActivity extends AppCompatActivity {
         waitlistRepo = App.graph().waitlists;
         authManager = App.graph().auth;
         eventRepo = App.graph().events;
+        firestore = FirebaseFirestore.getInstance();
 
         // Initialize views
         tvEventName = findViewById(R.id.tvEventName);
@@ -161,11 +170,15 @@ public class EventDetailActivity extends AppCompatActivity {
             btnDecline.setVisibility(View.GONE);
         }
 
-        // Load event data (placeholder for now)
-        loadEventData();
+        // Set up listeners first so they can handle initial data load and updates
+        // Listen to event document changes (for description/notes updates) - this will also load initial data
+        setupEventDescriptionListener();
         
         // Listen to waitlist count updates from Firebase
         setupWaitlistCountListener();
+        
+        // Load other event data that doesn't need real-time updates
+        loadEventData();
 
         // Wire bottom nav navigation to MainActivity destinations
         if (navButtonDiscover != null) {
@@ -183,12 +196,10 @@ public class EventDetailActivity extends AppCompatActivity {
         // Display event name
         tvEventName.setText(eventTitle != null ? eventTitle : "Event Name");
         
-        // Display event overview/notes
-        if (eventNotes != null && !eventNotes.isEmpty()) {
-            tvOverview.setText(eventNotes);
-        } else {
-            tvOverview.setText("No description available for this event.");
-        }
+        // Note: Overview/description is now handled by setupEventDescriptionListener()
+        // which loads from Firestore in real-time. The listener will update the overview
+        // immediately when it receives the initial snapshot, so we don't need to set it
+        // from Intent data here. The listener takes precedence.
         
         // Waitlist count will be updated by the listener
         tvWaitlistCount.setText("Loading...");
@@ -228,6 +239,61 @@ public class EventDetailActivity extends AppCompatActivity {
                 }
             });
         }
+    }
+    
+    /**
+     * Sets up a real-time listener for event document changes, specifically to update
+     * the description/notes when the organizer makes changes.
+     * This listener will trigger immediately on setup (initial snapshot) and on any subsequent changes.
+     */
+    private void setupEventDescriptionListener() {
+        if (eventId == null || firestore == null) {
+            android.util.Log.w("EventDetailActivity", "Cannot setup listener: eventId=" + eventId + ", firestore=" + firestore);
+            return;
+        }
+        
+        android.util.Log.d("EventDetailActivity", "Setting up event description listener for eventId: " + eventId);
+        
+        // Use addSnapshotListener - this will trigger immediately with the current document state and on any changes
+        eventListenerReg = firestore.collection("events")
+                .document(eventId)
+                .addSnapshotListener((snapshot, error) -> {
+                    if (error != null) {
+                        android.util.Log.w("EventDetailActivity", "Event listener error", error);
+                        return;
+                    }
+                    
+                    if (snapshot == null || !snapshot.exists()) {
+                        android.util.Log.w("EventDetailActivity", "Event document does not exist: " + eventId);
+                        if (tvOverview != null) {
+                            tvOverview.setText("No description available for this event.");
+                        }
+                        return;
+                    }
+                    
+                    // Update description/notes when they change
+                    String notes = snapshot.getString("notes");
+                    String description = snapshot.getString("description");
+                    
+                    android.util.Log.d("EventDetailActivity", "Event snapshot received - notes: " + 
+                        (notes != null ? notes.substring(0, Math.min(50, notes.length())) : "null") + 
+                        ", description: " + (description != null ? description.substring(0, Math.min(50, description.length())) : "null"));
+                    
+                    // Use notes if available, otherwise fall back to description (same logic as EventDetailsDiscoverActivity)
+                    String overviewContent = notes;
+                    if (TextUtils.isEmpty(overviewContent)) {
+                        overviewContent = description;
+                    }
+                    
+                    if (!TextUtils.isEmpty(overviewContent) && tvOverview != null) {
+                        tvOverview.setText(overviewContent);
+                        android.util.Log.d("EventDetailActivity", "Event description updated from Firestore: " + 
+                            overviewContent.substring(0, Math.min(50, overviewContent.length())));
+                    } else if (tvOverview != null) {
+                        tvOverview.setText("No description available for this event.");
+                        android.util.Log.d("EventDetailActivity", "No description found in event document");
+                    }
+                });
     }
 
     private void setupBottomNavigation() {
@@ -550,11 +616,70 @@ public class EventDetailActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        // Ensure listener is active when activity resumes (in case it was paused)
+        if (eventListenerReg == null && eventId != null && firestore != null) {
+            android.util.Log.d("EventDetailActivity", "Re-setting up listener in onResume");
+            setupEventDescriptionListener();
+        }
+        
+        // Manually refresh from server to ensure we have the latest data
+        // This is important when switching back from Organizer profile
+        refreshEventDescriptionFromServer();
+    }
+    
+    /**
+     * Manually fetches the latest event description from the server.
+     * This ensures we get the most up-to-date data, especially after switching profiles.
+     */
+    private void refreshEventDescriptionFromServer() {
+        if (eventId == null || firestore == null) {
+            return;
+        }
+        
+        android.util.Log.d("EventDetailActivity", "Refreshing event description from server for eventId: " + eventId);
+        
+        // Fetch from server to bypass cache and get latest data
+        firestore.collection("events")
+                .document(eventId)
+                .get(Source.SERVER)
+                .addOnSuccessListener(documentSnapshot -> {
+                    if (documentSnapshot != null && documentSnapshot.exists() && tvOverview != null) {
+                        String notes = documentSnapshot.getString("notes");
+                        String description = documentSnapshot.getString("description");
+                        
+                        // Use notes if available, otherwise fall back to description
+                        String overviewContent = notes;
+                        if (TextUtils.isEmpty(overviewContent)) {
+                            overviewContent = description;
+                        }
+                        
+                        if (!TextUtils.isEmpty(overviewContent)) {
+                            tvOverview.setText(overviewContent);
+                            android.util.Log.d("EventDetailActivity", "Event description refreshed from server: " + 
+                                overviewContent.substring(0, Math.min(50, overviewContent.length())));
+                        } else {
+                            tvOverview.setText("No description available for this event.");
+                        }
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    android.util.Log.w("EventDetailActivity", "Failed to refresh event description from server", e);
+                    // If server fetch fails, the listener should still work with cached data
+                });
+    }
+    
+    @Override
     protected void onDestroy() {
         super.onDestroy();
         if (waitlistCountReg != null) {
             waitlistCountReg.remove();
             waitlistCountReg = null;
+        }
+        if (eventListenerReg != null) {
+            eventListenerReg.remove();
+            eventListenerReg = null;
         }
     }
 }

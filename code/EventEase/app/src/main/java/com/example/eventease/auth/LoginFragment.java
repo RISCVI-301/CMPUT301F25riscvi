@@ -76,6 +76,19 @@ public class LoginFragment extends Fragment {
         final CheckBox checkboxRememberMe = view.findViewById(R.id.checkboxRememberMe);
         final ImageButton btnTogglePassword = view.findViewById(R.id.btnTogglePassword);
         final ProgressBar progress = view.findViewById(R.id.progress);
+        final android.widget.ImageView backButton = view.findViewById(R.id.back_button);
+        
+        // Set up back button to navigate to welcome screen
+        if (backButton != null) {
+            backButton.setOnClickListener(v -> {
+                try {
+                    NavHostFragment.findNavController(this).navigate(R.id.action_login_to_welcome);
+                } catch (Exception e) {
+                    Toast.makeText(requireContext(), "Navigation error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    e.printStackTrace();
+                }
+            });
+        }
 
         // Load saved credentials if Remember Me was checked
         SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);

@@ -65,7 +65,7 @@ public class OrganizerEntrantLocationsActivity extends AppCompatActivity impleme
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         
-        // Enable edge-to-edge display
+
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         
         setContentView(R.layout.activity_organizer_entrant_locations);
@@ -79,6 +79,39 @@ public class OrganizerEntrantLocationsActivity extends AppCompatActivity impleme
             return;
         }
         
+
+        checkGeolocationEnabled();
+    }
+    
+    private void checkGeolocationEnabled() {
+        db.collection("events").document(eventId).get()
+                .addOnSuccessListener(documentSnapshot -> {
+                    if (!documentSnapshot.exists()) {
+                        Toast.makeText(this, "Event not found", Toast.LENGTH_SHORT).show();
+                        finish();
+                        return;
+                    }
+                    
+                    Boolean geolocationEnabled = documentSnapshot.getBoolean("geolocation");
+                    boolean hasGeolocation = geolocationEnabled != null && geolocationEnabled;
+                    
+                    if (!hasGeolocation) {
+                        Toast.makeText(this, "Geolocation is disabled for this event", Toast.LENGTH_SHORT).show();
+                        finish();
+                        return;
+                    }
+                    
+                    // Geolocation is enabled, proceed with map setup
+                    initializeMap();
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to check geolocation setting", e);
+                    Toast.makeText(this, "Failed to load event data", Toast.LENGTH_SHORT).show();
+                    finish();
+                });
+    }
+    
+    private void initializeMap() {
         // Initialize views
         titleTextView = findViewById(R.id.map_title);
         backButton = findViewById(R.id.back_button);
@@ -125,18 +158,17 @@ public class OrganizerEntrantLocationsActivity extends AppCompatActivity impleme
     }
     
     private void loadEventData() {
-        // Title is already set to "Entrants Locations" in XML, no need to change it
         // This method is kept for potential future use if needed
     }
     
     private void loadWaitlistedEntrants() {
         if (eventId == null || eventId.isEmpty() || mMap == null) return;
         
-        // Clear existing markers
+
         mMap.clear();
         entrantInfoMap.clear();
         
-        // Get all waitlisted entrants from the subcollection
+        // Getting all waitlisted entrants from the subcollection
         db.collection("events").document(eventId).collection("WaitlistedEntrants")
                 .get()
                 .addOnSuccessListener(querySnapshot -> {

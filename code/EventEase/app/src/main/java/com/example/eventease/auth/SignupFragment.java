@@ -63,10 +63,32 @@ public class SignupFragment extends Fragment {
         final android.view.View btnSignup = view.findViewById(R.id.btnSignup);
         final MaterialButton btnToLogin = view.findViewById(R.id.btnToLogin);
         final ProgressBar progress = view.findViewById(R.id.progress);
+        final android.widget.ImageView backButton = view.findViewById(R.id.back_button);
         
         if (btnSignup == null) {
             ToastUtil.showShort(requireContext(), "Signup button not found");
             return;
+        }
+        
+        // Set up back button to navigate to welcome screen
+        if (backButton != null) {
+            backButton.setOnClickListener(v -> {
+                try {
+                    // Use Navigation.findNavController with the root view
+                    Navigation.findNavController(rootView).navigate(R.id.action_signup_to_welcome);
+                } catch (IllegalArgumentException e) {
+                    // If that fails, try with the fragment
+                    try {
+                        NavHostFragment.findNavController(this).navigate(R.id.action_signup_to_welcome);
+                    } catch (Exception e2) {
+                        Toast.makeText(requireContext(), "Navigation failed: " + e2.getMessage(), Toast.LENGTH_LONG).show();
+                        e2.printStackTrace();
+                    }
+                } catch (Exception e) {
+                    Toast.makeText(requireContext(), "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    e.printStackTrace();
+                }
+            });
         }
 
 

@@ -51,6 +51,8 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
     private String currentEventId;
     private ArrayList<String> entrantNamesList;
     private ArrayAdapter<String> waitlistAdapter;
+    private boolean isDescriptionEditing = false;
+    private ImageView editDescriptionButton;
 
     private final ActivityResultLauncher<String> pickImageLauncher =
             registerForActivityResult(new ActivityResultContracts.GetContent(), uri -> {
@@ -108,6 +110,7 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
         }
 
         // Set up location button to view entrant locations on map
+        // Note: Visibility will be controlled by geolocation setting in loadEventDataFromFirestore
         ImageView locationIcon = findViewById(R.id.location_icon);
         if (locationIcon != null) {
             locationIcon.setClickable(true);
@@ -123,7 +126,65 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
             });
         }
 
+        // Set up edit description button
+        editDescriptionButton = findViewById(R.id.edit_description_button);
+        if (editDescriptionButton != null) {
+            editDescriptionButton.setOnClickListener(v -> toggleDescriptionEditing());
+        }
+
+        // Set up focus change listener to save when clicking outside
+        overviewEditText.setOnFocusChangeListener((v, hasFocus) -> {
+            if (!hasFocus && isDescriptionEditing) {
+                // User clicked outside, save the description
+                saveDescription();
+            }
+        });
+
+        // Touch interceptor will be handled in dispatchTouchEvent override
+
         signInAndLoadData();
+    }
+
+    @Override
+    public boolean dispatchTouchEvent(android.view.MotionEvent ev) {
+        // Intercept touches to clear EditText focus when clicking outside
+        if (ev.getAction() == android.view.MotionEvent.ACTION_DOWN && isDescriptionEditing && overviewEditText != null && overviewEditText.hasFocus()) {
+            // Get touch coordinates relative to screen
+            float x = ev.getRawX();
+            float y = ev.getRawY();
+            
+            // Get EditText bounds on screen
+            int[] editTextLocation = new int[2];
+            overviewEditText.getLocationOnScreen(editTextLocation);
+            int editTextLeft = editTextLocation[0];
+            int editTextTop = editTextLocation[1];
+            int editTextRight = editTextLeft + overviewEditText.getWidth();
+            int editTextBottom = editTextTop + overviewEditText.getHeight();
+            
+            // Check if touch is outside EditText
+            boolean isOutsideEditText = (x < editTextLeft || x > editTextRight || y < editTextTop || y > editTextBottom);
+            
+            if (isOutsideEditText) {
+                // Check if not clicking on the edit icon
+                if (editDescriptionButton != null) {
+                    int[] iconLocation = new int[2];
+                    editDescriptionButton.getLocationOnScreen(iconLocation);
+                    int iconLeft = iconLocation[0];
+                    int iconTop = iconLocation[1];
+                    int iconRight = iconLeft + editDescriptionButton.getWidth();
+                    int iconBottom = iconTop + editDescriptionButton.getHeight();
+                    
+                    // If not clicking on icon either, clear focus
+                    boolean isOnIcon = (x >= iconLeft && x <= iconRight && y >= iconTop && y <= iconBottom);
+                    if (!isOnIcon) {
+                        overviewEditText.clearFocus();
+                    }
+                } else {
+                    overviewEditText.clearFocus();
+                }
+            }
+        }
+        return super.dispatchTouchEvent(ev);
     }
 
     private void signInAndLoadData() {
@@ -171,6 +232,10 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
             String title = documentSnapshot.getString("title");
             String description = documentSnapshot.getString("description");
             String posterUrl = documentSnapshot.getString("posterUrl");
+            
+            // Read geolocation setting
+            Boolean geolocationEnabled = documentSnapshot.getBoolean("geolocation");
+            boolean hasGeolocation = geolocationEnabled != null && geolocationEnabled;
 
             if (eventNameTextView != null) eventNameTextView.setText(title);
             if (overviewEditText != null) overviewEditText.setText(description);
@@ -180,6 +245,12 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
                         .placeholder(R.drawable.rounded_panel_bg)
                         .error(R.drawable.rounded_panel_bg)
                         .into(eventPosterImageView);
+            }
+            
+            // Hide location icon if geolocation is disabled
+            ImageView locationIcon = findViewById(R.id.location_icon);
+            if (locationIcon != null) {
+                locationIcon.setVisibility(hasGeolocation ? android.view.View.VISIBLE : android.view.View.GONE);
             }
 
             entrantNamesList.clear();
@@ -491,6 +562,63 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
                 Log.e(TAG, "Failed to send notifications: " + error);
             }
         });
+    }
+
+    private void toggleDescriptionEditing() {
+        if (currentEventId == null || currentEventId.isEmpty()) {
+            Toast.makeText(this, "Event ID not found", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (!isDescriptionEditing) {
+            // Enable editing mode
+            isDescriptionEditing = true;
+            overviewEditText.setFocusable(true);
+            overviewEditText.setFocusableInTouchMode(true);
+            overviewEditText.setClickable(true);
+            overviewEditText.requestFocus();
+            // Optionally show keyboard
+            android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager) getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                imm.showSoftInput(overviewEditText, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT);
+            }
+        } else {
+            // Save and disable editing mode
+            saveDescription();
+        }
+    }
+
+    private void saveDescription() {
+        if (currentEventId == null || currentEventId.isEmpty()) {
+            Toast.makeText(this, "Event ID not found", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        String newDescription = overviewEditText.getText().toString();
+        
+        // Hide keyboard
+        android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager) getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+        if (imm != null) {
+            imm.hideSoftInputFromWindow(overviewEditText.getWindowToken(), 0);
+        }
+
+        // Update Firestore
+        db.collection("events").document(currentEventId)
+                .update("description", newDescription)
+                .addOnSuccessListener(aVoid -> {
+                    Toast.makeText(this, "Description updated successfully", Toast.LENGTH_SHORT).show();
+                    isDescriptionEditing = false;
+                    overviewEditText.setFocusable(false);
+                    overviewEditText.setFocusableInTouchMode(false);
+                    overviewEditText.setClickable(false);
+                    // Clear focus to prevent cursor from showing
+                    overviewEditText.clearFocus();
+                    Log.d(TAG, "Description updated successfully");
+                })
+                .addOnFailureListener(e -> {
+                    Toast.makeText(this, "Failed to update description: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    Log.e(TAG, "Failed to update description", e);
+                });
     }
 
 }

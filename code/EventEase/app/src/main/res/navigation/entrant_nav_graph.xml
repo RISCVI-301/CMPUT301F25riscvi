@@ -21,6 +21,11 @@
         android:name="com.example.eventease.auth.SignupFragment"
         android:label="Sign Up">
         <action
+            android:id="@+id/action_signup_to_welcome"
+            app:destination="@id/welcomeFragment"
+            app:popUpTo="@id/welcomeFragment"
+            app:popUpToInclusive="true" />
+        <action
             android:id="@+id/action_signup_to_login"
             app:destination="@id/loginFragment" />
         <action
@@ -54,6 +59,11 @@
         android:id="@+id/loginFragment"
         android:name="com.example.eventease.auth.LoginFragment"
         android:label="Login">
+        <action
+            android:id="@+id/action_login_to_welcome"
+            app:destination="@id/welcomeFragment"
+            app:popUpTo="@id/welcomeFragment"
+            app:popUpToInclusive="true" />
         <action
             android:id="@+id/action_login_to_signup"
             app:destination="@id/signupFragment" />
