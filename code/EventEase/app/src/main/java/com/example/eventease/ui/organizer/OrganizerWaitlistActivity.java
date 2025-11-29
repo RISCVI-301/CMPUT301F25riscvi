@@ -158,19 +158,12 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
         }
 
         // Set up location button to view entrant locations on map
+        // Initially hide the icon - will be shown if geolocation is enabled for the event
         ImageView locationIcon = findViewById(R.id.location_icon);
         if (locationIcon != null) {
-            locationIcon.setClickable(true);
-            locationIcon.setFocusable(true);
-            locationIcon.setOnClickListener(v -> {
-                if (currentEventId == null || currentEventId.isEmpty()) {
-                    Toast.makeText(this, "Missing event ID", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                android.content.Intent mapIntent = new android.content.Intent(this, OrganizerEntrantLocationsActivity.class);
-                mapIntent.putExtra("eventId", currentEventId);
-                startActivity(mapIntent);
-            });
+            locationIcon.setVisibility(android.view.View.GONE);
+            locationIcon.setClickable(false);
+            locationIcon.setFocusable(false);
         }
 
         // Set up share button to show QR code
@@ -274,6 +267,34 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
                     tvEventStart.setText("Event Start Date: " + dateFormat.format(new Date(startsAtEpochMs)));
                 } else {
                     tvEventStart.setText("Event Start Date: TBD");
+                }
+            }
+
+            // Check geolocation setting and show/hide location icon
+            Boolean geolocationEnabled = documentSnapshot.getBoolean("geolocation");
+            ImageView locationIcon = findViewById(R.id.location_icon);
+            if (locationIcon != null) {
+                if (Boolean.TRUE.equals(geolocationEnabled)) {
+                    // Show location icon and make it clickable
+                    locationIcon.setVisibility(android.view.View.VISIBLE);
+                    locationIcon.setClickable(true);
+                    locationIcon.setFocusable(true);
+                    locationIcon.setOnClickListener(v -> {
+                        if (currentEventId == null || currentEventId.isEmpty()) {
+                            Toast.makeText(this, "Missing event ID", Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        android.content.Intent mapIntent = new android.content.Intent(this, OrganizerEntrantLocationsActivity.class);
+                        mapIntent.putExtra("eventId", currentEventId);
+                        startActivity(mapIntent);
+                    });
+                    Log.d(TAG, "Geolocation enabled - location icon is visible");
+                } else {
+                    // Hide location icon if geolocation is disabled
+                    locationIcon.setVisibility(android.view.View.GONE);
+                    locationIcon.setClickable(false);
+                    locationIcon.setFocusable(false);
+                    Log.d(TAG, "Geolocation disabled - location icon is hidden");
                 }
             }
 
