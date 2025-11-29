@@ -1206,44 +1206,28 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         cropDialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
         cropDialog.setContentView(R.layout.dialog_crop_poster);
         
-        ImageView cropImageView = cropDialog.findViewById(R.id.cropImageView);
-        Button btnZoomIn = cropDialog.findViewById(R.id.btnZoomIn);
-        Button btnZoomOut = cropDialog.findViewById(R.id.btnZoomOut);
-        Button btnReset = cropDialog.findViewById(R.id.btnReset);
-        Button btnDone = cropDialog.findViewById(R.id.btnDone);
-        Button btnCancel = cropDialog.findViewById(R.id.btnCancel);
-        
-        if (cropImageView == null) {
-            // Create layout programmatically if not found
-            createCropDialogLayout(cropDialog);
-            return;
-        }
+        ImageView cropImageView = cropDialog.findViewById(R.id.posterPreviewCrop);
+        com.google.android.material.button.MaterialButton btnDone = cropDialog.findViewById(R.id.btnSaveCrop);
+        com.google.android.material.button.MaterialButton btnCancel = cropDialog.findViewById(R.id.btnCancelCrop);
         
         // Load image into crop view
-        Glide.with(this)
-                .asBitmap()
-                .load(posterUri)
-                .into(new com.bumptech.glide.request.target.CustomTarget<android.graphics.Bitmap>() {
-                    @Override
-                    public void onResourceReady(@NonNull android.graphics.Bitmap resource, 
-                                                @Nullable com.bumptech.glide.request.transition.Transition<? super android.graphics.Bitmap> transition) {
-                        setupCropView(cropImageView, resource);
-                    }
-                    
-                    @Override
-                    public void onLoadCleared(@Nullable android.graphics.drawable.Drawable placeholder) {}
-                });
+        if (cropImageView != null) {
+            Glide.with(this)
+                    .asBitmap()
+                    .load(posterUri)
+                    .into(new com.bumptech.glide.request.target.CustomTarget<android.graphics.Bitmap>() {
+                        @Override
+                        public void onResourceReady(@NonNull android.graphics.Bitmap resource, 
+                                                    @Nullable com.bumptech.glide.request.transition.Transition<? super android.graphics.Bitmap> transition) {
+                            setupCropView(cropImageView, resource);
+                        }
+                        
+                        @Override
+                        public void onLoadCleared(@Nullable android.graphics.drawable.Drawable placeholder) {}
+                    });
+        }
         
-        // Setup zoom buttons
-        if (btnZoomIn != null) {
-            btnZoomIn.setOnClickListener(v -> zoomImage(cropImageView, 1.2f));
-        }
-        if (btnZoomOut != null) {
-            btnZoomOut.setOnClickListener(v -> zoomImage(cropImageView, 0.8f));
-        }
-        if (btnReset != null) {
-            btnReset.setOnClickListener(v -> resetCrop(cropImageView));
-        }
+        // Setup buttons
         if (btnDone != null) {
             btnDone.setOnClickListener(v -> {
                 applyCropToPreview(cropImageView);
@@ -1258,103 +1242,6 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         setupPanAndZoom(cropImageView);
         
         cropDialog.show();
-    }
-    
-    /**
-     * Creates crop dialog layout programmatically if XML doesn't exist
-     */
-    private void createCropDialogLayout(android.app.Dialog dialog) {
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(32, 32, 32, 32);
-        root.setBackgroundColor(Color.parseColor("#1E1E1E"));
-        
-        // Title
-        TextView title = new TextView(this);
-        title.setText("Adjust Poster Crop");
-        title.setTextColor(Color.WHITE);
-        title.setTextSize(20);
-        title.setTypeface(null, android.graphics.Typeface.BOLD);
-        title.setPadding(0, 0, 0, 16);
-        root.addView(title);
-        
-        // Crop image view
-        ImageView cropView = new ImageView(this);
-        cropView.setId(R.id.cropImageView);
-        cropView.setLayoutParams(new LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, 400));
-        cropView.setScaleType(ImageView.ScaleType.MATRIX);
-        cropView.setBackgroundColor(Color.BLACK);
-        root.addView(cropView);
-        
-        // Instructions
-        TextView instructions = new TextView(this);
-        instructions.setText("Pinch to zoom, drag to pan");
-        instructions.setTextColor(Color.GRAY);
-        instructions.setTextSize(14);
-        instructions.setPadding(0, 16, 0, 16);
-        root.addView(instructions);
-        
-        // Buttons
-        LinearLayout buttonRow = new LinearLayout(this);
-        buttonRow.setOrientation(LinearLayout.HORIZONTAL);
-        buttonRow.setPadding(0, 16, 0, 0);
-        
-        Button zoomIn = new Button(this);
-        zoomIn.setText("Zoom In");
-        zoomIn.setId(R.id.btnZoomIn);
-        Button zoomOut = new Button(this);
-        zoomOut.setText("Zoom Out");
-        zoomOut.setId(R.id.btnZoomOut);
-        Button reset = new Button(this);
-        reset.setText("Reset");
-        reset.setId(R.id.btnReset);
-        Button done = new Button(this);
-        done.setText("Done");
-        done.setId(R.id.btnDone);
-        Button cancel = new Button(this);
-        cancel.setText("Cancel");
-        cancel.setId(R.id.btnCancel);
-        
-        LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(0, 
-            LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
-        btnParams.setMargins(4, 0, 4, 0);
-        
-        buttonRow.addView(zoomIn, btnParams);
-        buttonRow.addView(zoomOut, btnParams);
-        buttonRow.addView(reset, btnParams);
-        buttonRow.addView(done, btnParams);
-        buttonRow.addView(cancel, btnParams);
-        
-        root.addView(buttonRow);
-        
-        dialog.setContentView(root);
-        
-        // Load image and setup
-        Glide.with(this)
-                .asBitmap()
-                .load(posterUri)
-                .into(new com.bumptech.glide.request.target.CustomTarget<android.graphics.Bitmap>() {
-                    @Override
-                    public void onResourceReady(@NonNull android.graphics.Bitmap resource, 
-                                                @Nullable com.bumptech.glide.request.transition.Transition<? super android.graphics.Bitmap> transition) {
-                        setupCropView(cropView, resource);
-                    }
-                    
-                    @Override
-                    public void onLoadCleared(@Nullable android.graphics.drawable.Drawable placeholder) {}
-                });
-        
-        zoomIn.setOnClickListener(v -> zoomImage(cropView, 1.2f));
-        zoomOut.setOnClickListener(v -> zoomImage(cropView, 0.8f));
-        reset.setOnClickListener(v -> resetCrop(cropView));
-        done.setOnClickListener(v -> {
-            applyCropToPreview(cropView);
-            dialog.dismiss();
-        });
-        cancel.setOnClickListener(v -> dialog.dismiss());
-        
-        setupPanAndZoom(cropView);
     }
     
     /**

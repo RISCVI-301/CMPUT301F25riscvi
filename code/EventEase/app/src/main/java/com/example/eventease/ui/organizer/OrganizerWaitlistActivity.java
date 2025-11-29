@@ -83,11 +83,17 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
     private String currentEventId;
     private ArrayList<String> entrantNamesList;
     private ArrayAdapter<String> waitlistAdapter;
+    
+    // For poster cropping
+    private Uri selectedPosterUri;
+    private android.graphics.Matrix imageMatrix;
+    private boolean posterCropped = false;
 
     private final ActivityResultLauncher<String> pickImageLauncher =
             registerForActivityResult(new ActivityResultContracts.GetContent(), uri -> {
                 if (uri != null) {
-                    uploadPosterImage(uri);
+                    selectedPosterUri = uri;
+                    showCropPosterDialog(uri);
                 } else {
                     Toast.makeText(this, "No image selected", Toast.LENGTH_SHORT).show();
                 }
@@ -324,9 +330,375 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
         waitlistAdapter.notifyDataSetChanged();
     }
 
+    /**
+     * Shows a crop dialog for the poster image with zoom and pan controls
+     */
+    private void showCropPosterDialog(Uri imageUri) {
+        Dialog dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setContentView(R.layout.dialog_crop_poster);
+        
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        }
+        
+        ImageView posterPreview = dialog.findViewById(R.id.posterPreviewCrop);
+        MaterialButton btnCancel = dialog.findViewById(R.id.btnCancelCrop);
+        MaterialButton btnSave = dialog.findViewById(R.id.btnSaveCrop);
+        TextView tvInstructions = dialog.findViewById(R.id.tvCropInstructions);
+        
+        // Initialize matrix for image transformations
+        imageMatrix = new android.graphics.Matrix();
+        posterPreview.setScaleType(ImageView.ScaleType.MATRIX);
+        
+        // Load image into preview
+        Glide.with(this)
+                .asBitmap()
+                .load(imageUri)
+                .into(new com.bumptech.glide.request.target.CustomTarget<android.graphics.Bitmap>() {
+                    @Override
+                    public void onResourceReady(@androidx.annotation.NonNull android.graphics.Bitmap bitmap,
+                                                @androidx.annotation.Nullable com.bumptech.glide.request.transition.Transition<? super android.graphics.Bitmap> transition) {
+                        setupImageCropping(posterPreview, bitmap);
+                    }
+                    
+                    @Override
+                    public void onLoadCleared(@androidx.annotation.Nullable android.graphics.drawable.Drawable placeholder) {
+                    }
+                });
+        
+        btnCancel.setOnClickListener(v -> {
+            selectedPosterUri = null;
+            imageMatrix = null;
+            posterCropped = false;
+            dialog.dismiss();
+        });
+        
+        btnSave.setOnClickListener(v -> {
+            posterCropped = true;
+            dialog.dismiss();
+            uploadPosterImage(imageUri);
+        });
+        
+        dialog.show();
+    }
+    
+    /**
+     * Sets up image cropping with touch gestures for zoom and pan
+     */
+    private void setupImageCropping(ImageView imageView, android.graphics.Bitmap bitmap) {
+        int viewWidth = imageView.getWidth();
+        int viewHeight = imageView.getHeight();
+        
+        if (viewWidth == 0 || viewHeight == 0) {
+            // View not measured yet, post to run after layout
+            imageView.post(() -> setupImageCropping(imageView, bitmap));
+            return;
+        }
+        
+        int bitmapWidth = bitmap.getWidth();
+        int bitmapHeight = bitmap.getHeight();
+        
+        // Calculate scale to fit width
+        float scaleX = (float) viewWidth / bitmapWidth;
+        float scaleY = (float) viewHeight / bitmapHeight;
+        float scale = Math.max(scaleX, scaleY); // Fill the view
+        
+        // Center the image
+        float dx = (viewWidth - bitmapWidth * scale) / 2f;
+        float dy = (viewHeight - bitmapHeight * scale) / 2f;
+        
+        imageMatrix.setScale(scale, scale);
+        imageMatrix.postTranslate(dx, dy);
+        imageView.setImageBitmap(bitmap);
+        imageView.setImageMatrix(imageMatrix);
+        
+        // Set up touch listener for zoom and pan
+        setupTouchListener(imageView, bitmap);
+    }
+    
+    /**
+     * Sets up touch gestures for image manipulation
+     */
+    private void setupTouchListener(ImageView imageView, android.graphics.Bitmap bitmap) {
+        final android.graphics.Matrix savedMatrix = new android.graphics.Matrix();
+        final android.graphics.PointF startPoint = new android.graphics.PointF();
+        final android.graphics.PointF midPoint = new android.graphics.PointF();
+        final float[] oldDist = new float[1]; // Use array for mutability in lambda
+        oldDist[0] = 1f;
+        final int[] mode = new int[1]; // Use array for mutability in lambda (0 = none, 1 = drag, 2 = zoom)
+        mode[0] = 0;
+        
+        imageView.setOnTouchListener((v, event) -> {
+            switch (event.getAction() & android.view.MotionEvent.ACTION_MASK) {
+                case android.view.MotionEvent.ACTION_DOWN:
+                    savedMatrix.set(imageMatrix);
+                    startPoint.set(event.getX(), event.getY());
+                    mode[0] = 1;
+                    break;
+                    
+                case android.view.MotionEvent.ACTION_POINTER_DOWN:
+                    oldDist[0] = spacing(event);
+                    if (oldDist[0] > 10f) {
+                        savedMatrix.set(imageMatrix);
+                        midpoint(midPoint, event);
+                        mode[0] = 2;
+                    }
+                    break;
+                    
+                case android.view.MotionEvent.ACTION_UP:
+                case android.view.MotionEvent.ACTION_POINTER_UP:
+                    mode[0] = 0;
+                    break;
+                    
+                case android.view.MotionEvent.ACTION_MOVE:
+                    if (mode[0] == 1) {
+                        // Drag
+                        imageMatrix.set(savedMatrix);
+                        float dx = event.getX() - startPoint.x;
+                        float dy = event.getY() - startPoint.y;
+                        imageMatrix.postTranslate(dx, dy);
+                    } else if (mode[0] == 2) {
+                        // Zoom
+                        float newDist = spacing(event);
+                        if (newDist > 10f) {
+                            imageMatrix.set(savedMatrix);
+                            float scale = newDist / oldDist[0];
+                            imageMatrix.postScale(scale, scale, midPoint.x, midPoint.y);
+                        }
+                    }
+                    break;
+            }
+            
+            imageView.setImageMatrix(imageMatrix);
+            return true;
+        });
+    }
+    
+    /**
+     * Calculate distance between two touch points
+     */
+    private float spacing(android.view.MotionEvent event) {
+        float x = event.getX(0) - event.getX(1);
+        float y = event.getY(0) - event.getY(1);
+        return (float) Math.sqrt(x * x + y * y);
+    }
+    
+    /**
+     * Calculate midpoint between two touch points
+     */
+    private void midpoint(android.graphics.PointF point, android.view.MotionEvent event) {
+        float x = event.getX(0) + event.getX(1);
+        float y = event.getY(0) + event.getY(1);
+        point.set(x / 2, y / 2);
+    }
+    
+    /**
+     * Applies the crop transformation and uploads the poster image to Firebase Storage
+     */
     private void uploadPosterImage(Uri uri) {
-        // Placeholder: implement upload if needed
-        Toast.makeText(this, "Upload not implemented yet", Toast.LENGTH_SHORT).show();
+        if (currentEventId == null || currentEventId.isEmpty()) {
+            Toast.makeText(this, "Event ID not found", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        Toast.makeText(this, "Updating poster...", Toast.LENGTH_SHORT).show();
+        
+        // Get device ID for auth
+        com.example.eventease.auth.DeviceAuthManager authManager = 
+            new com.example.eventease.auth.DeviceAuthManager(this);
+        String deviceId = authManager.getUid();
+        
+        // Create storage reference with event ID
+        final StorageReference ref = storage.getReference("posters/" + currentEventId + "_updated.jpg");
+        
+        // Create metadata
+        com.google.firebase.storage.StorageMetadata.Builder metaBuilder = 
+            new com.google.firebase.storage.StorageMetadata.Builder()
+                .setContentType("image/jpeg");
+        
+        if (deviceId != null && !deviceId.isEmpty()) {
+            metaBuilder.setCustomMetadata("deviceId", deviceId);
+            metaBuilder.setCustomMetadata("updatedAt", String.valueOf(System.currentTimeMillis()));
+        }
+        
+        final com.google.firebase.storage.StorageMetadata meta = metaBuilder.build();
+        
+        // Apply crop if user cropped the image
+        if (posterCropped && imageMatrix != null) {
+            Glide.with(this)
+                    .asBitmap()
+                    .load(uri)
+                    .into(new com.bumptech.glide.request.target.CustomTarget<android.graphics.Bitmap>() {
+                        @Override
+                        public void onResourceReady(@androidx.annotation.NonNull android.graphics.Bitmap originalBitmap,
+                                                    @androidx.annotation.Nullable com.bumptech.glide.request.transition.Transition<? super android.graphics.Bitmap> transition) {
+                            android.graphics.Bitmap croppedBitmap = applyCropToBitmap(originalBitmap);
+                            if (croppedBitmap != null) {
+                                uploadBitmapToStorage(croppedBitmap, ref, meta);
+                            } else {
+                                // Fallback to original
+                                uploadUriToStorage(uri, ref, meta);
+                            }
+                        }
+                        
+                        @Override
+                        public void onLoadCleared(@androidx.annotation.Nullable android.graphics.drawable.Drawable placeholder) {
+                        }
+                    });
+        } else {
+            // Upload original image without cropping
+            uploadUriToStorage(uri, ref, meta);
+        }
+    }
+    
+    /**
+     * Applies the crop transformation to the bitmap
+     */
+    private android.graphics.Bitmap applyCropToBitmap(android.graphics.Bitmap originalBitmap) {
+        if (originalBitmap == null || imageMatrix == null) {
+            return null;
+        }
+        
+        try {
+            // Use standard event card dimensions (400x200)
+            int targetWidth = 400;
+            int targetHeight = 200;
+            
+            // Get the transformation matrix values
+            float[] values = new float[9];
+            imageMatrix.getValues(values);
+            float scale = values[android.graphics.Matrix.MSCALE_X];
+            float transX = values[android.graphics.Matrix.MTRANS_X];
+            float transY = values[android.graphics.Matrix.MTRANS_Y];
+            
+            // Calculate the source rectangle in the original bitmap
+            float srcLeft = -transX / scale;
+            float srcTop = -transY / scale;
+            float srcWidth = targetWidth / scale;
+            float srcHeight = targetHeight / scale;
+            
+            // Ensure coordinates are within bitmap bounds
+            srcLeft = Math.max(0, Math.min(srcLeft, originalBitmap.getWidth()));
+            srcTop = Math.max(0, Math.min(srcTop, originalBitmap.getHeight()));
+            srcWidth = Math.min(srcWidth, originalBitmap.getWidth() - srcLeft);
+            srcHeight = Math.min(srcHeight, originalBitmap.getHeight() - srcTop);
+            
+            if (srcWidth <= 0 || srcHeight <= 0) {
+                return originalBitmap;
+            }
+            
+            // Create cropped bitmap
+            android.graphics.Bitmap croppedBitmap = android.graphics.Bitmap.createBitmap(
+                originalBitmap,
+                (int)srcLeft,
+                (int)srcTop,
+                (int)srcWidth,
+                (int)srcHeight
+            );
+            
+            // Scale to target dimensions
+            android.graphics.Bitmap scaledBitmap = android.graphics.Bitmap.createScaledBitmap(
+                croppedBitmap, targetWidth, targetHeight, true);
+            
+            if (scaledBitmap != croppedBitmap) {
+                croppedBitmap.recycle();
+            }
+            
+            return scaledBitmap;
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to apply crop", e);
+            return null;
+        }
+    }
+    
+    /**
+     * Uploads a bitmap to Firebase Storage
+     */
+    private void uploadBitmapToStorage(android.graphics.Bitmap bitmap, StorageReference ref, 
+                                      com.google.firebase.storage.StorageMetadata meta) {
+        try {
+            java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+            bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, baos);
+            byte[] imageData = baos.toByteArray();
+            
+            ref.putBytes(imageData, meta)
+                    .continueWithTask(task -> {
+                        if (!task.isSuccessful()) throw task.getException();
+                        return ref.getDownloadUrl();
+                    })
+                    .addOnSuccessListener(downloadUri -> {
+                        Log.d(TAG, "Poster uploaded successfully: " + downloadUri.toString());
+                        updateEventPosterUrl(downloadUri.toString());
+                    })
+                    .addOnFailureListener(e -> {
+                        Log.e(TAG, "Failed to upload poster", e);
+                        Toast.makeText(this, "Failed to upload poster: " + e.getMessage(), 
+                                      Toast.LENGTH_LONG).show();
+                    });
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to compress bitmap", e);
+            Toast.makeText(this, "Failed to process image: " + e.getMessage(), 
+                          Toast.LENGTH_LONG).show();
+        }
+    }
+    
+    /**
+     * Uploads a URI to Firebase Storage (fallback for no crop)
+     */
+    private void uploadUriToStorage(Uri uri, StorageReference ref, 
+                                   com.google.firebase.storage.StorageMetadata meta) {
+        ref.putFile(uri, meta)
+                .continueWithTask(task -> {
+                    if (!task.isSuccessful()) throw task.getException();
+                    return ref.getDownloadUrl();
+                })
+                .addOnSuccessListener(downloadUri -> {
+                    Log.d(TAG, "Poster uploaded successfully: " + downloadUri.toString());
+                    updateEventPosterUrl(downloadUri.toString());
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to upload poster", e);
+                    Toast.makeText(this, "Failed to upload poster: " + e.getMessage(), 
+                                  Toast.LENGTH_LONG).show();
+                });
+    }
+    
+    /**
+     * Updates the event document with the new poster URL
+     */
+    private void updateEventPosterUrl(String posterUrl) {
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("posterUrl", posterUrl);
+        updates.put("posterUpdatedAt", System.currentTimeMillis());
+        
+        db.collection("events").document(currentEventId)
+                .update(updates)
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "Event poster URL updated successfully");
+                    Toast.makeText(this, "Poster updated successfully!", Toast.LENGTH_SHORT).show();
+                    
+                    // Reload the poster image
+                    if (eventPosterImageView != null) {
+                        Glide.with(this)
+                                .load(posterUrl)
+                                .placeholder(R.drawable.rounded_panel_bg)
+                                .error(R.drawable.rounded_panel_bg)
+                                .into(eventPosterImageView);
+                    }
+                    
+                    // Reset crop state
+                    selectedPosterUri = null;
+                    imageMatrix = null;
+                    posterCropped = false;
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to update event poster URL", e);
+                    Toast.makeText(this, "Failed to update event: " + e.getMessage(), 
+                                  Toast.LENGTH_LONG).show();
+                });
     }
 
     private void showDeleteEventConfirmation() {

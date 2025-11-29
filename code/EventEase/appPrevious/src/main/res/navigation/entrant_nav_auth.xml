@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_auth"
+    app:startDestination="@id/loginFragment">
+
+
+    <fragment
+        android:id="@+id/loginFragment"
+        android:name="com.example.eventease.auth.LoginFragment"
+        android:label="Login">
+        <action
+            android:id="@+id/action_login_to_signup"
+            app:destination="@id/signupFragment" />
+        <action
+            android:id="@+id/action_login_to_discover"
+            app:destination="@id/discoverFragment" />
+    </fragment>
+
+
+    <fragment
+        android:id="@+id/signupFragment"
+        android:name="com.example.eventease.auth.SignupFragment"
+        android:label="Sign Up">
+        <action
+            android:id="@+id/action_signup_to_login"
+            app:destination="@id/loginFragment" />
+        <action
+            android:id="@+id/action_signup_to_discover"
+            app:destination="@id/discoverFragment" />
+    </fragment>
+
+
+    <!-- Replace with your actual Discover fragment class/name -->
+    <fragment
+        android:id="@+id/discoverFragment"
+        android:name="com.example.eventease.ui.entrant.discover.DiscoverFragment"
+        android:label="Discover" />
+</navigation>
+
