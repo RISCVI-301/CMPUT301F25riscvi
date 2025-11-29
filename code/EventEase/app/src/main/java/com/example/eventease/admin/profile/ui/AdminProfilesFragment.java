@@ -57,9 +57,6 @@ public class AdminProfilesFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        // Setup logout button
-        setupLogoutButton(view);
-
         rv = view.findViewById(R.id.rvProfiles);
         if (rv != null) {
             rv.setLayoutManager(new LinearLayoutManager(requireContext()));
@@ -177,13 +174,5 @@ public class AdminProfilesFragment extends Fragment {
             .show();
     }
 
-    private void setupLogoutButton(View view) {
-        View logoutButton = view.findViewById(R.id.adminLogoutButton);
-        if (logoutButton != null && getActivity() instanceof com.example.eventease.admin.AdminMainActivity) {
-            logoutButton.setOnClickListener(v -> {
-                ((com.example.eventease.admin.AdminMainActivity) getActivity()).performLogout();
-            });
-        }
-    }
 }
 

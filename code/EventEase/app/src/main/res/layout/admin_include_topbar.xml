@@ -20,31 +20,17 @@
         android:textSize="22sp"
         android:textColor="#1A2C44" />
 
-    <!-- Logout Button -->
-    <androidx.cardview.widget.CardView
+    <!-- Admin label (replaces logout button, no click) -->
+    <TextView
         android:id="@+id/adminLogoutButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_alignParentEnd="true"
         android:layout_centerVertical="true"
-        app:cardCornerRadius="12dp"
-        app:cardBackgroundColor="#EF9A9A"
-        android:elevation="4dp"
-        android:layout_marginEnd="0dp">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Log Out"
-            android:textSize="16sp"
-            android:textColor="#FFFFFF"
-            android:textStyle="bold"
-            android:gravity="center"
-            android:paddingStart="12dp"
-            android:paddingEnd="12dp"
-            android:paddingTop="8dp"
-            android:paddingBottom="8dp" />
-    </androidx.cardview.widget.CardView>
+        android:text="Admin"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="#1A2C44" />
 
 </RelativeLayout>
 

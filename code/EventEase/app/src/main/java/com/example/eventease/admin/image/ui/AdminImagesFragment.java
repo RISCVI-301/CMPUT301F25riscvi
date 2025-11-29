@@ -37,9 +37,6 @@ public class AdminImagesFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        // Setup logout button
-        setupLogoutButton(view);
-
         ImageData = new ArrayList<>();
 
         RecyclerView rv = view.findViewById(R.id.grid);
@@ -81,15 +78,6 @@ public class AdminImagesFragment extends Fragment {
                 });
             }
         });
-    }
-
-    private void setupLogoutButton(View view) {
-        View logoutButton = view.findViewById(R.id.adminLogoutButton);
-        if (logoutButton != null && getActivity() instanceof com.example.eventease.admin.AdminMainActivity) {
-            logoutButton.setOnClickListener(v -> {
-                ((com.example.eventease.admin.AdminMainActivity) getActivity()).performLogout();
-            });
-        }
     }
 
     @Override
