@@ -97,6 +97,8 @@ public class EventDetailActivity extends AppCompatActivity {
     private boolean hasInvitation;
     private String invitationId;
     private String eventQrPayload;
+    private boolean isPreviousEvent;  // Flag to indicate if viewing from Previous Events
+    private boolean isUpcomingEvent;  // Flag to indicate if viewing from Upcoming Events (already accepted)
     
     private InvitationRepository invitationRepo;
     private WaitlistRepository waitlistRepo;
@@ -120,6 +122,13 @@ public class EventDetailActivity extends AppCompatActivity {
         eventWaitlistCount = getIntent().getIntExtra("eventWaitlistCount", 0);
         hasInvitation = getIntent().getBooleanExtra("hasInvitation", false);
         invitationId = getIntent().getStringExtra("invitationId");
+        isPreviousEvent = getIntent().getBooleanExtra("isPreviousEvent", false);
+        
+        // Check if viewing from Upcoming Events (hasInvitation is false for already accepted)
+        // If hasInvitation is false and we're coming from an event detail, it's likely upcoming/accepted
+        isUpcomingEvent = !hasInvitation && !isPreviousEvent;
+        
+        android.util.Log.d("EventDetailActivity", "Event flags: isPreviousEvent=" + isPreviousEvent + ", isUpcomingEvent=" + isUpcomingEvent + ", hasInvitation=" + hasInvitation);
         
         // Initialize repositories
         invitationRepo = App.graph().invitations;
@@ -647,6 +656,23 @@ public class EventDetailActivity extends AppCompatActivity {
         android.util.Log.d("EventDetailActivity", "═══ Updating Button Visibility ═══");
         android.util.Log.d("EventDetailActivity", "Has Invite: " + hasInvite);
         android.util.Log.d("EventDetailActivity", "Invite ID: " + inviteId);
+        android.util.Log.d("EventDetailActivity", "Is Previous Event: " + isPreviousEvent);
+        android.util.Log.d("EventDetailActivity", "Is Upcoming Event: " + isUpcomingEvent);
+        
+        // CRITICAL: Hide ALL action buttons for Previous and Upcoming events (read-only views)
+        if (isPreviousEvent || isUpcomingEvent) {
+            android.util.Log.d("EventDetailActivity", "📖 READ-ONLY MODE - Hiding all action buttons");
+            btnRegister.setVisibility(View.GONE);
+            btnDecline.setVisibility(View.GONE);
+            if (btnOptOut != null) {
+                btnOptOut.setVisibility(View.GONE);
+            }
+            if (btnLeaveWaitlist != null && leaveWaitlistCard != null) {
+                btnLeaveWaitlist.setVisibility(View.GONE);
+                leaveWaitlistCard.setVisibility(View.GONE);
+            }
+            return;
+        }
         
         if (hasInvite && inviteId != null) {
             // Has invitation - show accept/decline, hide opt-out
