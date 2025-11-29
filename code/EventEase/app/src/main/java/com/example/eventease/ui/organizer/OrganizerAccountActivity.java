@@ -1,10 +1,11 @@
 package com.example.eventease.ui.organizer;
 
+import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
-import android.widget.ImageButton;
+import android.view.View;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -40,8 +41,7 @@ public class OrganizerAccountActivity extends AppCompatActivity {
 
     private ImageView ivAvatar;
     private TextView tvFullName;
-    private TextView tvUserId;
-    private ImageButton btnEditProfile;
+    private ImageView btnEditProfile;
     private String organizerId;
     private boolean isResolvingOrganizerId;
     private String userEmail;
@@ -58,6 +58,7 @@ public class OrganizerAccountActivity extends AppCompatActivity {
      * Initializes the activity, view components, and loads the organizer's profile data.
      * @param savedInstanceState If the activity is being re-initialized, this Bundle contains the most recent data.
      */
+    @SuppressLint("WrongViewCast")
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -65,7 +66,6 @@ public class OrganizerAccountActivity extends AppCompatActivity {
 
         ivAvatar = findViewById(R.id.ivAvatar);
         tvFullName = findViewById(R.id.tvFullName);
-        tvUserId = findViewById(R.id.tvUserId);
         btnEditProfile = findViewById(R.id.btnEditProfile);
 
         organizerId = getIntent().getStringExtra(OrganizerMyEventActivity.EXTRA_ORGANIZER_ID);
@@ -77,7 +77,7 @@ public class OrganizerAccountActivity extends AppCompatActivity {
 
         tvFullName.setText("Loading...");
         Glide.with(this).load(R.drawable.entrant_icon).circleCrop().into(ivAvatar);
-        
+
         // Get device ID
         String userId = com.example.eventease.auth.AuthHelper.getUid(this);
         if (userId == null || userId.isEmpty()) {
@@ -85,10 +85,9 @@ public class OrganizerAccountActivity extends AppCompatActivity {
             finish();
             return;
         }
-        
-        updateUserIdLabel(userId);
+
         loadProfile(userId);
-        resolveOrganizerId(() -> updateUserIdLabel(userId));
+        resolveOrganizerId(null);
 
         ivAvatar.setOnClickListener(v -> pickImage.launch("image/*"));
 
@@ -102,30 +101,12 @@ public class OrganizerAccountActivity extends AppCompatActivity {
                             .show()
             );
         }
-        
-        setupBottomNavigation();
-    }
 
-    private void updateUserIdLabel(String authUid) {
-        if (tvUserId == null) {
-            return;
-        }
-        String organizerLabel = (organizerId != null && !organizerId.trim().isEmpty())
-                ? organizerId
-                : "Loading…";
-        StringBuilder sb = new StringBuilder();
-        if (userEmail != null && !userEmail.isEmpty()) {
-            sb.append("Email: ").append(userEmail).append('\n');
-        }
-        sb.append("Auth UID: ").append(authUid).append('\n');
-        sb.append("Organizer ID: ").append(organizerLabel);
-        tvUserId.setText(sb.toString());
+        setupBottomNavigation();
     }
 
     private void resolveOrganizerId(@Nullable Runnable onReady) {
         if (organizerId != null && !organizerId.trim().isEmpty()) {
-            String userId = com.example.eventease.auth.AuthHelper.getUid(this);
-            updateUserIdLabel(userId != null ? userId : "");
             if (onReady != null) {
                 onReady.run();
             }
@@ -141,14 +122,13 @@ public class OrganizerAccountActivity extends AppCompatActivity {
         }
         isResolvingOrganizerId = true;
         organizerId = userId; // Use device ID as organizer ID
-        
+
         FirebaseFirestore.getInstance()
                 .collection("users")
                 .document(userId)
                 .get()
                 .addOnSuccessListener(doc -> {
                     isResolvingOrganizerId = false;
-                    updateUserIdLabel(userId);
                     if (organizerId == null || organizerId.trim().isEmpty()) {
                         Toast.makeText(this, "Organizer profile not configured yet.", Toast.LENGTH_LONG).show();
                     } else if (onReady != null) {
@@ -175,12 +155,12 @@ public class OrganizerAccountActivity extends AppCompatActivity {
                 finish();
             });
         }
-        
+
         LinearLayout btnAccount = findViewById(R.id.btnAccount);
         if (btnAccount != null) {
             btnAccount.setOnClickListener(v -> recreate());
         }
-        
+
         com.google.android.material.floatingactionbutton.FloatingActionButton fabAdd = findViewById(R.id.fabAdd);
         if (fabAdd != null) {
             fabAdd.setOnClickListener(v -> {
@@ -191,8 +171,8 @@ public class OrganizerAccountActivity extends AppCompatActivity {
                 startActivity(intent);
             });
         }
-        
-        com.google.android.material.button.MaterialButton btnSwitchRole = findViewById(R.id.btnSwitchRole);
+
+        View btnSwitchRole = findViewById(R.id.btnSwitchRole);
         if (btnSwitchRole != null) {
             btnSwitchRole.setOnClickListener(v -> {
                 Intent intent = new Intent(this, com.example.eventease.MainActivity.class);
@@ -202,8 +182,8 @@ public class OrganizerAccountActivity extends AppCompatActivity {
                 finish();
             });
         }
-        
-        com.google.android.material.button.MaterialButton btnDeleteProfile = findViewById(R.id.btnDeleteProfile);
+
+        View btnDeleteProfile = findViewById(R.id.btnDeleteProfile);
         if (btnDeleteProfile != null) {
             btnDeleteProfile.setOnClickListener(v -> {
                 new MaterialAlertDialogBuilder(this)
@@ -272,10 +252,7 @@ public class OrganizerAccountActivity extends AppCompatActivity {
             Glide.with(this).load(R.drawable.entrant_icon).circleCrop().into(ivAvatar);
         }
 
-        String authUserId = com.example.eventease.auth.AuthHelper.getUid(this);
-        if (authUserId != null && !authUserId.isEmpty()) {
-            updateUserIdLabel(authUserId);
-        }
+        // We no longer display authentication info on the organizer account screen
     }
     /**
      * Uploads a new avatar image to Firebase Storage and updates the URL

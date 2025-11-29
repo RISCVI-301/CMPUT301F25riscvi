@@ -35,7 +35,6 @@
                 android:textColor="#223C65"
                 android:padding="20dp"
                 android:paddingBottom="20dp"
-                android:fontFamily="@font/entrant_fredoka_one"
                 android:background="#FFFFFF"
                 android:shadowColor="#80000000"
                 android:shadowDx="0"
@@ -63,7 +62,7 @@
                     android:textSize="16sp"
                     android:textColor="#223C65"
                     android:paddingBottom="24dp"
-                    android:fontFamily="@font/entrant_fredoka_one"/>
+                    android:textStyle="bold"/>
 
             </LinearLayout>
 
@@ -97,7 +96,6 @@
                     android:textColor="#FFFFFF"
                     android:background="@drawable/entrant_button_guidelines_ok"
                     android:layout_marginEnd="8dp"
-                    android:fontFamily="@font/entrant_fredoka_one"
                     android:elevation="8dp"
                     android:gravity="center"
                     android:includeFontPadding="false"
@@ -115,7 +113,6 @@
                     android:ellipsize="end"
                     android:background="@drawable/entrant_button_guidelines_ok"
                     android:elevation="8dp"
-                    android:fontFamily="@font/entrant_fredoka_one"
                     android:gravity="center"
                     android:includeFontPadding="false"
                     android:text="Gallery"

@@ -432,7 +432,7 @@ public class MainActivity extends AppCompatActivity {
                     } else {
                         Log.e("MainActivity", "Failed to get FCM token: " + (task.getException() != null ? task.getException().getMessage() : "Unknown error"));
                         Log.e("MainActivity", "  This may indicate Google Play Services is not available (common on emulators)");
-                    }
+        }
                 });
         
         Log.d("MainActivity", "=== Notification Setup Verification Complete ===");

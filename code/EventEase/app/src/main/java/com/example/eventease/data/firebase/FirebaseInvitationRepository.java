@@ -241,14 +241,31 @@ public class FirebaseInvitationRepository implements InvitationRepository {
     public Task<Void> accept(String invitationId, String eventId, String uid) {
         Log.d(TAG, "Accept called with invitationId: " + invitationId + ", eventId: " + eventId + ", uid: " + uid);
         
-        // Delete invitation document and notificationRequests entry
-        return deleteInvitationAndNotificationRequests(invitationId, eventId, uid)
-                .continueWithTask(deleteTask -> {
-                    if (!deleteTask.isSuccessful()) {
-                        Log.e(TAG, "Failed to delete invitation and notification requests", deleteTask.getException());
-                        return Tasks.forException(deleteTask.getException());
+        // NEW BEHAVIOUR:
+        // 1. Update invitation status to ACCEPTED (do NOT delete the document)
+        // 2. Move user to AdmittedEntrants so event appears in "upcoming events"
+        // 3. Clean up notificationRequests for this user + event
+        //
+        // Keeping the invitation document is CRITICAL so that:
+        // - InvitationDeadlineProcessor can see this user as a responder (ACCEPTED)
+        // - Accepted entrants are NOT treated as non-responders and moved to CancelledEntrants
+
+        DocumentReference invitationRef = db.collection("invitations").document(invitationId);
+
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("status", "ACCEPTED");
+        updates.put("acceptedAt", System.currentTimeMillis());
+
+        Log.d(TAG, "Updating invitation status to ACCEPTED for invitationId=" + invitationId);
+
+        return invitationRef.update(updates)
+                .continueWithTask(updateTask -> {
+                    if (!updateTask.isSuccessful()) {
+                        Log.e(TAG, "Failed to update invitation status to ACCEPTED", updateTask.getException());
+                        return Tasks.forException(updateTask.getException());
                     }
                     
+                    // Update in-memory cache
                     Invitation inv = byId.get(invitationId);
                     if (inv != null) {
                         inv.setStatus(Status.ACCEPTED);
@@ -265,15 +282,34 @@ public class FirebaseInvitationRepository implements InvitationRepository {
                                         checkAndSendNotSelectedNotifications(eventId);
                                     } else {
                                         Log.e(TAG, "Failed to admit user to event", admitTask.getException());
-                                        // Still notify and continue even if admit fails
+                                        // Still continue even if admit fails
                                     }
+
+                                    // Notify listeners that invitations changed
                                     notifyUid(uid);
-                                    return Tasks.forResult(null);
+
+                                    // Clean up notificationRequests (non-critical)
+                                    return deleteNotificationRequests(eventId, uid)
+                                            .continueWith(cleanupTask -> {
+                                                if (!cleanupTask.isSuccessful()) {
+                                                    Log.w(TAG, "⚠️ Warning: Failed to clean up notification requests after ACCEPT", cleanupTask.getException());
+                                                } else {
+                                                    Log.d(TAG, "✓ Cleaned up notification requests after ACCEPT");
+                                                }
+                                                return null;
+                                            });
                                 });
                     } else {
                         Log.e(TAG, "admittedRepo is NULL! Cannot admit user to event.");
                         notifyUid(uid);
-                        return Tasks.forResult(null);
+                        // Still try to clean up notificationRequests even if admittedRepo is null
+                        return deleteNotificationRequests(eventId, uid)
+                                .continueWith(cleanupTask -> {
+                                    if (!cleanupTask.isSuccessful()) {
+                                        Log.w(TAG, "⚠️ Warning: Failed to clean up notification requests after ACCEPT (admittedRepo null)", cleanupTask.getException());
+                                    }
+                                    return null;
+                                });
                     }
                 });
     }

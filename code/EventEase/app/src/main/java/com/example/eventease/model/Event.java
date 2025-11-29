@@ -1,6 +1,7 @@
 package com.example.eventease.model;
 
 import androidx.annotation.Nullable;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -10,9 +11,27 @@ import java.util.UUID;
 
 /**
  * Represents an event in the EventEase system.
- * Contains event details including title, location, capacity, waitlist, and admitted entrants.
+ *
+ * <p>This class serves as a data model (Data Transfer Object pattern) for events in the EventEase
+ * application. It encapsulates all event-related information including scheduling, capacity management,
+ * waitlist handling, and attendee tracking. Instances of this class are used throughout the application
+ * for event creation, display, and management by both organizers and entrants.</p>
+ *
+ * <p>This class supports serialization to/from Firestore Map format via {@link #toMap()} and
+ * {@link #fromMap(Map)} methods, enabling persistence in the Firebase backend. The class follows
+ * the Value Object pattern for immutable data representation, though it uses public fields for
+ * Firestore compatibility.</p>
+ *
+ * <p><b>Role in Application:</b> Central data model for the event management system. Used by
+ * organizers to create and manage events, by entrants to view and register for events, and by
+ * the backend services for event processing and notifications.</p>
+ *
+ * <p><b>Outstanding Issues:</b> The {@code waitlistCount} field is deprecated in favor of using
+ * {@code waitlist.size()}, but is maintained for backwards compatibility with existing Firestore data.
+ * The {@code description} field is a legacy field that mirrors {@code notes}.</p>
  */
-public class Event {
+public class Event implements Serializable {
+    private static final long serialVersionUID = 1L;
     /** Unique event identifier. */
     public String id;
     /** Event title. */
@@ -47,11 +66,14 @@ public class Event {
     public String organizerId;
     /** Event creation timestamp in milliseconds UTC. */
     public long createdAtEpochMs;
-    /** QR code payload string (e.g., "event:<id>"). */
+    /** QR code payload string (e.g., {@code "event:<id>"}). */
     @Nullable public String qrPayload;
     /** Interests/tags for filtering (e.g., Outdoor, Music). */
     @Nullable public List<String> interests;
 
+    /**
+     * Default constructor for Firestore deserialization.
+     */
     public Event() { /* for Firestore */ }
 
     /**
@@ -96,6 +118,11 @@ public class Event {
         m.put("createdAtEpochMs", createdAtEpochMs);
         m.put("qrPayload", qrPayload);
         m.put("interests", interests != null ? interests : new ArrayList<>());
+        // CRITICAL: Initialize selection tracking fields to false
+        // These fields are required for the Cloud Function to find and process events
+        m.put("selectionProcessed", false);
+        m.put("selectionNotificationSent", false);
+        m.put("sorryNotificationSent", false);
         return m;
     }
     
@@ -236,9 +263,18 @@ public class Event {
      */
     public void setStartsAtEpochMs(long startsAtEpochMs) { this.startsAtEpochMs = startsAtEpochMs; }
 
-    /** Optional getter for interests. */
+    /**
+     * Gets the list of interests/tags associated with the event.
+     *
+     * @return the list of interests (e.g., Outdoor, Music), or null if not set
+     */
     public List<String> getInterests() { return interests; }
 
+    /**
+     * Sets the list of interests/tags associated with the event.
+     *
+     * @param interests the list of interests to set
+     */
     public void setInterests(List<String> interests) { this.interests = interests; }
 
     /**

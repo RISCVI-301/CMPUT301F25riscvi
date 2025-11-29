@@ -199,11 +199,12 @@ public class MyEventsFragment extends Fragment {
         // Load previous events (deadline passed)
         Task<List<Event>> previousEventsTask = admittedRepo.getPreviousEvents(uid);
         
-        // Load open events for waitlisted/selected filtering
-        Task<List<Event>> openEventsTask = eventRepo.getOpenEvents(new Date());
+        // CRITICAL FIX: Load events where user is participating (bypasses registrationEnd filter)
+        // This ensures events show in waitlist even after registration ends
+        Task<List<Event>> myParticipatingEventsTask = loadEventsForUser(uid);
         
         // Combine all tasks
-        Tasks.whenAllComplete(admittedEventsTask, previousEventsTask, openEventsTask)
+        Tasks.whenAllComplete(admittedEventsTask, previousEventsTask, myParticipatingEventsTask)
                 .addOnSuccessListener(tasks -> {
                     if (!isAdded()) return;
                     
@@ -236,16 +237,16 @@ public class MyEventsFragment extends Fragment {
                         android.util.Log.e("MyEventsFragment", "Error processing previous events", e);
                     }
                     
-                    // Process open events
+                    // Process user participating events
                     try {
                         @SuppressWarnings("unchecked")
-                        Task<List<Event>> openTask = (Task<List<Event>>) tasks.get(2);
-                        if (openTask.isSuccessful() && openTask.getResult() != null) {
-                            openEvents = openTask.getResult();
-                            android.util.Log.d("MyEventsFragment", "Loaded " + openEvents.size() + " open events, checking for waitlisted/selected");
+                        Task<List<Event>> myEventsTask = (Task<List<Event>>) tasks.get(2);
+                        if (myEventsTask.isSuccessful() && myEventsTask.getResult() != null) {
+                            openEvents = myEventsTask.getResult();
+                            android.util.Log.d("MyEventsFragment", "Loaded " + openEvents.size() + " events where user is participating");
                         }
                     } catch (Exception e) {
-                        android.util.Log.e("MyEventsFragment", "Error processing open events", e);
+                        android.util.Log.e("MyEventsFragment", "Error processing user participating events", e);
                     }
                     
                     // Process in background thread to avoid blocking UI
@@ -299,24 +300,49 @@ public class MyEventsFragment extends Fragment {
                                 Boolean admitted = Tasks.await(admittedRepo.isAdmitted(e.getId(), uid));
                                 Boolean hasAcceptedInvitation = Tasks.await(hasAcceptedInvitation(e.getId(), uid));
                                 Boolean hasDeclinedInvitation = Tasks.await(hasDeclinedInvitation(e.getId(), uid));
+                                Boolean hasPendingInvitation = Tasks.await(hasPendingInvitation(e.getId(), uid));
                                 
-                                android.util.Log.d("MyEventsFragment", "Event " + e.getTitle() + " - Joined: " + joined + ", Selected: " + inSelected + ", NonSelected: " + inNonSelected + ", Cancelled: " + inCancelled + ", Admitted: " + admitted + ", Accepted: " + hasAcceptedInvitation + ", Declined: " + hasDeclinedInvitation);
+                                android.util.Log.d("MyEventsFragment", "Event " + e.getTitle() +
+                                        " - Joined: " + joined +
+                                        ", Selected: " + inSelected +
+                                        ", NonSelected: " + inNonSelected +
+                                        ", Cancelled: " + inCancelled +
+                                        ", Admitted: " + admitted +
+                                        ", Accepted: " + hasAcceptedInvitation +
+                                        ", Declined: " + hasDeclinedInvitation +
+                                        ", PendingInvite: " + hasPendingInvitation);
                                 
                                 // CRITICAL: Show in upcoming only if user is in BOTH SelectedEntrants AND AdmittedEntrants
                                 // AND event hasn't started yet
+                                // If user has accepted invitation (admitted), they should NOT appear in waitlist
                                 if (Boolean.TRUE.equals(inSelected) && Boolean.TRUE.equals(admitted)) {
                                     acceptedNotYetShown.add(e);
                                     eventIds.add(e.getId());
-                                    android.util.Log.d("MyEventsFragment", "Event " + e.getTitle() + " - User is in both Selected and Admitted, showing in upcoming");
+                                    android.util.Log.d("MyEventsFragment", "Event " + e.getTitle() + " - User is in both Selected and Admitted, showing in upcoming (NOT in waitlist)");
+                                    continue; // Skip waitlist check - user has accepted
                                 }
                                 // If user declined/rejected or in cancelled, skip (will show in PreviousEventsFragment)
                                 else if (Boolean.TRUE.equals(hasDeclinedInvitation) || Boolean.TRUE.equals(inCancelled)) {
                                     android.util.Log.d("MyEventsFragment", "User declined/cancelled event " + e.getTitle() + " - skipping (will show in previous events)");
                                     // Skip - declined/cancelled events should show in PreviousEventsFragment
                                 }
-                                // CRITICAL: Show in waitlist if user is in selected OR not selected (until event start - 1 minute)
-                                // For not selected: if current time >= event start - 1 minute, they should be in cancelled (handled by cloud function)
-                                else if (Boolean.TRUE.equals(inSelected) || Boolean.TRUE.equals(inNonSelected) || Boolean.TRUE.equals(joined)) {
+                                // CRITICAL: Show in waitlist if:
+                                //  - User is in NonSelectedEntrants OR WaitlistedEntrants (always until event start - 1 minute), OR
+                                //  - User is in SelectedEntrants WITH a PENDING invitation (hasPendingInvitation),
+                                // AND they are NOT admitted and have NOT accepted yet.
+                                // For NonSelectedEntrants: if current time >= event start - 1 minute, they should be moved to cancelled by Cloud Function.
+                                else if (
+                                        // Non-selected or just joined waitlist (no invite yet)
+                                        (Boolean.TRUE.equals(inNonSelected) || Boolean.TRUE.equals(joined))
+                                        ||
+                                        // Selected but invitation is still pending
+                                        (Boolean.TRUE.equals(inSelected) && Boolean.TRUE.equals(hasPendingInvitation))
+                                ) {
+                                    // Do not show if already admitted or accepted (those go to upcoming)
+                                    if (Boolean.TRUE.equals(admitted) || Boolean.TRUE.equals(hasAcceptedInvitation)) {
+                                        android.util.Log.d("MyEventsFragment", "Event " + e.getTitle() + " - Skipping from waitlist (user admitted/accepted)");
+                                        continue;
+                                    }
                                     // Check if not selected and should be moved to cancelled (event start - 1 minute has passed)
                                     if (Boolean.TRUE.equals(inNonSelected)) {
                                         if (eventStart > 0 && currentTime >= (eventStart - oneMinuteInMs)) {
@@ -376,6 +402,116 @@ public class MyEventsFragment extends Fragment {
                 });
     }
 
+    /**
+     * Loads all events where the user is participating (waitlisted, selected, non-selected, or has invitation).
+     * This bypasses the registrationEnd filter in getOpenEvents() so events remain visible after registration ends.
+     */
+    private Task<List<Event>> loadEventsForUser(String uid) {
+        com.google.firebase.firestore.FirebaseFirestore db = com.google.firebase.firestore.FirebaseFirestore.getInstance();
+        
+        // Get all invitations for this user (this gives us eventIds)
+        Task<com.google.firebase.firestore.QuerySnapshot> invitationsTask = db.collection("invitations")
+                .whereEqualTo("uid", uid)
+                .get();
+        
+        // Get all events
+        Task<com.google.firebase.firestore.QuerySnapshot> eventsTask = db.collection("events")
+                .get();
+        
+        return Tasks.whenAllSuccess(invitationsTask, eventsTask)
+                .continueWith(task -> {
+                    if (!task.isSuccessful()) {
+                        android.util.Log.e("MyEventsFragment", "Failed to load user participating events", task.getException());
+                        return new ArrayList<Event>();
+                    }
+                    
+                    List<Object> results = task.getResult();
+                    com.google.firebase.firestore.QuerySnapshot invitationsSnap = (com.google.firebase.firestore.QuerySnapshot) results.get(0);
+                    com.google.firebase.firestore.QuerySnapshot eventsSnap = (com.google.firebase.firestore.QuerySnapshot) results.get(1);
+                    
+                    // Collect eventIds from invitations
+                    Set<String> eventIdsFromInvitations = new HashSet<>();
+                    if (invitationsSnap != null) {
+                        for (com.google.firebase.firestore.DocumentSnapshot doc : invitationsSnap.getDocuments()) {
+                            String eventId = doc.getString("eventId");
+                            if (eventId != null) {
+                                eventIdsFromInvitations.add(eventId);
+                            }
+                        }
+                    }
+                    
+                    // Load events and check if user is in any participation subcollection
+                    List<Event> participatingEvents = new ArrayList<>();
+                    Set<String> checkedEventIds = new HashSet<>();
+                    
+                    if (eventsSnap != null) {
+                        for (com.google.firebase.firestore.DocumentSnapshot eventDoc : eventsSnap.getDocuments()) {
+                            String eventId = eventDoc.getId();
+                            if (checkedEventIds.contains(eventId)) continue;
+                            
+                            // Check if user has invitation for this event
+                            if (eventIdsFromInvitations.contains(eventId)) {
+                                try {
+                                    Event event = Event.fromMap(eventDoc.getData());
+                                    if (event != null && event.getId() != null) {
+                                        participatingEvents.add(event);
+                                        checkedEventIds.add(eventId);
+                                        android.util.Log.d("MyEventsFragment", "Found event via invitation: " + event.getTitle());
+                                        continue;
+                                    }
+                                } catch (Exception e) {
+                                    android.util.Log.e("MyEventsFragment", "Error parsing event " + eventId, e);
+                                }
+                            }
+                            
+                            // Check if user is in any participation subcollection
+                            Task<Boolean> inWaitlist = eventDoc.getReference()
+                                    .collection("WaitlistedEntrants")
+                                    .document(uid)
+                                    .get()
+                                    .continueWith(t -> t.isSuccessful() && t.getResult() != null && t.getResult().exists());
+                            
+                            Task<Boolean> inSelected = eventDoc.getReference()
+                                    .collection("SelectedEntrants")
+                                    .document(uid)
+                                    .get()
+                                    .continueWith(t -> t.isSuccessful() && t.getResult() != null && t.getResult().exists());
+                            
+                            Task<Boolean> inNonSelected = eventDoc.getReference()
+                                    .collection("NonSelectedEntrants")
+                                    .document(uid)
+                                    .get()
+                                    .continueWith(t -> t.isSuccessful() && t.getResult() != null && t.getResult().exists());
+                            
+                            try {
+                                Boolean waitlisted = Tasks.await(inWaitlist);
+                                Boolean selected = Tasks.await(inSelected);
+                                Boolean nonSelected = Tasks.await(inNonSelected);
+                                
+                                if (Boolean.TRUE.equals(waitlisted) || Boolean.TRUE.equals(selected) || Boolean.TRUE.equals(nonSelected)) {
+                                    try {
+                                        Event event = Event.fromMap(eventDoc.getData());
+                                        if (event != null && event.getId() != null) {
+                                            participatingEvents.add(event);
+                                            checkedEventIds.add(eventId);
+                                            android.util.Log.d("MyEventsFragment", "Found participating event: " + event.getTitle() + 
+                                                    " (waitlisted: " + waitlisted + ", selected: " + selected + ", nonSelected: " + nonSelected + ")");
+                                        }
+                                    } catch (Exception e) {
+                                        android.util.Log.e("MyEventsFragment", "Error parsing event " + eventId, e);
+                                    }
+                                }
+                            } catch (Exception e) {
+                                android.util.Log.e("MyEventsFragment", "Error checking participation for event " + eventId, e);
+                            }
+                        }
+                    }
+                    
+                    android.util.Log.d("MyEventsFragment", "Found " + participatingEvents.size() + " events where user is participating");
+                    return participatingEvents;
+                });
+    }
+
     private Task<Boolean> isInSelectedEntrants(String eventId, String uid) {
         com.google.firebase.firestore.FirebaseFirestore db = com.google.firebase.firestore.FirebaseFirestore.getInstance();
         return db.collection("events")
@@ -394,6 +530,27 @@ public class MyEventsFragment extends Fragment {
                 .whereEqualTo("eventId", eventId)
                 .whereEqualTo("uid", uid)
                 .whereEqualTo("status", "ACCEPTED")
+                .limit(1)
+                .get()
+                .continueWith(task -> {
+                    if (task.isSuccessful() && task.getResult() != null) {
+                        return !task.getResult().isEmpty();
+                    }
+                    return false;
+                });
+    }
+    
+    /**
+     * Checks if the user has a PENDING invitation for the given event.
+     * This is used to show the event in the waitlist section with Accept/Decline buttons
+     * when the user has been selected but has not yet accepted or declined.
+     */
+    private Task<Boolean> hasPendingInvitation(String eventId, String uid) {
+        com.google.firebase.firestore.FirebaseFirestore db = com.google.firebase.firestore.FirebaseFirestore.getInstance();
+        return db.collection("invitations")
+                .whereEqualTo("eventId", eventId)
+                .whereEqualTo("uid", uid)
+                .whereEqualTo("status", "PENDING")
                 .limit(1)
                 .get()
                 .continueWith(task -> {

@@ -40,6 +40,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Calendar;
 import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.Locale;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -71,7 +72,10 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
     private ImageView backButton;
     private MaterialButton deleteEventButton;
     private MaterialButton entrantDetailsButton;
-    private MaterialButton changeDeadlinesButton;
+    private TextView tvRegStart;
+    private TextView tvRegEnd;
+    private TextView tvDeadline;
+    private TextView tvEventStart;
 
     private FirebaseFirestore db;
     private FirebaseStorage storage;
@@ -104,7 +108,10 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
         backButton = findViewById(R.id.back_button);
         entrantDetailsButton = findViewById(R.id.entrant_details_button);
         deleteEventButton = findViewById(R.id.delete_event_button);
-        changeDeadlinesButton = findViewById(R.id.change_deadlines_button);
+        tvRegStart = findViewById(R.id.tvRegStart);
+        tvRegEnd = findViewById(R.id.tvRegEnd);
+        tvDeadline = findViewById(R.id.tvDeadline);
+        tvEventStart = findViewById(R.id.tvEventStart);
 
         currentEventId = getIntent().getStringExtra("eventId");
 
@@ -128,11 +135,6 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
             }
         });
         deleteEventButton.setOnClickListener(v -> showDeleteEventConfirmation());
-        
-        // Set up change deadlines button (for testing)
-        if (changeDeadlinesButton != null) {
-            changeDeadlinesButton.setOnClickListener(v -> showChangeDeadlinesDialog());
-        }
 
         // Set up notification button for Waitlisted Entrants
         ImageView mailIcon = findViewById(R.id.mail_icon);
@@ -210,6 +212,45 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
                         .placeholder(R.drawable.rounded_panel_bg)
                         .error(R.drawable.rounded_panel_bg)
                         .into(eventPosterImageView);
+            }
+
+            // Load and display dates
+            SimpleDateFormat dateFormat = new SimpleDateFormat("EEE, MMM d, yyyy 'at' h:mm a", Locale.getDefault());
+            
+            Long registrationStart = documentSnapshot.getLong("registrationStart");
+            if (tvRegStart != null) {
+                if (registrationStart != null && registrationStart > 0) {
+                    tvRegStart.setText("Registration Start: " + dateFormat.format(new Date(registrationStart)));
+                } else {
+                    tvRegStart.setText("Registration Start: TBD");
+                }
+            }
+
+            Long registrationEnd = documentSnapshot.getLong("registrationEnd");
+            if (tvRegEnd != null) {
+                if (registrationEnd != null && registrationEnd > 0) {
+                    tvRegEnd.setText("Registration End: " + dateFormat.format(new Date(registrationEnd)));
+                } else {
+                    tvRegEnd.setText("Registration End: TBD");
+                }
+            }
+
+            Long deadlineEpochMs = documentSnapshot.getLong("deadlineEpochMs");
+            if (tvDeadline != null) {
+                if (deadlineEpochMs != null && deadlineEpochMs > 0) {
+                    tvDeadline.setText("Accept/Decline Deadline: " + dateFormat.format(new Date(deadlineEpochMs)));
+                } else {
+                    tvDeadline.setText("Accept/Decline Deadline: TBD");
+                }
+            }
+
+            Long startsAtEpochMs = documentSnapshot.getLong("startsAtEpochMs");
+            if (tvEventStart != null) {
+                if (startsAtEpochMs != null && startsAtEpochMs > 0) {
+                    tvEventStart.setText("Event Start Date: " + dateFormat.format(new Date(startsAtEpochMs)));
+                } else {
+                    tvEventStart.setText("Event Start Date: TBD");
+                }
             }
 
             entrantNamesList.clear();
@@ -524,8 +565,9 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
     }
     
     /**
-     * Shows a dialog to change event deadlines for testing purposes.
+     * @deprecated This method is no longer used. Removed change deadlines testing functionality.
      */
+    @Deprecated
     private void showChangeDeadlinesDialog() {
         if (currentEventId == null || currentEventId.isEmpty()) {
             Toast.makeText(this, "Event ID not found", Toast.LENGTH_SHORT).show();

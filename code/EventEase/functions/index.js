@@ -13,28 +13,34 @@ exports.sendNotification = functions.firestore
         const requestData = snap.data();
         const requestId = context.params.requestId;
         
+        console.log(`\n=== sendNotification TRIGGERED ===`);
+        console.log(`Request ID: ${requestId}`);
+        console.log(`Triggered at: ${new Date().toISOString()}`);
+        console.log(`Request data keys: ${Object.keys(requestData).join(', ')}`);
+        
         // Skip if already processed
         if (requestData.processed === true) {
-            console.log(`Request ${requestId} already processed, skipping`);
+            console.log(`⚠ Request ${requestId} already processed, skipping`);
             return null;
         }
         
         const { userIds, title, message, eventId, eventTitle, groupType } = requestData;
         
         if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
-            console.log(`Request ${requestId} has no userIds, marking as processed`);
+            console.error(`✗ Request ${requestId} has no userIds, marking as processed`);
             await snap.ref.update({ processed: true, error: 'No userIds provided' });
             return null;
         }
         
-            console.log(`=== Processing notification request ${requestId} ===`);
-            console.log(`Title: ${title}`);
-            console.log(`Message: ${message}`);
-            console.log(`Event ID: ${eventId}`);
-            console.log(`Group Type: ${groupType}`);
-            console.log(`User IDs: ${JSON.stringify(userIds)}`);
-            console.log(`Processing for ${userIds.length} users`);
-            
+        console.log(`=== Processing notification request ${requestId} ===`);
+        console.log(`Title: ${title}`);
+        console.log(`Message: ${message}`);
+        console.log(`Event ID: ${eventId}`);
+        console.log(`Event Title: ${eventTitle || 'N/A'}`);
+        console.log(`Group Type: ${groupType}`);
+        console.log(`User IDs: ${JSON.stringify(userIds)}`);
+        console.log(`Processing for ${userIds.length} users`);
+        
             // CRITICAL: For selection notifications, verify these users are actually in SelectedEntrants
             if (groupType === 'selection') {
                 console.log(`⚠ VERIFICATION: This is a SELECTION notification. Verifying users are in SelectedEntrants...`);
@@ -413,23 +419,34 @@ exports.processAutomaticEntrantSelection = functions.pubsub
         
         try {
             // Find events where selection hasn't been processed
-            // Query only by selectionProcessed to avoid needing a composite index
-            // Then filter by registrationEnd in code
-            const eventsSnapshot = await admin.firestore()
+            // Get all events and filter in code to handle both:
+            // 1. Events with selectionProcessed=false (new events with our fix)
+            // 2. Events where selectionProcessed field is missing (old events before fix)
+            const allEventsSnapshot = await admin.firestore()
                 .collection('events')
-                .where('selectionProcessed', '==', false)
                 .get();
             
-            if (eventsSnapshot.empty) {
+            // Filter events where selectionProcessed is false or missing
+            const eventsToProcess = allEventsSnapshot.docs.filter(eventDoc => {
+                const eventData = eventDoc.data();
+                const selectionProcessed = eventData.selectionProcessed;
+                // Treat missing field as false (needs processing)
+                return selectionProcessed !== true;
+            });
+            
+            console.log(`DEBUG: Total events: ${allEventsSnapshot.size}, Events needing processing: ${eventsToProcess.length}`);
+            
+            if (eventsToProcess.length === 0) {
                 console.log('No events found that need selection processing');
+                console.log('DEBUG: This means all events have selectionProcessed=true');
                 return null;
             }
             
-            console.log(`Found ${eventsSnapshot.size} event(s) that may need selection processing`);
+            console.log(`Found ${eventsToProcess.length} event(s) that may need selection processing`);
             
             let processedCount = 0;
             
-            for (const eventDoc of eventsSnapshot.docs) {
+            for (const eventDoc of eventsToProcess) {
                 const eventId = eventDoc.id;
                 const eventData = eventDoc.data();
                 const registrationEnd = eventData.registrationEnd;
@@ -437,27 +454,35 @@ exports.processAutomaticEntrantSelection = functions.pubsub
                 const selectionNotificationSent = eventData.selectionNotificationSent;
                 const startsAtEpochMs = eventData.startsAtEpochMs;
                 
+                console.log(`\n=== Processing event ${eventId} ===`);
+                console.log(`  Title: ${eventData.title || 'N/A'}`);
+                console.log(`  selectionProcessed: ${selectionProcessed}`);
+                console.log(`  selectionNotificationSent: ${selectionNotificationSent}`);
+                console.log(`  registrationEnd: ${registrationEnd} (${registrationEnd ? new Date(registrationEnd).toISOString() : 'N/A'})`);
+                console.log(`  startsAtEpochMs: ${startsAtEpochMs} (${startsAtEpochMs ? new Date(startsAtEpochMs).toISOString() : 'N/A'})`);
+                console.log(`  Current time: ${new Date(now).toISOString()}`);
+                
                 // Skip if already processed or notification sent (double check)
                 if (selectionProcessed === true || selectionNotificationSent === true) {
-                    console.log(`Event ${eventId} already processed, skipping`);
+                    console.log(`✗ Event ${eventId} already processed (selectionProcessed=${selectionProcessed}, selectionNotificationSent=${selectionNotificationSent}), skipping`);
                     continue;
                 }
                 
                 // Skip if registrationEnd is missing or invalid
                 if (!registrationEnd || registrationEnd <= 0) {
-                    console.log(`Event ${eventId} has invalid registrationEnd, skipping`);
+                    console.log(`✗ Event ${eventId} has invalid registrationEnd (${registrationEnd}), skipping`);
                     continue;
                 }
                 
                 // Skip if registration period hasn't ended yet
                 if (registrationEnd > now) {
-                    console.log(`Event ${eventId} registration period hasn't ended yet (ends at ${new Date(registrationEnd)})`);
+                    console.log(`✗ Event ${eventId} registration period hasn't ended yet (ends at ${new Date(registrationEnd).toISOString()}, now is ${new Date(now).toISOString()}), skipping`);
                     continue;
                 }
                 
                 // Skip if event start date has already passed
                 if (startsAtEpochMs && startsAtEpochMs > 0 && now >= startsAtEpochMs) {
-                    console.log(`Event ${eventId} start date has already passed, skipping`);
+                    console.log(`✗ Event ${eventId} start date has already passed (starts at ${new Date(startsAtEpochMs).toISOString()}, now is ${new Date(now).toISOString()}), skipping`);
                     continue;
                 }
                 
@@ -486,14 +511,22 @@ exports.processAutomaticEntrantSelection = functions.pubsub
                 
                 if (waitlistSnapshot.empty) {
                     console.log(`No waitlisted entrants for event ${eventId}, marking as processed`);
-                    await eventDoc.ref.update({ selectionProcessed: true });
+                    await eventDoc.ref.update({ 
+                        selectionProcessed: true,
+                        selectionNotificationSent: eventData.selectionNotificationSent || false,
+                        sorryNotificationSent: eventData.sorryNotificationSent || false
+                    });
                     continue;
                 }
                 
                 const sampleSize = eventData.sampleSize || 0;
                 if (sampleSize <= 0) {
                     console.log(`Event ${eventId} has invalid sample size: ${sampleSize}, marking as processed`);
-                    await eventDoc.ref.update({ selectionProcessed: true });
+                    await eventDoc.ref.update({ 
+                        selectionProcessed: true,
+                        selectionNotificationSent: eventData.selectionNotificationSent || false,
+                        sorryNotificationSent: eventData.sorryNotificationSent || false
+                    });
                     continue;
                 }
                 
@@ -510,7 +543,11 @@ exports.processAutomaticEntrantSelection = functions.pubsub
                 
                 if (availableSpots <= 0) {
                     console.log(`Event ${eventId} already at or above sample size limit (selected: ${currentSelectedCount}, sampleSize: ${sampleSize}). Marking as processed.`);
-                    await eventDoc.ref.update({ selectionProcessed: true });
+                    await eventDoc.ref.update({ 
+                        selectionProcessed: true,
+                        selectionNotificationSent: eventData.selectionNotificationSent || false,
+                        sorryNotificationSent: eventData.sorryNotificationSent || false
+                    });
                     continue;
                 }
                 
@@ -520,7 +557,11 @@ exports.processAutomaticEntrantSelection = functions.pubsub
                 
                 if (toSelect === 0) {
                     console.log(`No entrants to select for event ${eventId} (available spots: ${availableSpots}, waitlist: ${waitlistDocs.length}), marking as processed`);
-                    await eventDoc.ref.update({ selectionProcessed: true });
+                    await eventDoc.ref.update({ 
+                        selectionProcessed: true,
+                        selectionNotificationSent: eventData.selectionNotificationSent || false,
+                        sorryNotificationSent: eventData.sorryNotificationSent || false
+                    });
                     continue;
                 }
                 
@@ -552,7 +593,11 @@ exports.processAutomaticEntrantSelection = functions.pubsub
                         selectedDocs.splice(maxToAdd);
                     } else {
                         console.error(`Cannot add any more - already at sample size!`);
-                        await eventDoc.ref.update({ selectionProcessed: true });
+                        await eventDoc.ref.update({ 
+                            selectionProcessed: true,
+                            selectionNotificationSent: eventData.selectionNotificationSent || false,
+                            sorryNotificationSent: eventData.sorryNotificationSent || false
+                        });
                         continue;
                     }
                 }
@@ -577,13 +622,21 @@ exports.processAutomaticEntrantSelection = functions.pubsub
                     batch.delete(waitlistedEntrantsRef.doc(userId));
                     batch.delete(admin.firestore().collection('events').doc(eventId).collection('NonSelectedEntrants').doc(userId));
                     batch.delete(admin.firestore().collection('events').doc(eventId).collection('CancelledEntrants').doc(userId));
+
+                    const displayName = userData.fullName || userData.name || userData.firstName || '(unknown)';
+                    console.log(`ENTRANT_MOVE: eventId=${eventId}, userId=${userId}, name=${displayName}, from=[Waitlisted/NonSelected/Cancelled], to=SelectedEntrants, reason=automatic_selection`);
                 }
                 
                 // Don't update waitlistCount - users stay in waitlist
                 // batch.update(eventDoc.ref, 'waitlistCount', admin.firestore.FieldValue.increment(-selectedUserIds.length));
                 
-                // Mark as selection processed
-                batch.update(eventDoc.ref, 'selectionProcessed', true);
+                // Mark as selection processed (but NOT selectionNotificationSent yet - that happens after notification request is created)
+                // Only initialize sorryNotificationSent if it doesn't exist
+                batch.update(eventDoc.ref, {
+                    'selectionProcessed': true,
+                    'sorryNotificationSent': eventData.sorryNotificationSent || false
+                    // NOTE: selectionNotificationSent will be set to true AFTER notification request is successfully created
+                });
                 
                 await batch.commit();
                 console.log(`✓ Moved ${selectedUserIds.length} entrants to SelectedEntrants for event ${eventId}`);
@@ -631,26 +684,75 @@ exports.processAutomaticEntrantSelection = functions.pubsub
                 console.log(`✓ Created invitations for ${selectedUserIds.length} SELECTED users only for event ${eventId}`);
                 
                 // Send selection notification ONLY to selectedUserIds
-                const eventTitle = eventData.title || 'Event';
-                const deadlineText = deadlineEpochMs ? new Date(deadlineEpochMs).toLocaleString() : 'N/A';
-                const notificationRequest = {
-                    eventId: eventId,
-                    eventTitle: eventTitle,
-                    organizerId: organizerId,
-                    userIds: selectedUserIds, // CRITICAL: Only selected users
-                    groupType: 'selection',
-                    title: "You've been selected! 🎉",
-                    message: `Congratulations! You've been selected for ${eventTitle}. Please check your invitations to accept or decline. Deadline to respond: ${deadlineText}`,
-                    status: 'PENDING',
-                    createdAt: now,
-                    processed: false
-                };
-                
-                console.log(`Creating notification request for ${selectedUserIds.length} SELECTED users only: ${JSON.stringify(selectedUserIds)}`);
-                await admin.firestore().collection('notificationRequests').add(notificationRequest);
-                await eventDoc.ref.update({ selectionNotificationSent: true });
-                
-                console.log(`✓ Created selection notification request for ${selectedUserIds.length} SELECTED users only for event ${eventId}`);
+                // Only create notification request if there are selected users
+                if (selectedUserIds.length > 0) {
+                    try {
+                        const eventTitle = eventData.title || 'Event';
+                        const deadlineText = deadlineEpochMs ? new Date(deadlineEpochMs).toLocaleString() : 'N/A';
+                        const notificationRequest = {
+                            eventId: eventId,
+                            eventTitle: eventTitle,
+                            organizerId: organizerId,
+                            userIds: selectedUserIds, // CRITICAL: Only selected users
+                            groupType: 'selection',
+                            title: "You've been selected! 🎉",
+                            message: `Congratulations! You've been selected for ${eventTitle}. Please check your invitations to accept or decline. Deadline to respond: ${deadlineText}`,
+                            status: 'PENDING',
+                            createdAt: now,
+                            processed: false
+                        };
+                        
+                        console.log(`=== CREATING SELECTION NOTIFICATION REQUEST ===`);
+                        console.log(`Event ID: ${eventId}`);
+                        console.log(`Event Title: ${eventTitle}`);
+                        console.log(`Selected User IDs: ${JSON.stringify(selectedUserIds)}`);
+                        console.log(`Number of users: ${selectedUserIds.length}`);
+                        console.log(`Notification title: ${notificationRequest.title}`);
+                        console.log(`Notification message: ${notificationRequest.message}`);
+                        
+                        const notificationRequestRef = await admin.firestore().collection('notificationRequests').add(notificationRequest);
+                        const notificationRequestId = notificationRequestRef.id;
+                        console.log(`✓ Notification request created with ID: ${notificationRequestId}`);
+                        console.log(`  Document path: notificationRequests/${notificationRequestId}`);
+                        
+                        // Verify the notification request was created correctly
+                        const verifyRequest = await notificationRequestRef.get();
+                        if (verifyRequest.exists) {
+                            const verifyData = verifyRequest.data();
+                            console.log(`✓ Verification: Notification request exists in Firestore`);
+                            console.log(`  - userIds: ${JSON.stringify(verifyData.userIds)}`);
+                            console.log(`  - groupType: ${verifyData.groupType}`);
+                            console.log(`  - processed: ${verifyData.processed}`);
+                            console.log(`  - eventId: ${verifyData.eventId}`);
+                        } else {
+                            console.error(`✗ CRITICAL ERROR: Notification request was not created!`);
+                            throw new Error('Notification request verification failed');
+                        }
+                        
+                        // Mark notification as sent
+                        await eventDoc.ref.update({ selectionNotificationSent: true });
+                        console.log(`✓ Marked selectionNotificationSent=true for event ${eventId}`);
+                        
+                        console.log(`✓ Created selection notification request for ${selectedUserIds.length} SELECTED users only for event ${eventId}`);
+                        console.log(`  → This should trigger sendNotification Cloud Function automatically`);
+                    } catch (error) {
+                        console.error(`✗ ERROR creating selection notification request for event ${eventId}:`, error);
+                        console.error(`  Error type: ${error.constructor.name}`);
+                        console.error(`  Error message: ${error.message}`);
+                        console.error(`  Error stack: ${error.stack}`);
+                        // Still mark as sent to prevent retry loops, but log the error
+                        await eventDoc.ref.update({ 
+                            selectionNotificationSent: true,
+                            selectionNotificationError: error.message
+                        });
+                        console.log(`⚠ Marked selectionNotificationSent=true despite error (to prevent retry loops)`);
+                    }
+                } else {
+                    console.log(`⚠ No selected users for event ${eventId}, skipping notification request creation`);
+                    // Still mark as sent since there's nothing to notify
+                    await eventDoc.ref.update({ selectionNotificationSent: true });
+                    console.log(`✓ Marked selectionNotificationSent=true (no users to notify)`);
+                }
                 
                 // Move remaining waitlisted entrants to NonSelectedEntrants (excluding selected ones)
                 // CRITICAL: These users should NOT receive invitations or selection notifications
@@ -689,6 +791,9 @@ exports.processAutomaticEntrantSelection = functions.pubsub
                             nonSelectedBatch.delete(waitlistedEntrantsRef.doc(userId));
                             nonSelectedBatch.delete(admin.firestore().collection('events').doc(eventId).collection('SelectedEntrants').doc(userId));
                             nonSelectedBatch.delete(admin.firestore().collection('events').doc(eventId).collection('CancelledEntrants').doc(userId));
+
+                            const displayName = userData.fullName || userData.name || userData.firstName || '(unknown)';
+                            console.log(`ENTRANT_MOVE: eventId=${eventId}, userId=${userId}, name=${displayName}, from=[Waitlisted/Selected/Cancelled], to=NonSelectedEntrants, reason=automatic_selection_non_selected`);
                         }
                         
                         // Don't update waitlistCount - users stay in waitlist
@@ -795,6 +900,9 @@ exports.sendSorryNotificationsBeforeEventStart = functions.pubsub
                     cancelledBatch.delete(nonSelectedRef.doc(userId));
                     cancelledBatch.delete(waitlistedRef.doc(userId));
                     cancelledBatch.delete(selectedRef.doc(userId));
+
+                    const displayName = userData.fullName || userData.name || userData.firstName || '(unknown)';
+                    console.log(`ENTRANT_MOVE: eventId=${eventId}, userId=${userId}, name=${displayName}, from=[NonSelected/Waitlisted/Selected], to=CancelledEntrants, reason=sorry_notification_before_event_start`);
                 }
                 
                 await cancelledBatch.commit();

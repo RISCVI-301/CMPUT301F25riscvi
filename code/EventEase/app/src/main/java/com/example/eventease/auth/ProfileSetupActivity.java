@@ -1,21 +1,40 @@
 package com.example.eventease.auth;
 
+import android.Manifest;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 
+import com.bumptech.glide.Glide;
 import com.example.eventease.MainActivity;
 import com.example.eventease.R;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.StorageReference;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Activity for first-time profile setup.
  * Shown when a device doesn't have a user profile yet.
+ * Includes optional profile picture upload and permission requests.
  */
 public class ProfileSetupActivity extends AppCompatActivity {
     private static final String TAG = "ProfileSetupActivity";
@@ -25,8 +44,47 @@ public class ProfileSetupActivity extends AppCompatActivity {
     private EditText etPhone;
     private Button btnContinue;
     private TextView tvDeviceInfo;
+    private ImageView ivProfilePicture;
+    private Button btnUploadPicture;
+    private ProgressBar progressUpload;
+    private View profilePictureSection;
     
     private DeviceAuthManager authManager;
+    private Uri selectedImageUri;
+    
+    private final ActivityResultLauncher<String> pickImageLauncher = registerForActivityResult(
+            new ActivityResultContracts.GetContent(),
+            uri -> {
+                if (uri != null) {
+                    selectedImageUri = uri;
+                    ivProfilePicture.setImageURI(uri);
+                    ivProfilePicture.setVisibility(View.VISIBLE);
+                    btnUploadPicture.setText("Change Picture");
+                }
+            }
+    );
+    
+    private final ActivityResultLauncher<String> requestCameraPermission = registerForActivityResult(
+            new ActivityResultContracts.RequestPermission(),
+            isGranted -> {
+                if (isGranted) {
+                    openCamera();
+                } else {
+                    Toast.makeText(this, "Camera permission is required to take photos", Toast.LENGTH_SHORT).show();
+                }
+            }
+    );
+    
+    private final ActivityResultLauncher<Uri> takePictureLauncher = registerForActivityResult(
+            new ActivityResultContracts.TakePicture(),
+            success -> {
+                if (success && selectedImageUri != null) {
+                    ivProfilePicture.setImageURI(selectedImageUri);
+                    ivProfilePicture.setVisibility(View.VISIBLE);
+                    btnUploadPicture.setText("Change Picture");
+                }
+            }
+    );
     
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -47,11 +105,25 @@ public class ProfileSetupActivity extends AppCompatActivity {
         etPhone = findViewById(R.id.etPhone);
         btnContinue = findViewById(R.id.btnContinue);
         tvDeviceInfo = findViewById(R.id.tvDeviceInfo);
+        ivProfilePicture = findViewById(R.id.ivProfilePicture);
+        btnUploadPicture = findViewById(R.id.btnUploadPicture);
+        progressUpload = findViewById(R.id.progressUpload);
+        profilePictureSection = findViewById(R.id.profilePictureSection);
         
         // Show device ID for debugging
         String deviceId = authManager.getDeviceId();
         tvDeviceInfo.setText("Device ID: " + deviceId);
         Log.d(TAG, "Device ID: " + deviceId);
+        
+        // Set up profile picture upload button
+        if (btnUploadPicture != null) {
+            btnUploadPicture.setOnClickListener(v -> showImageSourceDialog());
+        }
+        
+        // Make profile picture clickable
+        if (ivProfilePicture != null) {
+            ivProfilePicture.setOnClickListener(v -> showImageSourceDialog());
+        }
         
         // Set up continue button
         btnContinue.setOnClickListener(v -> createProfile());
@@ -93,14 +165,19 @@ public class ProfileSetupActivity extends AppCompatActivity {
         btnContinue.setEnabled(false);
         btnContinue.setText("Creating Profile...");
         
-        // Create profile
+        // Create profile first
         authManager.createProfile(name, role, email, phone)
                 .addOnSuccessListener(aVoid -> {
                     Log.d(TAG, "Profile created successfully");
-                    Toast.makeText(this, "Welcome, " + name + "!", Toast.LENGTH_SHORT).show();
                     
-                    // Navigate to main app
-                    navigateToMainApp();
+                    // If user selected a profile picture, upload it
+                    if (selectedImageUri != null) {
+                        uploadProfilePicture(name);
+                    } else {
+                        // No picture selected, proceed to permissions
+                    Toast.makeText(this, "Welcome, " + name + "!", Toast.LENGTH_SHORT).show();
+                        navigateToPermissions();
+                    }
                 })
                 .addOnFailureListener(e -> {
                     Log.e(TAG, "Failed to create profile", e);
@@ -110,6 +187,153 @@ public class ProfileSetupActivity extends AppCompatActivity {
                     btnContinue.setEnabled(true);
                     btnContinue.setText("Continue");
                 });
+    }
+    
+    private void showImageSourceDialog() {
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Select Profile Picture")
+                .setMessage("Choose how you want to add your profile picture")
+                .setPositiveButton("Camera", (dialog, which) -> openCamera())
+                .setNeutralButton("Gallery", (dialog, which) -> pickImageLauncher.launch("image/*"))
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+    
+    private void openCamera() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) 
+                != PackageManager.PERMISSION_GRANTED) {
+            requestCameraPermission.launch(Manifest.permission.CAMERA);
+        } else {
+            openCameraInternal();
+        }
+    }
+    
+    private void openCameraInternal() {
+        try {
+            java.io.File photoFile = java.io.File.createTempFile(
+                "profile_photo_" + System.currentTimeMillis(),
+                ".jpg",
+                getCacheDir()
+            );
+            
+            selectedImageUri = androidx.core.content.FileProvider.getUriForFile(
+                this,
+                getPackageName() + ".fileprovider",
+                photoFile
+            );
+            
+            takePictureLauncher.launch(selectedImageUri);
+        } catch (java.io.IOException e) {
+            e.printStackTrace();
+            Toast.makeText(this, "Failed to create image file", Toast.LENGTH_SHORT).show();
+        }
+    }
+    
+    private void uploadProfilePicture(String userName) {
+        if (selectedImageUri == null) {
+            navigateToPermissions();
+            return;
+        }
+        
+        if (progressUpload != null) {
+            progressUpload.setVisibility(View.VISIBLE);
+        }
+        
+        String uid = authManager.getUid();
+        if (uid == null) {
+            Toast.makeText(this, "User not authenticated", Toast.LENGTH_SHORT).show();
+            navigateToPermissions();
+            return;
+        }
+        
+        try {
+            FirebaseStorage storage = FirebaseStorage.getInstance();
+            StorageReference storageRef = storage.getReference();
+            String filename = uid + "_" + System.currentTimeMillis() + ".jpg";
+            StorageReference profilePicRef = storageRef.child("profile_pictures").child(filename);
+            
+            Log.d(TAG, "Uploading profile picture to: profile_pictures/" + filename);
+            Log.d(TAG, "Storage bucket: " + storage.getApp().getOptions().getStorageBucket());
+            Log.d(TAG, "UID: " + uid + " (should start with 'device_')");
+            
+            profilePicRef.putFile(selectedImageUri)
+                    .addOnProgressListener(snapshot -> {
+                        double progress = (100.0 * snapshot.getBytesTransferred()) / snapshot.getTotalByteCount();
+                        Log.d(TAG, "Upload progress: " + progress + "%");
+                    })
+                    .addOnSuccessListener(taskSnapshot -> {
+                        Log.d(TAG, "Upload successful!");
+                        profilePicRef.getDownloadUrl()
+                                .addOnSuccessListener(uri -> {
+                                    Log.d(TAG, "Profile picture uploaded: " + uri.toString());
+                                    saveProfilePictureUrl(uid, uri.toString(), userName);
+                                })
+                                .addOnFailureListener(e -> {
+                                    Log.e(TAG, "Failed to get download URL", e);
+                                    if (progressUpload != null) {
+                                        progressUpload.setVisibility(View.GONE);
+                                    }
+                                    String errorMsg = "Failed to get download URL: " + (e.getMessage() != null ? e.getMessage() : "Unknown error");
+                                    Toast.makeText(this, errorMsg, Toast.LENGTH_LONG).show();
+                                    Log.e(TAG, "Full error details", e);
+                                    navigateToPermissions();
+                                });
+                    })
+                    .addOnFailureListener(e -> {
+                        Log.e(TAG, "Upload failed", e);
+                        if (progressUpload != null) {
+                            progressUpload.setVisibility(View.GONE);
+                        }
+                        String errorMsg = "Upload failed: " + (e.getMessage() != null ? e.getMessage() : "Unknown error");
+                        Toast.makeText(this, errorMsg + "\n\nPlease ensure Firebase Storage is enabled and rules are deployed.", Toast.LENGTH_LONG).show();
+                        Log.e(TAG, "Full error details", e);
+                        navigateToPermissions();
+                    });
+        } catch (Exception e) {
+            Log.e(TAG, "Exception during upload", e);
+            if (progressUpload != null) {
+                progressUpload.setVisibility(View.GONE);
+            }
+            Toast.makeText(this, "Error: " + (e.getMessage() != null ? e.getMessage() : "Unknown error"), Toast.LENGTH_LONG).show();
+            navigateToPermissions();
+        }
+    }
+    
+    private void saveProfilePictureUrl(String uid, String photoUrl, String userName) {
+        FirebaseFirestore db = FirebaseFirestore.getInstance();
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("photoUrl", photoUrl);
+        updates.put("updatedAt", System.currentTimeMillis());
+        
+        // Use set with merge instead of update to handle case where document might not exist yet
+        db.collection("users").document(uid)
+                .set(updates, com.google.firebase.firestore.SetOptions.merge())
+                .addOnSuccessListener(aVoid -> {
+                    if (progressUpload != null) {
+                        progressUpload.setVisibility(View.GONE);
+                    }
+                    Log.d(TAG, "Profile picture URL saved successfully");
+                    Toast.makeText(this, "Welcome, " + userName + "!", Toast.LENGTH_SHORT).show();
+                    navigateToPermissions();
+                })
+                .addOnFailureListener(e -> {
+                    if (progressUpload != null) {
+                        progressUpload.setVisibility(View.GONE);
+                    }
+                    Log.e(TAG, "Failed to save profile picture URL", e);
+                    String errorMsg = "Failed to save profile picture: " + (e.getMessage() != null ? e.getMessage() : "Unknown error");
+                    Toast.makeText(this, errorMsg, Toast.LENGTH_LONG).show();
+                    Log.e(TAG, "Full error details", e);
+                    // Still navigate even if save fails
+                    navigateToPermissions();
+                });
+    }
+    
+    private void navigateToPermissions() {
+        // Navigate to permission request activity
+        Intent intent = new Intent(this, PermissionRequestActivity.class);
+        startActivity(intent);
+        finish();
     }
     
     private void navigateToMainApp() {

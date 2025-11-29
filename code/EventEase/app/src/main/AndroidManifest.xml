@@ -64,6 +64,13 @@
             android:label="Setup Profile"
             android:theme="@style/Theme.EventEase" />
 
+        <!-- Permission Request Activity (After profile setup) -->
+        <activity
+            android:name="com.example.eventease.auth.PermissionRequestActivity"
+            android:exported="false"
+            android:label="Permissions"
+            android:theme="@style/Theme.EventEase" />
+
         <!-- Admin Activity -->
         <activity
             android:name="com.example.eventease.admin.AdminMainActivity"
