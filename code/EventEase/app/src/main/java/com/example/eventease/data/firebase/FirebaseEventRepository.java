@@ -89,18 +89,12 @@ public class FirebaseEventRepository implements EventRepository {
                     long nowMs = now != null ? now.getTime() : System.currentTimeMillis();
                     // Filter open events
                     List<Event> result = new ArrayList<>();
-                    Iterator<Map.Entry<String, Event>> iterator = events.entrySet().iterator();
-                    while (iterator.hasNext()) {
-                        Map.Entry<String, Event> entry = iterator.next();
+                    for (Map.Entry<String, Event> entry : events.entrySet()) {
                         Event e = entry.getValue();
 
-                        // Remove cached events whose registration window has ended
-                        long registrationEnd = e.getRegistrationEnd();
-                        if (registrationEnd > 0 && nowMs > registrationEnd) {
-                            iterator.remove();
-                            continue;
-                        }
-
+                        // CRITICAL: Do NOT remove events from cache based on registration deadline
+                        // Users who are already on the waitlist should continue to see the event
+                        // Only filter based on event start date
                         Date startDate = e.getStartAt();
                         if (startDate == null || startDate.after(now)) {
                             result.add(e);

@@ -23,7 +23,6 @@ public final class FirebaseDevGraph {
     /**
      * Constructs a new dependency graph and initializes all repositories.
      * Repositories are initialized with empty seed data as data is loaded from Firebase.
-     * Note: Authentication now handled by DeviceAuthManager, not part of this graph.
      */
     public FirebaseDevGraph() {
         // Initialize repositories with empty seed data, data loads from firebase
