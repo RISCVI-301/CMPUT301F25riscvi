@@ -62,7 +62,7 @@
                     android:textSize="16sp"
                     android:textColor="#223C65"
                     android:paddingBottom="16dp"
-                    android:textStyle="bold">
+                    android:textStyle="bold"/>
 
                 <!-- New Email -->
                 <com.google.android.material.textfield.TextInputLayout
