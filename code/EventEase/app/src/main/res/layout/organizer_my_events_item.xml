@@ -1,57 +1,76 @@
 <?xml version="1.0" encoding="utf-8"?>
-<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+<com.google.android.material.card.MaterialCardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="12dp"
+    android:layout_marginStart="8dp"
+    android:layout_marginEnd="8dp"
+    android:layout_marginBottom="14dp"
     android:foreground="?attr/selectableItemBackground"
-    app:cardUseCompatPadding="true"
-    app:cardCornerRadius="14dp"
-    app:strokeWidth="0dp"
-    app:cardBackgroundColor="@color/ee_navy_dark">
+    app:cardUseCompatPadding="false"
+    app:cardPreventCornerOverlap="true"
+    app:cardCornerRadius="28dp"
+    app:cardElevation="8dp">
 
-    <LinearLayout
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:layout_height="196dp">
 
-        <!-- Poster (16:9-ish height) -->
         <ImageView
             android:id="@+id/imgPoster"
             android:layout_width="match_parent"
-            android:layout_height="200dp"
-            android:contentDescription="@string/app_name"
-            android:scaleType="centerCrop" />
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:contentDescription="@string/event_image"
+            android:src="@drawable/entrant_image_placeholder_event" />
 
-        <!-- Text area -->
+        <View
+            android:id="@+id/eventAccent"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:layout_gravity="top|start"
+            android:layout_margin="16dp"
+            android:background="@drawable/entrant_event_card_accent" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="110dp"
+            android:layout_gravity="bottom"
+            android:background="@drawable/entrant_event_card_scrim" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
             android:orientation="vertical"
-            android:paddingLeft="12dp"
-            android:paddingRight="12dp"
-            android:paddingTop="10dp"
-            android:paddingBottom="12dp">
+            android:paddingStart="22dp"
+            android:paddingEnd="22dp"
+            android:paddingTop="14dp"
+            android:paddingBottom="18dp">
 
             <TextView
                 android:id="@+id/tvTitle"
-                android:layout_width="match_parent"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:maxLines="1"
+                android:text="Event title"
                 android:textColor="@android:color/white"
-                android:textSize="18sp"
-                android:textStyle="bold" />
+                android:textSize="24sp"
+                android:textStyle="bold"
+                android:fontFamily="@font/entrant_fredoka_one" />
 
             <TextView
                 android:id="@+id/tvMeta"
-                android:layout_width="match_parent"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:ellipsize="end"
-                android:maxLines="2"
-                android:textColor="#B3FFFFFF"
-                android:textSize="14sp" />
+                android:text="Nov 4, 2:12AM • Community Pool"
+                android:textColor="#F3F7FF"
+                android:textSize="14sp"
+                android:fontFamily="sans-serif-medium" />
+
         </LinearLayout>
-    </LinearLayout>
+
+    </FrameLayout>
+
 </com.google.android.material.card.MaterialCardView>

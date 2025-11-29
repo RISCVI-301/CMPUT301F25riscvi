@@ -18,7 +18,7 @@
         android:textStyle="bold"
         android:textSize="22sp"
         android:textColor="#1A2C44"
-        android:background="#BDE9DB" />
+        android:background="#A7D4D4" />
 
     <!-- Back + Event title row -->
     <androidx.constraintlayout.widget.ConstraintLayout
@@ -190,7 +190,7 @@
                 android:textColor="#2C4A6E"
                 app:cornerRadius="16dp"
                 android:layout_marginBottom="12dp"
-                android:backgroundTint="#7FDBDA" />
+                android:backgroundTint="#A7D4D4" />
 
             <!-- Delete button -->
             <com.google.android.material.button.MaterialButton

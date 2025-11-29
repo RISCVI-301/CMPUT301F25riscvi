@@ -11,7 +11,7 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@color/ee_mint_aqua"
+        android:background="@color/ee_topbar_bg"
         android:padding="16dp"
         android:orientation="horizontal"
         android:gravity="center_vertical">
@@ -124,7 +124,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Adjust Crop"
-                    android:textColor="@color/ee_mint_aqua"
+                    android:textColor="@color/ee_topbar_bg"
                     android:textSize="14sp"
                     android:visibility="gone"
                     app:cornerRadius="8dp"/>
@@ -301,9 +301,9 @@
                         android:textColor="@color/ee_text_light"
                         android:textSize="16sp"
                         app:backgroundTint="@color/ee_navy_dark"
-                        app:strokeColor="@color/ee_mint_aqua"
+                        app:strokeColor="@color/ee_topbar_bg"
                         app:strokeWidth="2dp"
-                        app:rippleColor="@color/ee_mint_aqua"
+                        app:rippleColor="@color/ee_topbar_bg"
                         app:cornerRadius="12dp"/>
                 </LinearLayout>
 
@@ -331,9 +331,9 @@
                         android:textColor="@color/ee_text_light"
                         android:textSize="16sp"
                         app:backgroundTint="@color/ee_navy_dark"
-                        app:strokeColor="@color/ee_mint_aqua"
+                        app:strokeColor="@color/ee_topbar_bg"
                         app:strokeWidth="2dp"
-                        app:rippleColor="@color/ee_mint_aqua"
+                        app:rippleColor="@color/ee_topbar_bg"
                         app:cornerRadius="12dp"/>
                 </LinearLayout>
             </LinearLayout>
@@ -359,9 +359,9 @@
                 android:textSize="16sp"
                 android:layout_marginBottom="16dp"
                 app:backgroundTint="@color/ee_navy_dark"
-                app:strokeColor="@color/ee_mint_aqua"
+                app:strokeColor="@color/ee_topbar_bg"
                 app:strokeWidth="2dp"
-                app:rippleColor="@color/ee_mint_aqua"
+                app:rippleColor="@color/ee_topbar_bg"
                 app:cornerRadius="12dp"/>
 
             <!-- Event Start Date -->
@@ -385,9 +385,9 @@
                 android:textSize="16sp"
                 android:layout_marginBottom="16dp"
                 app:backgroundTint="@color/ee_navy_dark"
-                app:strokeColor="@color/ee_mint_aqua"
+                app:strokeColor="@color/ee_topbar_bg"
                 app:strokeWidth="2dp"
-                app:rippleColor="@color/ee_mint_aqua"
+                app:rippleColor="@color/ee_topbar_bg"
                 app:cornerRadius="12dp"/>
 
             <!-- Toggles -->
@@ -577,7 +577,7 @@
             android:textSize="18sp"
             android:textColor="@color/ee_navy_dark"
             android:elevation="8dp"
-            app:backgroundTint="@color/ee_mint_aqua"
+            app:backgroundTint="@color/ee_topbar_bg"
             app:rippleColor="@color/ee_card"
             app:cornerRadius="12dp"/>
     </LinearLayout>

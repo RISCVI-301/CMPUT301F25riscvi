@@ -18,7 +18,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@color/ee_mint_aqua"
+            android:background="@color/ee_topbar_bg"
             android:elevation="4dp"
             android:gravity="center_vertical"
             android:orientation="horizontal"
@@ -160,7 +160,7 @@
             android:fontFamily="@font/fredoka_bold"
             android:paddingVertical="10dp"
             android:text="Delete Event"
-            android:textColor="#223C65"
+            android:textColor="#FFFFFF"
             android:textSize="26sp"
             android:textStyle="bold"
             app:backgroundTint="#F89393"
@@ -182,7 +182,7 @@
             android:textColor="#223C65"
             android:textSize="26sp"
             android:textStyle="bold"
-            app:backgroundTint="#9EFFF1"
+            app:backgroundTint="#A7D4D4"
             app:cornerRadius="12dp" />
 
         <!-- Change Deadlines Button (for testing) -->

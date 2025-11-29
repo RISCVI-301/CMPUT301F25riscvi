@@ -84,7 +84,7 @@
                 android:textSize="20sp"
                 android:textStyle="bold"
                 android:textColor="#FFFFFF"
-                android:backgroundTint="#9EFFF1"
+                android:backgroundTint="#A7D4D4"
                 android:layout_margin="28dp"
                 android:layout_marginTop="20dp"
                 android:layout_marginBottom="12dp"

@@ -18,7 +18,7 @@
         android:textSize="28sp"
         android:textStyle="bold"
         android:padding="16dp"
-        android:background="#9EFFF1" />
+        android:background="#A7D4D4" />
 
 
 </LinearLayout>

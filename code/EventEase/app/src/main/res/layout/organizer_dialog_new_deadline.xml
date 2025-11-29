@@ -27,7 +27,7 @@
                 android:text="Set New Accept/Decline Deadline"
                 android:textSize="24sp"
                 android:textStyle="bold"
-                android:textColor="#7FDBDA"
+                android:textColor="#A7D4D4"
                 android:fontFamily="@font/entrant_fredoka_one"
                 android:gravity="center"
                 android:paddingBottom="16dp"/>
@@ -39,7 +39,7 @@
                 android:layout_height="wrap_content"
                 android:text="Please select a new deadline for accept/decline. It must be after the previous deadline and at least 48 hours before the event date."
                 android:textSize="16sp"
-                android:textColor="#7FDBDA"
+                android:textColor="#A7D4D4"
                 android:fontFamily="@font/entrant_fredoka_one"
                 android:paddingBottom="20dp"
                 android:gravity="center"/>
@@ -51,14 +51,14 @@
                 android:layout_width="match_parent"
                 android:layout_height="56dp"
                 android:text="Select New Deadline"
-                android:textColor="#7FDBDA"
+                android:textColor="#A7D4D4"
                 android:textSize="16sp"
                 android:fontFamily="@font/entrant_fredoka_one"
                 android:layout_marginBottom="16dp"
                 app:backgroundTint="#FFFFFF"
-                app:strokeColor="#7FDBDA"
+                app:strokeColor="#A7D4D4"
                 app:strokeWidth="2dp"
-                app:rippleColor="#7FDBDA"
+                app:rippleColor="#A7D4D4"
                 app:cornerRadius="12dp"/>
 
             <!-- Selected Deadline Display -->
@@ -85,7 +85,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Cancel"
-                    android:textColor="#7FDBDA"
+                    android:textColor="#A7D4D4"
                     android:fontFamily="@font/entrant_fredoka_one"
                     android:backgroundTint="#E0E0E0"
                     android:layout_marginEnd="12dp"
@@ -99,7 +99,7 @@
                     android:text="Confirm"
                     android:textColor="#FFFFFF"
                     android:fontFamily="@font/entrant_fredoka_one"
-                    android:backgroundTint="#7FDBDA"
+                    android:backgroundTint="#A7D4D4"
                     android:paddingStart="24dp"
                     android:paddingEnd="24dp"
                     android:enabled="false"/>

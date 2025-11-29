@@ -13,7 +13,7 @@
         android:orientation="horizontal"
         android:padding="16dp"
         android:gravity="center_vertical"
-        android:background="#B8E2D7">
+        android:background="#A7D4D4">
 
         <ImageButton
             android:id="@+id/backButton"
@@ -174,7 +174,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 app:cardCornerRadius="16dp"
-                app:cardBackgroundColor="#B8E2D7"
+                app:cardBackgroundColor="#A7D4D4"
                 android:elevation="8dp">
 
                 <TextView
