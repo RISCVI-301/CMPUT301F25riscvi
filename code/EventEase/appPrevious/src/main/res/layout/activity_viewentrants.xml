@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#223C65"
+    android:fitsSystemWindows="true"
+    tools:context=".ViewEntrantsActivity">
+
+
+
+
+    <!-- Header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/ee_topbar_bg"
+        android:elevation="4dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="12dp">
+
+        <ImageView
+            android:id="@+id/back_button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@drawable/baseline_arrow_back_24"
+            android:contentDescription="Back"
+            android:tint="@color/header_text_green" />
+
+        <TextView
+            android:id="@+id/titleText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:text="EventEase"
+            android:textColor="@color/header_text_green"
+            android:textSize="32sp"
+            android:textStyle="bold"
+            android:gravity="center"/>
+    </LinearLayout>
+
+    <!-- Selected Entrants Title Row -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="16dp"
+        android:layout_marginTop="8dp">
+
+        <TextView
+            android:id="@+id/txtSelectedEntrantsTitle"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="Selected Entrants"
+            android:textStyle="bold"
+            android:textColor="#A7D4D4"
+            android:textSize="24sp" />
+
+        <ImageButton
+            android:id="@+id/btnMailSelected"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@android:color/transparent"
+            android:src="@drawable/notification"
+            android:contentDescription="Mail Selected Entrants"
+            android:layout_marginEnd="4dp"
+            android:tint="#A7D4D4" />
+    </LinearLayout>
+
+    <!-- Selected Entrants Scrollable List -->
+
+    <!-- Not Selected Entrants Title Row -->
+    <ListView
+        android:id="@+id/recyclerSelected"
+        android:layout_width="match_parent"
+        android:layout_height="120dp"
+        android:layout_margin="12dp"
+        android:background="@drawable/bg_waitlist_card"
+        android:padding="8dp"
+        android:scrollbars="vertical" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="16dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="Not Selected Entrants"
+            android:textStyle="bold"
+            android:textColor="#A7D4D4"
+            android:textSize="24sp" />
+
+        <!-- Mail Icon -->
+        <ImageButton
+            android:id="@+id/btnMailNotSelected"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="@android:color/transparent"
+            android:src="@drawable/notification"
+            android:contentDescription="Mail Not Selected Entrants"
+            android:tint="#A7D4D4"
+            android:layout_marginEnd="8dp" />
+
+        <!-- Swap Icon -->
+        <ImageButton
+            android:id="@+id/btnSwapNotSelected"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="@android:color/transparent"
+            android:src="@drawable/swap"
+            android:contentDescription="Swap Not Selected Entrants"
+            android:tint="#A7D4D4" />
+    </LinearLayout>
+
+    <!-- Not Selected Entrants Scrollable List -->
+    <ListView
+        android:id="@+id/recyclerNotSelected"
+        android:layout_width="match_parent"
+        android:layout_height="120dp"
+        android:layout_margin="12dp"
+        android:background="@drawable/bg_waitlist_card"
+        android:padding="8dp"
+        android:scrollbars="vertical" />
+
+    <!-- Final Entrants Button -->
+    <Button
+        android:id="@+id/finalentrant_button"
+        android:layout_width="match_parent"
+        android:layout_height="55dp"
+        android:text="View Final Entrants"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:textColor="#223C65"
+        android:layout_margin="12dp"
+        android:backgroundTint="#A7D4D4"
+        app:cornerRadius="10dp" />
+
+    <!-- Cancelled Entrants Title Row -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="16dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="Cancelled Entrants"
+            android:textStyle="bold"
+            android:textColor="#A7D4D4"
+            android:textSize="24sp" />
+
+        <ImageButton
+            android:id="@+id/btnMailCancelled"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@android:color/transparent"
+            android:src="@drawable/notification"
+            android:contentDescription="Mail Cancelled Entrants"
+            android:layout_marginEnd="4dp"
+            android:tint="#A7D4D4" />
+    </LinearLayout>
+
+    <!-- Cancelled Entrants Scrollable List -->
+    <ListView
+        android:id="@+id/recyclerCancelled"
+        android:layout_width="match_parent"
+        android:layout_height="120dp"
+        android:layout_margin="12dp"
+        android:background="@drawable/bg_waitlist_card"
+        android:padding="8dp"
+        android:scrollbars="vertical" />
+
+    <!-- Remove Cancelled Entrants Button -->
+    <Button
+        android:id="@+id/btnRemCancelledEntrants"
+        android:layout_width="match_parent"
+        android:layout_height="55dp"
+        android:text="Remove Cancelled Entrants"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:layout_margin="12dp"
+        android:backgroundTint="#F89393"
+        app:cornerRadius="10dp" />
+
+</LinearLayout>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="CircularImageView">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">50%</item>
+    </style>
+
+    <!-- Dialog window animations: zoom in + fade in on enter, fade in for subtle overlay -->
+    <style name="DialogAnimation">
+        <item name="android:windowEnterAnimation">@anim/entrant_dialog_zoom_in</item>
+        <item name="android:windowExitAnimation">@anim/entrant_dialog_fade_in</item>
+    </style>
+</resources>
+

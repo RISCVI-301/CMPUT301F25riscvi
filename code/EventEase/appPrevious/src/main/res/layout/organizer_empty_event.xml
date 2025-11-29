@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:background="@color/ee_navy_dark"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Header -->
+    <TextView
+        android:id="@+id/tvHeader"
+        android:text="EventEase"
+        android:textStyle="bold"
+        android:textSize="32sp"
+        android:gravity="center"
+        android:textColor="@color/ee_topbar_text"
+        android:background="@color/ee_topbar_bg"
+        android:padding="16dp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
+    <!-- Content -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginTop="64dp"
+        android:clipToPadding="false"
+        android:paddingBottom="96dp">
+
+        <!-- Empty state -->
+        <LinearLayout
+            android:id="@+id/emptyState"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="24dp"
+            android:paddingBottom="96dp"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <TextView
+                android:text="You haven’t posted any events yet"
+                android:textColor="#FFFFFFFF"
+                android:textSize="18sp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+
+            <TextView
+                android:text="Tap the + button to create your first event"
+                android:textColor="#B3FFFFFF"
+                android:layout_marginTop="6dp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </LinearLayout>
+
+        <!-- List -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvMyEvents"
+            android:padding="12dp"
+            android:clipToPadding="false"
+            android:paddingBottom="96dp"
+            android:visibility="gone"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+    </FrameLayout>
+
+    <!-- Floating + button -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabAdd"
+        android:contentDescription="Create Event"
+        app:srcCompat="@android:drawable/ic_input_add"
+        app:tint="@color/ee_navy_dark"
+        android:layout_margin="16dp"
+        app:backgroundTint="@color/toolbar_button"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:layout_anchor="@id/bottomBar"
+        app:layout_anchorGravity="top|center" />
+
+    <!-- Bottom bar with three buttons -->
+    <LinearLayout
+        android:id="@+id/bottomBar"
+        android:layout_width="match_parent"
+        android:layout_height="72dp"
+        android:layout_gravity="bottom"
+        android:background="@color/toolbar_button"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <!-- Left: My Events (current) -->
+        <LinearLayout
+            android:id="@+id/btnMyEvents"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackgroundBorderless">
+
+            <ImageView
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:src="@drawable/entrant_ic_my_events_circle_dark"
+                android:scaleType="fitCenter" />
+
+            <TextView
+                android:text="My Events"
+                android:textColor="@color/ee_navy_dark"
+                android:textSize="12sp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </LinearLayout>
+
+        <!-- Spacer for center FAB footprint -->
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1" />
+
+        <!-- Right: Account -->
+        <LinearLayout
+            android:id="@+id/btnAccount"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackgroundBorderless">
+
+            <ImageView
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:src="@drawable/entrant_ic_account_circle_dark"
+                android:scaleType="fitCenter" />
+
+            <TextView
+                android:text="Account"
+                android:textColor="@color/ee_navy_dark"
+                android:textSize="12sp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </LinearLayout>
+    </LinearLayout>
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

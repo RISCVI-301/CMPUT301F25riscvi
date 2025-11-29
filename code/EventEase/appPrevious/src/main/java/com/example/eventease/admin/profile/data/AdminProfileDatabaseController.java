@@ -1,0 +1,140 @@
+package com.example.eventease.admin.profile.data;
+
+import android.content.Context;
+import android.util.Log;
+
+import androidx.annotation.NonNull;
+
+import com.example.eventease.ui.entrant.profile.ProfileDeletionHelper;
+import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.QuerySnapshot;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class AdminProfileDatabaseController {
+
+    private static final String TAG = "AdminProfileDB";
+    private final FirebaseFirestore db = FirebaseFirestore.getInstance();
+
+    public interface ProfilesCallback {
+        void onLoaded(@NonNull List<UserProfile> profiles);
+        void onError(@NonNull Exception e);
+    }
+
+    public interface DeleteCallback {
+        void onSuccess();
+        void onError(@NonNull Exception e);
+    }
+
+    public void fetchProfiles(@NonNull final ProfilesCallback cb) {
+        // Use UserRoleChecker to verify admin role
+        com.example.eventease.auth.UserRoleChecker.isAdmin()
+                .addOnCompleteListener(task -> {
+                    if (!task.isSuccessful()) {
+                        Exception e = task.getException();
+                        Log.e(TAG, "fetchProfiles: Failed to verify admin status. Error: " + (e != null ? e.getMessage() : "Unknown error"), e);
+                        cb.onError(new IllegalStateException("Failed to verify admin status: " + (e != null ? e.getMessage() : "Unknown error")));
+                        return;
+                    }
+                    
+                    Boolean isAdmin = task.getResult();
+                    if (isAdmin == null || !isAdmin) {
+                        Log.e(TAG, "fetchProfiles: Current user is not an admin. isAdmin result: " + isAdmin);
+                        cb.onError(new SecurityException("Only administrators can view all profiles"));
+                        return;
+                    }
+                    
+                    Log.d(TAG, "fetchProfiles: Admin verified, proceeding to fetch all profiles");
+                    // User is admin, proceed to fetch all profiles
+                    fetchAllProfiles(cb);
+                });
+    }
+    
+    private void fetchAllProfiles(@NonNull final ProfilesCallback cb) {
+        db.collection("users")
+                .get()
+                .addOnSuccessListener((QuerySnapshot qs) -> {
+                    List<UserProfile> list = new ArrayList<>();
+                    for (DocumentSnapshot d : qs.getDocuments()) {
+                        String uid = d.getId();
+                        String email = getStr(d, "email");
+                        String name = getStr(d, "name");
+                        String phoneNumber = getStr(d, "phoneNumber");
+                        Long createdAt = d.getLong("createdAt");
+                        
+                        // Get roles
+                        List<String> roles = new ArrayList<>();
+                        Object rolesObj = d.get("roles");
+                        if (rolesObj instanceof List<?>) {
+                            for (Object role : (List<?>) rolesObj) {
+                                if (role != null) {
+                                    roles.add(role.toString());
+                                }
+                            }
+                        }
+
+                        list.add(new UserProfile(uid, email, name, phoneNumber, roles, createdAt != null ? createdAt : 0L));
+                    }
+                    Log.d(TAG, "fetchProfiles: Successfully loaded " + list.size() + " profiles");
+                    cb.onLoaded(list);
+                })
+                .addOnFailureListener(e -> {
+                    String errorMsg = e.getMessage();
+                    Log.e(TAG, "fetchProfiles: Failed to read users collection. Error: " + errorMsg, e);
+                    if (errorMsg != null && errorMsg.contains("permission")) {
+                        cb.onError(new SecurityException("Permission denied. Please check Firestore security rules to allow admins to read all user profiles."));
+                    } else {
+                        cb.onError(e);
+                    }
+                });
+    }
+
+    private static String getStr(DocumentSnapshot d, String key) {
+        Object v = d.get(key);
+        return v != null ? String.valueOf(v) : "";
+    }
+
+    public void deleteProfile(@NonNull Context context, @NonNull UserProfile profile, @NonNull DeleteCallback callback) {
+        String uid = profile.getUid();
+        if (uid == null || uid.isEmpty()) {
+            callback.onError(new IllegalArgumentException("Profile UID is null or empty"));
+            return;
+        }
+
+        Log.d(TAG, "Starting deletion of profile: " + uid);
+        
+        // Use ProfileDeletionHelper to delete all user references first
+        ProfileDeletionHelper deletionHelper = new ProfileDeletionHelper(context);
+        deletionHelper.deleteAllUserReferences(uid, new ProfileDeletionHelper.DeletionCallback() {
+            @Override
+            public void onDeletionComplete() {
+                // After cleaning up references, delete the user document
+                deleteUserDocument(uid, callback);
+            }
+
+            @Override
+            public void onDeletionFailure(String error) {
+                Log.w(TAG, "Failed to delete some user references: " + error + ", proceeding with document deletion");
+                // Still try to delete the user document even if some references failed
+                deleteUserDocument(uid, callback);
+            }
+        });
+    }
+    
+    private void deleteUserDocument(@NonNull String uid, @NonNull DeleteCallback callback) {
+        DocumentReference userRef = db.collection("users").document(uid);
+        userRef.delete()
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "Successfully deleted user document: " + uid);
+                    callback.onSuccess();
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Delete failed for user document: " + uid, e);
+                    callback.onError(e);
+                });
+    }
+}
+
