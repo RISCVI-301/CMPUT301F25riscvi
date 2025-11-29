@@ -13,4 +13,19 @@ public class Notification {
         this.organizerID = organizerID;
     }
 
+    public String getNotificationTitle() {
+        return notificationTitle;
+    }
+
+    public String getNotificationMessage() {
+        return notificationMessage;
+    }
+
+    public String getEventTitle() {
+        return eventTitle;
+    }
+
+    public String getOrganizerID() {
+        return organizerID;
+    }
 }
