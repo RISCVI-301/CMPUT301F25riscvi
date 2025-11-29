@@ -1,6 +1,7 @@
 package com.example.eventease.model;
 
 import androidx.annotation.Nullable;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -29,7 +30,8 @@ import java.util.UUID;
  * {@code waitlist.size()}, but is maintained for backwards compatibility with existing Firestore data.
  * The {@code description} field is a legacy field that mirrors {@code notes}.</p>
  */
-public class Event {
+public class Event implements Serializable {
+    private static final long serialVersionUID = 1L;
     /** Unique event identifier. */
     public String id;
     /** Event title. */

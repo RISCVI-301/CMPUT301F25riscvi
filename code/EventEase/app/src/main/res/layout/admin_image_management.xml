@@ -17,26 +17,7 @@
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
-
-        <!-- Admin Pill -->
-        <TextView
-            android:id="@+id/adminBadge"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:text="Admin"
-            android:textColor="#223C65"
-            android:textSize="22sp"
-            android:textStyle="bold"
-            android:paddingVertical="14dp"
-            android:gravity="center"
-            android:layout_marginTop="16dp"
-            android:background="@drawable/admin_pill"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintWidth_percent="0.8"/>
-    </androidx.constraintlayout.widget.ConstraintLayout>
+        android:layout_height="wrap_content"/>
 
     <!--  Scrolling container to display the Images  -->
     <androidx.recyclerview.widget.RecyclerView
