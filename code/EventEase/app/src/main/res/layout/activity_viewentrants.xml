@@ -36,11 +36,11 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="12dp"
-            android:gravity="start"
             android:text="EventEase"
             android:textColor="@color/header_text_green"
-            android:textSize="34sp"
-            android:textStyle="bold" />
+            android:textSize="32sp"
+            android:textStyle="bold"
+            android:gravity="center"/>
     </LinearLayout>
 
     <!-- Selected Entrants Title Row -->

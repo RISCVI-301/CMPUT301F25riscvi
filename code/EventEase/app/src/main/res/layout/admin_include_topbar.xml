@@ -14,11 +14,11 @@
         android:id="@+id/tvTitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_centerVertical="true"
+        android:gravity="center"
         android:text="EventEase"
         android:textStyle="bold"
-        android:textSize="22sp"
-        android:textColor="#1A2C44" />
+        android:textSize="32sp"
+        android:textColor="@color/header_text_green"/>
 
     <!-- Admin label (replaces logout button, no click) -->
     <TextView

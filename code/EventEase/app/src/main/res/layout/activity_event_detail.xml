@@ -12,12 +12,12 @@
         android:id="@+id/tvBrand"
         android:layout_width="match_parent"
         android:layout_height="56dp"
-        android:gravity="center_vertical"
+        android:gravity="center"
         android:paddingStart="16dp"
         android:text="EventEase"
         android:textStyle="bold"
-        android:textSize="22sp"
-        android:textColor="#1A2C44"
+        android:textSize="32sp"
+        android:textColor="@color/ee_topbar_text"
         android:background="#A7D4D4" />
 
     <!-- Back + Event title row -->
