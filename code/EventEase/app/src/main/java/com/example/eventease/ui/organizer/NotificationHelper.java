@@ -160,43 +160,54 @@ public class NotificationHelper {
                         return;
                     }
                     
-                    // Create default message if not provided
-                    String notificationMessage = customMessage;
-                    if (notificationMessage == null || notificationMessage.trim().isEmpty()) {
-                        notificationMessage = getDefaultMessage(groupType, eventTitle);
-                    }
-                    
-                    // Create notification request in Firestore
-                    // Cloud Functions will pick this up and send FCM notifications
-                    Map<String, Object> notificationRequest = new HashMap<>();
-                    notificationRequest.put("eventId", eventId);
-                    notificationRequest.put("eventTitle", eventTitle != null ? eventTitle : "Event");
-                    notificationRequest.put("organizerId", finalOrganizerId);
-                    notificationRequest.put("userIds", userIds);
-                    notificationRequest.put("groupType", groupType);
-                    notificationRequest.put("message", notificationMessage);
-                    notificationRequest.put("title", getDefaultTitle(groupType, eventTitle));
-                    notificationRequest.put("status", "PENDING");
-                    notificationRequest.put("createdAt", System.currentTimeMillis());
-                    notificationRequest.put("processed", false);
-                    
-                    // Write to notificationRequests collection
-                    db.collection("notificationRequests").add(notificationRequest)
-                            .addOnSuccessListener(docRef -> {
-                                Log.d(TAG, "Notification request created for " + userIds.size() + " users in " + groupType + " group");
-                                Log.d(TAG, "Request ID: " + docRef.getId());
-                                
-                                // Return success - Cloud Functions will handle actual sending
-                                if (callback != null) {
-                                    callback.onComplete(userIds.size());
-                                }
-                            })
-                            .addOnFailureListener(e -> {
-                                Log.e(TAG, "Failed to create notification request", e);
-                                if (callback != null) {
-                                    callback.onError("Failed to create notification request: " + e.getMessage());
-                                }
-                            });
+                    // Filter users based on their notification preferences before sending
+                    filterUsersByPreferences(userIds, groupType, filteredUserIds -> {
+                        if (filteredUserIds.isEmpty()) {
+                            Log.d(TAG, "No users with matching notification preferences for " + groupType);
+                            if (callback != null) {
+                                callback.onComplete(0);
+                            }
+                            return;
+                        }
+                        
+                        // Create default message if not provided
+                        String notificationMessage = customMessage;
+                        if (notificationMessage == null || notificationMessage.trim().isEmpty()) {
+                            notificationMessage = getDefaultMessage(groupType, eventTitle);
+                        }
+                        
+                        // Create notification request in Firestore
+                        // Cloud Functions will pick this up and send FCM notifications
+                        Map<String, Object> notificationRequest = new HashMap<>();
+                        notificationRequest.put("eventId", eventId);
+                        notificationRequest.put("eventTitle", eventTitle != null ? eventTitle : "Event");
+                        notificationRequest.put("organizerId", finalOrganizerId);
+                        notificationRequest.put("userIds", filteredUserIds);
+                        notificationRequest.put("groupType", groupType);
+                        notificationRequest.put("message", notificationMessage);
+                        notificationRequest.put("title", getDefaultTitle(groupType, eventTitle));
+                        notificationRequest.put("status", "PENDING");
+                        notificationRequest.put("createdAt", System.currentTimeMillis());
+                        notificationRequest.put("processed", false);
+                        
+                        // Write to notificationRequests collection
+                        db.collection("notificationRequests").add(notificationRequest)
+                                .addOnSuccessListener(docRef -> {
+                                    Log.d(TAG, "Notification request created for " + filteredUserIds.size() + " users in " + groupType + " group");
+                                    Log.d(TAG, "Request ID: " + docRef.getId());
+                                    
+                                    // Return success - Cloud Functions will handle actual sending
+                                    if (callback != null) {
+                                        callback.onComplete(filteredUserIds.size());
+                                    }
+                                })
+                                .addOnFailureListener(e -> {
+                                    Log.e(TAG, "Failed to create notification request", e);
+                                    if (callback != null) {
+                                        callback.onError("Failed to create notification request: " + e.getMessage());
+                                    }
+                                });
+                    });
                 })
                 .addOnFailureListener(e -> {
                     Log.e(TAG, "Failed to load entrants from " + subcollectionName, e);
@@ -429,6 +440,86 @@ public class NotificationHelper {
                     // On error, send to all (better to send than miss)
                     callback.accept(userIds);
                 });
+    }
+    
+    /**
+     * Filters user IDs based on their notification preferences.
+     * For "selected" notifications: checks notificationPreferenceInvited
+     * For "nonSelected" notifications: checks notificationPreferenceNotInvited
+     * 
+     * @param userIds List of user IDs to filter
+     * @param groupType Type of notification (selected/invited or nonSelected/not invited)
+     * @param callback Callback with filtered user IDs
+     */
+    private void filterUsersByPreferences(List<String> userIds, String groupType, java.util.function.Consumer<List<String>> callback) {
+        if (userIds == null || userIds.isEmpty()) {
+            callback.accept(new ArrayList<>());
+            return;
+        }
+        
+        // Determine which preference field to check based on group type
+        // "selected" = invited notifications (notificationPreferenceInvited)
+        // "nonSelected" = not invited notifications (notificationPreferenceNotInvited)
+        boolean checkInvitedPreference = groupType.equals("selected") || groupType.equals("selection");
+        
+        List<String> filteredUserIds = new ArrayList<>();
+        List<Task<DocumentSnapshot>> tasks = new ArrayList<>();
+        
+        // Fetch all user documents
+        for (String userId : userIds) {
+            tasks.add(db.collection("users").document(userId).get());
+        }
+        
+        // Wait for all tasks to complete
+        Tasks.whenAllComplete(tasks).addOnSuccessListener(tasksList -> {
+            for (int i = 0; i < tasksList.size() && i < userIds.size(); i++) {
+                Task<?> task = tasksList.get(i);
+                String userId = userIds.get(i);
+                
+                if (task.isSuccessful()) {
+                    Object result = task.getResult();
+                    if (result instanceof DocumentSnapshot) {
+                        DocumentSnapshot userDoc = (DocumentSnapshot) result;
+                        
+                        if (userDoc != null && userDoc.exists()) {
+                            // Check the appropriate preference field
+                            Boolean preferenceValue;
+                            if (checkInvitedPreference) {
+                                preferenceValue = userDoc.getBoolean("notificationPreferenceInvited");
+                            } else {
+                                preferenceValue = userDoc.getBoolean("notificationPreferenceNotInvited");
+                            }
+                            
+                            // Default to true (enabled) if preference not set
+                            boolean isEnabled = preferenceValue != null ? preferenceValue : true;
+                            
+                            if (isEnabled) {
+                                filteredUserIds.add(userId);
+                                Log.d(TAG, "User " + userId + " has " + 
+                                    (checkInvitedPreference ? "invited" : "not invited") + 
+                                    " notifications enabled");
+                            } else {
+                                Log.d(TAG, "User " + userId + " has " + 
+                                    (checkInvitedPreference ? "invited" : "not invited") + 
+                                    " notifications disabled - skipping");
+                            }
+                        } else {
+                            // User document doesn't exist or no preference set - default to enabled
+                            filteredUserIds.add(userId);
+                            Log.d(TAG, "User " + userId + " has no preference set - defaulting to enabled");
+                        }
+                    }
+                } else {
+                    // Failed to fetch user doc - default to enabled (don't block notifications)
+                    filteredUserIds.add(userId);
+                    Log.w(TAG, "Failed to fetch preferences for user " + userId + " - defaulting to enabled");
+                }
+            }
+            
+            Log.d(TAG, "Filtered " + userIds.size() + " users to " + filteredUserIds.size() + 
+                " based on " + (checkInvitedPreference ? "invited" : "not invited") + " notification preferences");
+            callback.accept(filteredUserIds);
+        });
     }
     
     /**

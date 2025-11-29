@@ -1,31 +1,11 @@
 package com.example.eventease.ui.organizer;
 
-import android.app.DatePickerDialog;
-import android.app.Dialog;
 import android.content.Intent;
-import android.graphics.Bitmap;
-import android.graphics.Color;
-import android.graphics.drawable.BitmapDrawable;
-import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
-import android.text.Editable;
-import android.text.TextUtils;
-import android.text.TextWatcher;
 import android.util.Log;
 import android.view.View;
-import android.view.Window;
-import android.view.WindowManager;
-import android.widget.Button;
-import android.widget.EditText;
-import android.widget.ImageButton;
 import android.widget.LinearLayout;
-import android.widget.RadioButton;
-import android.widget.TextView;
 import android.widget.Toast;
-import android.renderscript.Allocation;
-import android.renderscript.Element;
-import android.renderscript.RenderScript;
-import android.renderscript.ScriptIntrinsicBlur;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
@@ -74,21 +54,10 @@ public class OrganizerMyEventActivity extends AppCompatActivity {
 
     private OrganizerMyEventAdapter adapter;
     private final List<Map<String, Object>> items = new ArrayList<>();
-    private final List<Map<String, Object>> allItems = new ArrayList<>(); // Store all items for filtering
 
     private FirebaseFirestore db;
     private ListenerRegistration registration;
     private ListenerRegistration legacyRegistration;
-    
-    // Filter state
-    private String searchQuery = "";
-    private String locationFilter = "";
-    private enum DateFilterOption {
-        ANY_DATE, TODAY, THIS_MONTH, CUSTOM
-    }
-    private DateFilterOption activeDateFilter = DateFilterOption.ANY_DATE;
-    private long customDateFilterStartMs = 0L;
-    private final SimpleDateFormat filterDateFormat = new SimpleDateFormat("MMM d, yyyy", Locale.getDefault());
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -141,31 +110,6 @@ public class OrganizerMyEventActivity extends AppCompatActivity {
             intent.putExtra(EXTRA_ORGANIZER_ID, organizerId);
             startActivity(intent);
         });
-        
-        // Set up filter button
-        ImageButton btnFilter = findViewById(R.id.btnFilter);
-        if (btnFilter != null) {
-            btnFilter.setOnClickListener(v -> showFilterDialog());
-        }
-        
-        // Set up search input
-        EditText searchInput = findViewById(R.id.etOrganizerSearch);
-        if (searchInput != null) {
-            searchInput.addTextChangedListener(new TextWatcher() {
-                @Override
-                public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-                
-                @Override
-                public void onTextChanged(CharSequence s, int start, int before, int count) {}
-                
-                @Override
-                public void afterTextChanged(Editable s) {
-                    updateSearchQuery(s != null ? s.toString() : "");
-                }
-            });
-        }
-        
-        seedSampleParticipants();
     }
 
     private void ensureOrganizerId(Runnable onReady) {
@@ -440,9 +384,8 @@ public class OrganizerMyEventActivity extends AppCompatActivity {
         // Update the UI with the merged results
         items.clear();
         items.addAll(merged.values());
-        allItems.clear();
-        allItems.addAll(items); // Store all items for filtering
-        applyFiltersAndUpdateUI();
+        adapter.setData(items);
+        toggleEmpty(!items.isEmpty());
     }
 
     private void mergeSnapshotsAndDisplay(@Nullable Iterable<? extends DocumentSnapshot> primary,
@@ -473,9 +416,8 @@ public class OrganizerMyEventActivity extends AppCompatActivity {
         Log.d("OrganizerMyEventActivity", "Merging events: primary=" + primaryCount + " legacy=" + legacyCount);
         items.clear();
         items.addAll(merged.values());
-        allItems.clear();
-        allItems.addAll(items); // Store all items for filtering
-        applyFiltersAndUpdateUI();
+        adapter.setData(items);
+        toggleEmpty(!items.isEmpty());
     }
 
     private void backfillLegacy(@Nullable QuerySnapshot legacySnap) {
@@ -499,9 +441,8 @@ public class OrganizerMyEventActivity extends AppCompatActivity {
             Map<String, Object> m = toAdapterMap(d);
             if (m != null) items.add(m);
         }
-        allItems.clear();
-        allItems.addAll(items); // Store all items for filtering
-        applyFiltersAndUpdateUI();
+        adapter.setData(items);
+        toggleEmpty(!items.isEmpty());
     }
 
     private void toggleEmpty(boolean hasItems) {
@@ -557,413 +498,4 @@ public class OrganizerMyEventActivity extends AppCompatActivity {
         return def;
     }
 
-    /**
-     * Convenience helper you can call while developing to populate the event buckets
-     * for the sample event (ID: 699bb06d-ea19-4edf-8238-ba2103fa6509) with all nine
-     * demo users (waitlist) and three entrants in each bucket (selected / non-selected / cancelled).
-     * Invoke manually from onCreate(), a debug button, or temporarily when you need to reseed the data.
-     */
-    private void seedSampleParticipants() {
-        final String eventId = "c494766e-ddc8-4ef5-83a3-5fce4fbbac5f";
-
-        Map<String, ParticipantSeed> all = new LinkedHashMap<>();
-        all.put("c3hY3rcQwtPpKwJfEylBfwCar2", new ParticipantSeed("Caramel Verma", "carver123@ualberta.ca", "123123123"));
-        all.put("nF9GwuUQdahEPP4oJsoPe0smmn1", new ParticipantSeed("dukh antam", "dukhaitamaslay@gmail.com", "1234567890"));
-        all.put("LTrhOeKa3NnFa7SyHAtC9z2ut2", new ParticipantSeed("Baby Groot", "lamrgroot@gmail.com", "1234567890"));
-        all.put("JQDhJDOqLqPmDTv0QOqvBF9v2", new ParticipantSeed("Hair Gobi", "tharigobbrocks@gmail.com", "1234567890"));
-        all.put("D3W8BKiP40FHyLhhBXtK0mwdjH2", new ParticipantSeed("sam ver", "samver@gmail.com", "1234567899"));
-        all.put("qsF0hQGYCpYEOGUuhNd4vFLQp1", new ParticipantSeed("Sanika Verma", "sanika123@gmail.com", "123456789"));
-        all.put("LvaLG92OU0UuasiyS0ZfQSvpudym2", new ParticipantSeed("maan naam", "1manog@gmail.com", "7805551111"));
-        all.put("VVopE1dwcH54jS7na9cOsDiShL2", new ParticipantSeed("gainda monke", "two@gmail.com", "696969"));
-        all.put("4g0z3tuuAHc6y9miUh9hCR83dWn2", new ParticipantSeed("kyo bhang", "1kya@gmail.com", "12345678"));
-
-        List<String> selected = Arrays.asList(
-                "c3hY3rcQwtPpKwJfEylBfwCar2",
-                "nF9GwuUQdahEPP4oJsoPe0smmn1",
-                "LvaLG92OU0UuasiyS0ZfQSvpudym2");
-
-        List<String> nonSelected = Arrays.asList(
-                "LTrhOeKa3NnFa7SyHAtC9z2ut2",
-                "JQDhJDOqLqPmDTv0QOqvBF9v2",
-                "VVopE1dwcH54jS7na9cOsDiShL2");
-
-        List<String> cancelled = Arrays.asList(
-                "D3W8BKiP40FHyLhhBXtK0mwdjH2",
-                "qsF0hQGYCpYEOGUuhNd4vFLQp1",
-                "4g0z3tuuAHc6y9miUh9hCR83dWn2");
-
-        WriteBatch batch = db.batch();
-        DocumentReference eventRef = db.collection("events").document(eventId);
-
-        for (Map.Entry<String, ParticipantSeed> entry : all.entrySet()) {
-            String userId = entry.getKey();
-            ParticipantSeed info = entry.getValue();
-            Map<String, Object> payload = info.toMap();
-            payload.put("userId", userId);
-
-            batch.set(eventRef.collection("WaitlistedEntrants").document(userId), payload, SetOptions.merge());
-            if (selected.contains(userId)) {
-                batch.set(eventRef.collection("SelectedEntrants").document(userId), payload, SetOptions.merge());
-            }
-            if (nonSelected.contains(userId)) {
-                batch.set(eventRef.collection("NonSelectedEntrants").document(userId), payload, SetOptions.merge());
-            }
-            if (cancelled.contains(userId)) {
-                batch.set(eventRef.collection("CancelledEntrants").document(userId), payload, SetOptions.merge());
-            }
-        }
-
-        batch.commit()
-                .addOnSuccessListener(unused -> Log.d("OrganizerMyEventActivity", "Seeded sample participants for " + eventId))
-                .addOnFailureListener(e -> Log.e("OrganizerMyEventActivity", "Failed to seed participants", e));
-    }
-
-    private static class ParticipantSeed {
-        final String name;
-        final String email;
-        final String phone;
-
-        ParticipantSeed(String name, String email, String phone) {
-            this.name = name;
-            this.email = email;
-            this.phone = phone;
-        }
-
-        Map<String, Object> toMap() {
-            Map<String, Object> m = new HashMap<>();
-            m.put("name", name);
-            m.put("email", email);
-            m.put("phoneNumber", phone);
-            return m;
-        }
-    }
-
-    /**
-     * Shows the filter dialog for filtering events by date and location
-     */
-    private void showFilterDialog() {
-        Dialog dialog = new Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
-        dialog.setContentView(R.layout.entrant_dialog_discover_filter);
-        dialog.setCanceledOnTouchOutside(false);
-
-        if (dialog.getWindow() != null) {
-            dialog.getWindow().setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
-            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            WindowManager.LayoutParams layoutParams = dialog.getWindow().getAttributes();
-            layoutParams.dimAmount = 0f;
-            dialog.getWindow().setAttributes(layoutParams);
-            dialog.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
-        }
-
-        Bitmap screenshot = captureScreenshot();
-        if (screenshot != null) {
-            Bitmap blurredBitmap = blurBitmap(screenshot, 25f);
-            if (blurredBitmap != null) {
-                View blurBackground = dialog.findViewById(R.id.dialogBlurBackground);
-                if (blurBackground != null) {
-                    blurBackground.setBackground(new BitmapDrawable(getResources(), blurredBitmap));
-                }
-            }
-        }
-
-        View blurBackground = dialog.findViewById(R.id.dialogBlurBackground);
-        ImageButton closeButton = dialog.findViewById(R.id.btnFilterClose);
-        if (closeButton != null) {
-            closeButton.setOnClickListener(v -> dialog.dismiss());
-        }
-
-        RadioButton radioAnyDate = dialog.findViewById(R.id.radioAnyDate);
-        RadioButton radioToday = dialog.findViewById(R.id.radioToday);
-        RadioButton radioThisMonth = dialog.findViewById(R.id.radioTomorrow);
-        RadioButton radioCustom = dialog.findViewById(R.id.radioCustomDate);
-        TextView chooseDateValue = dialog.findViewById(R.id.textChooseDateValue);
-        View chooseDateRow = dialog.findViewById(R.id.chooseDateRow);
-        EditText etFilterLocation = dialog.findViewById(R.id.etFilterLocation);
-        if (etFilterLocation != null) {
-            etFilterLocation.setText(locationFilter);
-        }
-
-        restoreDateSelection(radioAnyDate, radioToday, radioThisMonth, radioCustom, chooseDateValue);
-        setDateSelectionHandlers(radioAnyDate, radioToday, radioThisMonth, radioCustom, chooseDateRow, chooseDateValue);
-
-        Button applyButton = dialog.findViewById(R.id.btnApplyFilters);
-        if (applyButton != null) {
-            applyButton.setOnClickListener(v -> {
-                if (etFilterLocation != null) {
-                    locationFilter = etFilterLocation.getText() != null
-                            ? etFilterLocation.getText().toString().trim()
-                            : "";
-                }
-                applyFiltersAndUpdateUI();
-                dialog.dismiss();
-            });
-        }
-
-        dialog.show();
-
-        View card = dialog.findViewById(R.id.dialogCardView);
-        if (blurBackground != null && card != null) {
-            android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_fade_in);
-            android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_zoom_in);
-
-            blurBackground.startAnimation(fadeIn);
-            card.startAnimation(zoomIn);
-        }
-    }
-
-    private void restoreDateSelection(RadioButton any, RadioButton today,
-                                      RadioButton thisMonth, RadioButton custom,
-                                      TextView chooseDateValue) {
-        clearDateChecks(any, today, thisMonth, custom);
-        if (any == null || today == null || thisMonth == null || custom == null) return;
-
-        switch (activeDateFilter) {
-            case ANY_DATE:
-                any.setChecked(true);
-                break;
-            case TODAY:
-                today.setChecked(true);
-                break;
-            case THIS_MONTH:
-                thisMonth.setChecked(true);
-                break;
-            case CUSTOM:
-                custom.setChecked(true);
-                break;
-        }
-
-        updateChooseDateLabel(chooseDateValue);
-    }
-
-    private void openDatePicker(TextView chooseDateValue, RadioButton customRadio) {
-        Calendar cal = Calendar.getInstance();
-        if (customDateFilterStartMs > 0) {
-            cal.setTimeInMillis(customDateFilterStartMs);
-        }
-
-        DatePickerDialog picker = new DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
-            Calendar chosen = Calendar.getInstance();
-            chosen.set(year, month, dayOfMonth, 0, 0, 0);
-            chosen.set(Calendar.MILLISECOND, 0);
-            customDateFilterStartMs = chosen.getTimeInMillis();
-            activeDateFilter = DateFilterOption.CUSTOM;
-            updateChooseDateLabel(chooseDateValue);
-            if (customRadio != null) {
-                customRadio.setChecked(true);
-            }
-        }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH));
-
-        picker.show();
-    }
-
-    private void updateChooseDateLabel(TextView chooseDateValue) {
-        if (chooseDateValue == null) return;
-        if (customDateFilterStartMs > 0) {
-            chooseDateValue.setText(filterDateFormat.format(new Date(customDateFilterStartMs)));
-        } else {
-            chooseDateValue.setText("No date selected");
-        }
-    }
-
-    private void setDateSelectionHandlers(RadioButton any, RadioButton today,
-                                          RadioButton thisMonth, RadioButton custom,
-                                          View chooseDateRow, TextView chooseDateValue) {
-        View.OnClickListener anyHandler = v -> setDateChoice(DateFilterOption.ANY_DATE, any, today, thisMonth, custom, chooseDateValue, false);
-        View.OnClickListener todayHandler = v -> setDateChoice(DateFilterOption.TODAY, today, any, thisMonth, custom, chooseDateValue, false);
-        View.OnClickListener thisMonthHandler = v -> setDateChoice(DateFilterOption.THIS_MONTH, thisMonth, any, today, custom, chooseDateValue, false);
-        View.OnClickListener customHandler = v -> setDateChoice(DateFilterOption.CUSTOM, custom, any, today, thisMonth, chooseDateValue, true);
-
-        if (any != null) any.setOnClickListener(anyHandler);
-        if (today != null) today.setOnClickListener(todayHandler);
-        if (thisMonth != null) thisMonth.setOnClickListener(thisMonthHandler);
-        if (custom != null) custom.setOnClickListener(customHandler);
-        if (chooseDateRow != null) chooseDateRow.setOnClickListener(customHandler);
-    }
-
-    private void setDateChoice(DateFilterOption option, RadioButton target,
-                               RadioButton other1, RadioButton other2, RadioButton other3,
-                               TextView chooseDateValue, boolean launchPickerIfNeeded) {
-        clearDateChecks(target, other1, other2, other3);
-        if (target != null) {
-            target.setChecked(true);
-        }
-        activeDateFilter = option;
-        if (option == DateFilterOption.CUSTOM) {
-            if (customDateFilterStartMs <= 0 || launchPickerIfNeeded) {
-                openDatePicker(chooseDateValue, target);
-            } else {
-                updateChooseDateLabel(chooseDateValue);
-            }
-        } else {
-            updateChooseDateLabel(chooseDateValue);
-        }
-    }
-
-    private void clearDateChecks(RadioButton... buttons) {
-        for (RadioButton btn : buttons) {
-            if (btn != null) btn.setChecked(false);
-        }
-    }
-
-    private void applyFiltersAndUpdateUI() {
-        if (adapter == null) return;
-
-        List<Map<String, Object>> filtered = new ArrayList<>();
-        for (Map<String, Object> event : allItems) {
-            if (passesDateFilter(event) && passesLocationFilter(event) && passesSearchFilter(event)) {
-                filtered.add(event);
-            }
-        }
-
-        items.clear();
-        items.addAll(filtered);
-        adapter.setData(items);
-        toggleEmpty(!items.isEmpty());
-    }
-    
-    private void updateSearchQuery(String query) {
-        String cleaned = query.trim();
-        if (cleaned.equals(searchQuery)) {
-            return;
-        }
-        searchQuery = cleaned;
-        applyFiltersAndUpdateUI();
-    }
-    
-    private boolean passesSearchFilter(Map<String, Object> event) {
-        if (TextUtils.isEmpty(searchQuery)) {
-            return true;
-        }
-        String queryLower = searchQuery.toLowerCase(Locale.getDefault());
-        
-        // Search in title
-        String title = (String) event.get("title");
-        if (title != null && title.toLowerCase(Locale.getDefault()).contains(queryLower)) {
-            return true;
-        }
-        
-        // Search in location
-        String location = (String) event.get("location");
-        if (location != null && location.toLowerCase(Locale.getDefault()).contains(queryLower)) {
-            return true;
-        }
-        
-        // Search in interests
-        @SuppressWarnings("unchecked")
-        List<String> interests = (List<String>) event.get("interests");
-        if (interests != null && !interests.isEmpty()) {
-            for (String interest : interests) {
-                if (interest != null && interest.toLowerCase(Locale.getDefault()).contains(queryLower)) {
-                    return true;
-                }
-            }
-        }
-        
-        return false;
-    }
-
-    private boolean passesLocationFilter(Map<String, Object> event) {
-        if (TextUtils.isEmpty(locationFilter)) {
-            return true;
-        }
-        String eventLocation = (String) event.get("location");
-        if (TextUtils.isEmpty(eventLocation)) {
-            return false;
-        }
-        return eventLocation.toLowerCase(Locale.getDefault())
-                .contains(locationFilter.toLowerCase(Locale.getDefault()));
-    }
-
-    private boolean passesDateFilter(Map<String, Object> event) {
-        if (activeDateFilter == DateFilterOption.ANY_DATE) {
-            return true;
-        }
-
-        long eventDate = getEventDateForFilter(event);
-        if (eventDate <= 0) {
-            return false;
-        }
-
-        switch (activeDateFilter) {
-            case TODAY:
-                return isSameDay(eventDate, startOfDay(System.currentTimeMillis()));
-            case THIS_MONTH:
-                return isSameMonth(eventDate, System.currentTimeMillis());
-            case CUSTOM:
-                if (customDateFilterStartMs <= 0) return true;
-                return isSameDay(eventDate, customDateFilterStartMs);
-            default:
-                return true;
-        }
-    }
-
-    private long getEventDateForFilter(Map<String, Object> event) {
-        // Use registration start date for filtering
-        Object regStart = event.get("registrationStart");
-        if (regStart instanceof Number) {
-            return ((Number) regStart).longValue();
-        }
-        return 0L;
-    }
-
-    private long startOfDay(long timestamp) {
-        Calendar cal = Calendar.getInstance();
-        cal.setTimeInMillis(timestamp);
-        cal.set(Calendar.HOUR_OF_DAY, 0);
-        cal.set(Calendar.MINUTE, 0);
-        cal.set(Calendar.SECOND, 0);
-        cal.set(Calendar.MILLISECOND, 0);
-        return cal.getTimeInMillis();
-    }
-
-    private boolean isSameDay(long timestamp1, long timestamp2) {
-        Calendar cal1 = Calendar.getInstance();
-        cal1.setTimeInMillis(timestamp1);
-        Calendar cal2 = Calendar.getInstance();
-        cal2.setTimeInMillis(timestamp2);
-        return cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
-               cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR);
-    }
-
-    private boolean isSameMonth(long timestamp1, long timestamp2) {
-        Calendar cal1 = Calendar.getInstance();
-        cal1.setTimeInMillis(timestamp1);
-        Calendar cal2 = Calendar.getInstance();
-        cal2.setTimeInMillis(timestamp2);
-        return cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
-               cal1.get(Calendar.MONTH) == cal2.get(Calendar.MONTH);
-    }
-
-    private Bitmap captureScreenshot() {
-        try {
-            View rootView = getWindow().getDecorView().getRootView();
-            rootView.setDrawingCacheEnabled(true);
-            Bitmap bitmap = Bitmap.createBitmap(rootView.getDrawingCache());
-            rootView.setDrawingCacheEnabled(false);
-            return bitmap;
-        } catch (Exception e) {
-            Log.e("OrganizerMyEventActivity", "Failed to capture screenshot", e);
-            return null;
-        }
-    }
-
-    private Bitmap blurBitmap(Bitmap bitmap, float radius) {
-        if (bitmap == null) return null;
-        try {
-            RenderScript rs = RenderScript.create(this);
-            Allocation input = Allocation.createFromBitmap(rs, bitmap);
-            Allocation output = Allocation.createTyped(rs, input.getType());
-            ScriptIntrinsicBlur script = ScriptIntrinsicBlur.create(rs, Element.U8_4(rs));
-            script.setRadius(radius);
-            script.setInput(input);
-            script.forEach(output);
-            output.copyTo(bitmap);
-            rs.destroy();
-            return bitmap;
-        } catch (Exception e) {
-            Log.e("OrganizerMyEventActivity", "Failed to blur bitmap", e);
-            return bitmap;
-        }
-    }
 }

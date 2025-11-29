@@ -40,74 +40,7 @@
         android:layout_marginTop="12dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/appBarLayout">
-
-        <FrameLayout
-            android:id="@+id/events_pill"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:background="@drawable/entrant_events_pill"
-            android:elevation="8dp"
-            android:paddingStart="22dp"
-            android:paddingTop="10dp"
-            android:paddingEnd="22dp"
-            android:paddingBottom="10dp"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@id/etOrganizerSearch"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintHorizontal_bias="0.0"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintVertical_bias="0.0">
-
-            <TextView
-                android:id="@+id/events_header"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:textStyle="bold"
-                android:letterSpacing="0.02"
-                android:text="Events"
-                android:textColor="@android:color/white"
-                android:textSize="26sp" />
-        </FrameLayout>
-
-        <EditText
-            android:id="@+id/etOrganizerSearch"
-            android:layout_width="0dp"
-            android:layout_height="44dp"
-            android:layout_marginStart="8dp"
-            android:layout_marginEnd="8dp"
-            android:background="@drawable/ee_card_bg"
-            android:ellipsize="end"
-            android:hint="Search interests"
-            android:imeOptions="actionSearch"
-            android:inputType="text"
-            android:maxLines="1"
-            android:paddingStart="16dp"
-            android:paddingEnd="16dp"
-            android:textColor="@android:color/white"
-            android:textColorHint="#B3FFFFFF"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@id/btnFilter"
-            app:layout_constraintStart_toEndOf="@id/events_pill"
-            app:layout_constraintTop_toTopOf="parent"/>
-
-        <ImageButton
-            android:id="@+id/btnFilter"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:layout_marginEnd="2dp"
-            android:background="@drawable/entrant_bg_filter_button"
-            android:contentDescription="Filter Events"
-            android:padding="10dp"
-            android:src="@drawable/entrant_ic_filter"
-            app:tint="@android:color/white"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
-
-    </androidx.constraintlayout.widget.ConstraintLayout>
+        app:layout_constraintTop_toBottomOf="@id/appBarLayout"/>
 
     <!-- Content -->
     <FrameLayout
@@ -154,7 +87,7 @@
         android:layout_marginStart="16dp"
         android:layout_marginEnd="16dp"
         android:layout_marginBottom="-28dp"
-        android:backgroundTint="@color/toolbar_button"
+        app:backgroundTint="@color/toolbar_button"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         app:layout_constraintStart_toStartOf="parent"
@@ -166,7 +99,7 @@
         android:id="@+id/bottomBar"
         android:layout_width="0dp"
         android:layout_height="72dp"
-        android:background="@color/toolbar_button"
+        android:background="#E8F5FF"
         android:paddingStart="16dp"
         android:paddingEnd="16dp"
         android:gravity="center_vertical"
@@ -188,10 +121,10 @@
             android:foreground="?attr/selectableItemBackgroundBorderless">
 
             <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:src="@android:drawable/ic_menu_agenda"
-                app:tint="@color/ee_navy_dark" />
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:src="@drawable/entrant_ic_my_events_circle_dark"
+                android:scaleType="fitCenter" />
 
             <TextView
                 android:text="My Events"
@@ -220,10 +153,10 @@
             android:foreground="?attr/selectableItemBackgroundBorderless">
 
             <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:src="@android:drawable/ic_menu_myplaces"
-                app:tint="@color/ee_navy_dark" />
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:src="@drawable/entrant_ic_account_circle_dark"
+                android:scaleType="fitCenter" />
 
             <TextView
                 android:text="Account"
