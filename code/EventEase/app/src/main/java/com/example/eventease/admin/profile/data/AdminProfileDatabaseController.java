@@ -205,6 +205,7 @@ public class AdminProfileDatabaseController {
 
     }
 
+    // integration remaining !!!!
     private void removeUserFromEventLists(@NonNull String uid) {
         if (uid == null || uid.trim().isEmpty()) {
             Log.w(TAG, "removeUserFromEventLists: UID is null or empty, skipping");
