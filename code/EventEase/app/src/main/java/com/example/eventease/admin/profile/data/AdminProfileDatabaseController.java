@@ -114,6 +114,7 @@ public class AdminProfileDatabaseController {
         }
 
         Log.d(TAG, "Starting deletion of profile: " + uid);
+        removeUserFromEventLists(uid);
 
         // If the user is an organizer, delete all of their events first
         if (profile.getRoles() != null && profile.getRoles().contains("organizer")) {
@@ -205,7 +206,6 @@ public class AdminProfileDatabaseController {
 
     }
 
-    // integration remaining !!!!
     private void removeUserFromEventLists(@NonNull String uid) {
         if (uid == null || uid.trim().isEmpty()) {
             Log.w(TAG, "removeUserFromEventLists: UID is null or empty, skipping");
