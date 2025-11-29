@@ -189,11 +189,16 @@ public class NotificationsActivity extends AppCompatActivity {
 
     private void loadNotificationRequests(String uid, List<NotificationItem> existingNotifications) {
         android.util.Log.d(TAG, "Loading notification requests for user: " + uid);
+        android.util.Log.d(TAG, "Current existingNotifications size: " + existingNotifications.size());
+        
         db.collection("notificationRequests")
                 .orderBy("createdAt", Query.Direction.DESCENDING)
                 .limit(100)
                 .get()
                 .addOnSuccessListener(querySnapshot -> {
+                    android.util.Log.d(TAG, "Query success! Found " + querySnapshot.size() + " total notificationRequests documents");
+                    
+                    int matchedCount = 0;
                     for (QueryDocumentSnapshot doc : querySnapshot) {
                         String docId = doc.getId();
                         Object userIdsObj = doc.get("userIds");
@@ -201,6 +206,7 @@ public class NotificationsActivity extends AppCompatActivity {
                         if (userIdsObj instanceof List) {
                             userIds = (List<String>) userIdsObj;
                         } else if (userIdsObj != null) {
+                            android.util.Log.w(TAG, "userIds is not a List for doc " + docId);
                             continue;
                         }
                         
@@ -208,6 +214,7 @@ public class NotificationsActivity extends AppCompatActivity {
                             continue;
                         }
                         
+                        matchedCount++;
                         NotificationItem item = new NotificationItem();
                         item.id = docId;
                         item.title = doc.getString("title");
@@ -219,13 +226,19 @@ public class NotificationsActivity extends AppCompatActivity {
                         item.groupType = doc.getString("groupType");
                         existingNotifications.add(item);
                         loadedNotificationIds.add(item.id);
+                        
+                        android.util.Log.d(TAG, "Added notification: " + item.title + " (created: " + item.createdAt + ")");
                     }
+                    
+                    android.util.Log.d(TAG, "Matched " + matchedCount + " notifications for user " + uid);
+                    android.util.Log.d(TAG, "Total existingNotifications after matching: " + existingNotifications.size());
                     
                     loadInvitationsAsNotifications(uid, existingNotifications);
                 })
                 .addOnFailureListener(e -> {
                     android.util.Log.e(TAG, "Failed to load notifications with orderBy", e);
                     if (e.getMessage() != null && e.getMessage().contains("index")) {
+                        android.util.Log.d(TAG, "Index error detected, falling back to query without orderBy");
                         loadNotificationsWithoutOrderBy(uid, existingNotifications);
                     } else {
                         loadInvitationsAsNotifications(uid, existingNotifications);

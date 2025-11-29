@@ -37,7 +37,7 @@
             android:layout_height="match_parent">
 
             <TextView
-                android:text="You haven’t posted any events yet"
+                android:text="You haven't posted any events yet"
                 android:textColor="#FFFFFFFF"
                 android:textSize="18sp"
                 android:layout_width="wrap_content"

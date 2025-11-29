@@ -155,6 +155,21 @@ public class EventDetailActivity extends AppCompatActivity {
         waitlistCountCard = findViewById(R.id.waitlistCountCard);
         leaveWaitlistCard = findViewById(R.id.leaveWaitlistCard);
 
+        // CRITICAL: Hide ALL action buttons immediately for Previous/Upcoming events (read-only views)
+        // This prevents any flash of buttons before they're hidden
+        if (isPreviousEvent || isUpcomingEvent) {
+            android.util.Log.d("EventDetailActivity", "📖 READ-ONLY MODE - Hiding all action buttons immediately");
+            btnRegister.setVisibility(View.GONE);
+            btnDecline.setVisibility(View.GONE);
+            if (btnOptOut != null) {
+                btnOptOut.setVisibility(View.GONE);
+            }
+            if (btnLeaveWaitlist != null && leaveWaitlistCard != null) {
+                btnLeaveWaitlist.setVisibility(View.GONE);
+                leaveWaitlistCard.setVisibility(View.GONE);
+            }
+        }
+
         // Set up back button
         btnBack.setOnClickListener(v -> finish());
 
@@ -596,6 +611,12 @@ public class EventDetailActivity extends AppCompatActivity {
      * Checks for pending invitations for this event and updates UI accordingly.
      */
     private void checkForPendingInvitation() {
+        // Skip invitation check for Previous/Upcoming events (read-only views)
+        if (isPreviousEvent || isUpcomingEvent) {
+            android.util.Log.d("EventDetailActivity", "Skipping invitation check - read-only view");
+            return;
+        }
+        
         String uid = com.example.eventease.auth.AuthHelper.getUid(this);
         if (uid == null || eventId == null) {
             android.util.Log.w("EventDetailActivity", "Cannot check invitation - uid or eventId is null");
