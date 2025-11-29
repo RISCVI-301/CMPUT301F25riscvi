@@ -4,18 +4,35 @@ import java.util.Date;
 
 /**
  * Represents an invitation sent to an entrant for an event.
- * Tracks invitation status and timing information.
+ *
+ * <p>This class serves as a data model (Data Transfer Object pattern) for event invitations in the
+ * EventEase application. It tracks the lifecycle of invitations sent to users who are on the waitlist
+ * for an event, including their current status (pending, accepted, or declined) and timing information
+ * for expiration handling.</p>
+ *
+ * <p>This class follows the JavaBean pattern with private fields and public getter/setter methods,
+ * and includes a status enumeration to represent the invitation state. The class is used by the
+ * invitation management system to track user responses and manage invitation deadlines.</p>
+ *
+ * <p><b>Role in Application:</b> Central to the waitlist-to-admission workflow. When an organizer
+ * admits users from the waitlist, invitations are created and sent. This class tracks the invitation
+ * status and expiration, enabling automatic processing of expired invitations and user response
+ * handling.</p>
+ *
+ * <p><b>Outstanding Issues:</b> None currently.</p>
  */
 public class Invitation {
     /**
      * Invitation status values.
-     * <ul>
-     *   <li>PENDING - Invitation has been sent but not yet responded to</li>
-     *   <li>ACCEPTED - Invitation has been accepted by the user</li>
-     *   <li>DECLINED - Invitation has been declined by the user</li>
-     * </ul>
      */
-    public enum Status { PENDING, ACCEPTED, DECLINED }
+    public enum Status {
+        /** Invitation has been sent but not yet responded to. */
+        PENDING,
+        /** Invitation has been accepted by the user. */
+        ACCEPTED,
+        /** Invitation has been declined by the user. */
+        DECLINED
+    }
 
     private String id;
     private String eventId;

@@ -4,7 +4,21 @@ import java.util.Date;
 
 /**
  * Represents an admitted entry for an event.
- * Tracks when a user was admitted and when they accepted the invitation.
+ *
+ * <p>This class serves as a data model (Data Transfer Object pattern) for tracking users who have
+ * been admitted to an event. It records both when a user was admitted to the event (moved from
+ * waitlist to admitted status) and when they accepted the invitation, providing a complete
+ * audit trail of the admission process.</p>
+ *
+ * <p>This class follows the JavaBean pattern with private fields and public getter/setter methods.
+ * It is used in conjunction with the {@link Invitation} class to manage the complete lifecycle
+ * from waitlist to admission to acceptance.</p>
+ *
+ * <p><b>Role in Application:</b> Used by the event management system to track which users have
+ * been admitted to events and when they accepted their invitations. This information is used for
+ * event capacity management, attendee lists, and check-in processing.</p>
+ *
+ * <p><b>Outstanding Issues:</b> None currently.</p>
  */
 public class AdmittedEntry {
     private String eventId;
