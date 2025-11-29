@@ -205,7 +205,7 @@ public class AdminProfileDatabaseController {
 
 
     }
-    
+
     private void removeUserFromEventLists(@NonNull String uid) {
         if (uid == null || uid.trim().isEmpty()) {
             Log.w(TAG, "removeUserFromEventLists: UID is null or empty, skipping");
@@ -261,6 +261,4 @@ public class AdminProfileDatabaseController {
                         Log.e(TAG, "removeUserFromEventLists: Failed to load events when cleaning up uid=" + uid, e));
     }
 
-
 }
-
