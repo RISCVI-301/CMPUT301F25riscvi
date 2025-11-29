@@ -255,7 +255,9 @@ public class AdminProfileDatabaseController {
                                                     "/" + uid + " for event " + eventId, e));
                         }
                     }
-                });
+                })
+                .addOnFailureListener(e ->
+                        Log.e(TAG, "removeUserFromEventLists: Failed to load events when cleaning up uid=" + uid, e));
     }
 
 
