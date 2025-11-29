@@ -2,10 +2,10 @@ package com.example.eventease.admin.logs.data;
 
 public class Notification {
     private String notificationTitle, notificationMessage, eventTitle, organizerID;
-    private int createdAt;
+    private long createdAt;
     private String OrganizerName;
 
-    public Notification(int createdAt, String notificationTitle, String notificationMessage, String eventTitle, String organizerID ){
+    public Notification(long createdAt, String notificationTitle, String notificationMessage, String eventTitle, String organizerID ){
         this.createdAt = createdAt;
         this.notificationTitle = notificationTitle;
         this.notificationMessage = notificationMessage;
@@ -14,18 +14,25 @@ public class Notification {
     }
 
     public String getNotificationTitle() {
-        return notificationTitle;
+        return this.notificationTitle;
     }
 
     public String getNotificationMessage() {
-        return notificationMessage;
+        return this.notificationMessage;
     }
 
     public String getEventTitle() {
-        return eventTitle;
+        return this.eventTitle;
     }
 
     public String getOrganizerID() {
-        return organizerID;
+        return this.organizerID;
+    }
+
+    public String getCreatedAt() {
+        long millis = (long) this.createdAt;   // ideally: make createdAt a long
+        java.text.SimpleDateFormat sdf =
+                new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault());
+        return sdf.format(new java.util.Date(millis));
     }
 }
