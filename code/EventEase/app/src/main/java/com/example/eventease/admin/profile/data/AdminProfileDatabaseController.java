@@ -114,7 +114,13 @@ public class AdminProfileDatabaseController {
         }
 
         Log.d(TAG, "Starting deletion of profile: " + uid);
-        
+
+        // If the user is an organizer, delete all of their events first
+        if (profile.getRoles() != null && profile.getRoles().contains("organizer")) {
+            Log.d(TAG, "deleteProfile: User is an organizer, deleting their events. uid=" + uid);
+            deleteOrganizerEvents(uid);
+        }
+
         // Use ProfileDeletionHelper to delete all user references first
         ProfileDeletionHelper deletionHelper = new ProfileDeletionHelper(context);
         deletionHelper.deleteAllUserReferences(uid, new ProfileDeletionHelper.DeletionCallback() {
@@ -132,7 +138,7 @@ public class AdminProfileDatabaseController {
             }
         });
     }
-    
+
     private void deleteUserDocument(@NonNull String uid, @NonNull DeleteCallback callback) {
         DocumentReference userRef = db.collection("users").document(uid);
         userRef.delete()
