@@ -26,9 +26,8 @@
                 android:layout_height="wrap_content"
                 android:text="Set New Accept/Decline Deadline"
                 android:textSize="24sp"
-                android:textStyle="bold"
                 android:textColor="#A7D4D4"
-                android:fontFamily="@font/entrant_fredoka_one"
+                android:textStyle="bold"
                 android:gravity="center"
                 android:paddingBottom="16dp"/>
 
@@ -40,7 +39,7 @@
                 android:text="Please select a new deadline for accept/decline. It must be after the previous deadline and at least 48 hours before the event date."
                 android:textSize="16sp"
                 android:textColor="#A7D4D4"
-                android:fontFamily="@font/entrant_fredoka_one"
+                android:textStyle="bold"
                 android:paddingBottom="20dp"
                 android:gravity="center"/>
 
@@ -53,7 +52,7 @@
                 android:text="Select New Deadline"
                 android:textColor="#A7D4D4"
                 android:textSize="16sp"
-                android:fontFamily="@font/entrant_fredoka_one"
+                android:textStyle="bold"
                 android:layout_marginBottom="16dp"
                 app:backgroundTint="#FFFFFF"
                 app:strokeColor="#A7D4D4"
@@ -86,7 +85,7 @@
                     android:layout_height="wrap_content"
                     android:text="Cancel"
                     android:textColor="#A7D4D4"
-                    android:fontFamily="@font/entrant_fredoka_one"
+                    android:textStyle="bold"
                     android:backgroundTint="#E0E0E0"
                     android:layout_marginEnd="12dp"
                     android:paddingStart="24dp"
@@ -98,7 +97,7 @@
                     android:layout_height="wrap_content"
                     android:text="Confirm"
                     android:textColor="#FFFFFF"
-                    android:fontFamily="@font/entrant_fredoka_one"
+                    android:textStyle="bold"
                     android:backgroundTint="#A7D4D4"
                     android:paddingStart="24dp"
                     android:paddingEnd="24dp"

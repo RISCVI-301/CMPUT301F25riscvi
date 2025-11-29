@@ -60,7 +60,7 @@
                 android:textColor="#2C4A6E"
                 android:gravity="center"
                 android:lineSpacingExtra="4dp"
-                android:fontFamily="@font/entrant_fredoka_one"
+                android:textStyle="bold"
                 android:layout_marginBottom="28dp"
                 android:shadowColor="#40000000"
                 android:shadowDx="0"
@@ -74,10 +74,9 @@
                 android:layout_height="56dp"
                 android:text="Yes, Opt Out"
                 android:textSize="18sp"
-                android:textStyle="bold"
                 android:textColor="#FFFFFF"
                 android:background="@drawable/entrant_button_decline_done"
-                android:fontFamily="@font/entrant_fredoka_one"
+                android:textStyle="bold"
                 android:elevation="8dp"
                 android:layout_marginBottom="12dp"
                 style="@style/Widget.AppCompat.Button.Borderless"/>
@@ -92,7 +91,6 @@
                 android:textStyle="bold"
                 android:textColor="#2C4A6E"
                 android:background="@android:color/transparent"
-                android:fontFamily="@font/entrant_fredoka_one"
                 style="@style/Widget.AppCompat.Button.Borderless"/>
 
         </LinearLayout>

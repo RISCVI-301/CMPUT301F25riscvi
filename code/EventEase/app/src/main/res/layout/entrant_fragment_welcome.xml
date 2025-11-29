@@ -16,7 +16,6 @@
         android:textSize="48sp"
         android:textStyle="bold"
         android:textColor="#FFFFFF"
-        android:fontFamily="@font/entrant_fredoka_one"
         android:layout_marginBottom="32dp"
         android:shadowColor="#80000000"
         android:shadowDx="0"
@@ -70,7 +69,6 @@
                 android:textSize="20sp"
                 android:textStyle="bold"
                 android:textColor="#223C65"
-                android:fontFamily="@font/entrant_fredoka_one"
                 android:layout_marginBottom="16dp"/>
 
 
@@ -85,7 +83,6 @@
                 android:textStyle="bold"
                 android:textColor="#223C65"
                 android:background="@drawable/entrant_btn_welcome_action"
-                android:fontFamily="@font/entrant_fredoka_one"
                 android:elevation="8dp"
                 android:layout_marginBottom="24dp"/>
 
@@ -97,7 +94,6 @@
                 android:textSize="20sp"
                 android:textStyle="bold"
                 android:textColor="#223C65"
-                android:fontFamily="@font/entrant_fredoka_one"
                 android:layout_marginBottom="16dp"/>
 
             <!-- Login Button -->
@@ -111,7 +107,6 @@
                 android:textStyle="bold"
                 android:textColor="#223C65"
                 android:background="@drawable/entrant_btn_welcome_action"
-                android:fontFamily="@font/entrant_fredoka_one"
                 android:elevation="8dp"/>
 
         </LinearLayout>

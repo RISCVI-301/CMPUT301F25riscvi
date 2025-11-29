@@ -35,7 +35,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_centerInParent="true"
-                android:fontFamily="@font/entrant_fredoka_one"
+                android:textStyle="bold"
                 android:text="Notifications"
                 android:textColor="@color/ee_topbar_text"
                 android:textSize="28sp"/>

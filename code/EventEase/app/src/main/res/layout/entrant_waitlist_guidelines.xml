@@ -71,7 +71,7 @@
                     android:id="@+id/tvDialogContent"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:fontFamily="@font/entrant_fredoka_one"
+                    android:textStyle="bold"
                     android:gravity="center"
                     android:lineSpacingExtra="8dp"
                     android:text="@string/waitlist_dialog_message"
@@ -89,10 +89,9 @@
                 android:layout_marginTop="20dp"
                 android:background="@drawable/entrant_button_guidelines_ok"
                 android:elevation="8dp"
-                android:fontFamily="@font/entrant_fredoka_one"
+                android:textStyle="bold"
                 android:text="@string/waitlist_dialog_done"
                 android:textSize="20sp"
-                android:textStyle="bold"
                 android:textColor="#FFFFFF" />
 
         </LinearLayout>
