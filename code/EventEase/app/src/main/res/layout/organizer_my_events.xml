@@ -154,7 +154,7 @@
         android:layout_marginStart="16dp"
         android:layout_marginEnd="16dp"
         android:layout_marginBottom="-28dp"
-        android:backgroundTint="@color/toolbar_button"
+        app:backgroundTint="@color/toolbar_button"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         app:layout_constraintStart_toStartOf="parent"
@@ -166,7 +166,7 @@
         android:id="@+id/bottomBar"
         android:layout_width="0dp"
         android:layout_height="72dp"
-        android:background="@color/toolbar_button"
+        android:background="#E8F5FF"
         android:paddingStart="16dp"
         android:paddingEnd="16dp"
         android:gravity="center_vertical"
@@ -188,10 +188,10 @@
             android:foreground="?attr/selectableItemBackgroundBorderless">
 
             <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:src="@android:drawable/ic_menu_agenda"
-                app:tint="@color/ee_navy_dark" />
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:src="@drawable/entrant_ic_my_events_circle_dark"
+                android:scaleType="fitCenter" />
 
             <TextView
                 android:text="My Events"
@@ -220,10 +220,10 @@
             android:foreground="?attr/selectableItemBackgroundBorderless">
 
             <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:src="@android:drawable/ic_menu_myplaces"
-                app:tint="@color/ee_navy_dark" />
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:src="@drawable/entrant_ic_account_circle_dark"
+                android:scaleType="fitCenter" />
 
             <TextView
                 android:text="Account"
