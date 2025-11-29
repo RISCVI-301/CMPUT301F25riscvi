@@ -205,6 +205,10 @@ public class AdminProfileDatabaseController {
 
     }
 
+    private void removeUserFromEventLists(@NonNull String uid) {
+        
+    }
+
 
 }
 
