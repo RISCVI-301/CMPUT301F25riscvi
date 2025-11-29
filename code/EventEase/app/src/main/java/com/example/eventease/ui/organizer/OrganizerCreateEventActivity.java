@@ -859,6 +859,11 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         // Always generate QR payload for sharing (regardless of QR switch setting)
         String qrPayload = "eventease://event/" + id;
         doc.put("qrPayload", qrPayload);
+        // CRITICAL: Initialize selection tracking fields to false
+        // These fields are required for the Cloud Function to find and process events
+        doc.put("selectionProcessed", false);
+        doc.put("selectionNotificationSent", false);
+        doc.put("sorryNotificationSent", false);
         FirebaseFirestore.getInstance()
                 .collection("events")
                 .document(id)
@@ -867,7 +872,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                     btnSave.setEnabled(true);
                     btnSave.setText("SAVE CHANGES");
                     // Always show QR dialog after creating event
-                    showQrPreparationDialog(title, qrPayload);
+                    showQrPreparationDialog(title, qrPayload, id);
                 })
                 .addOnFailureListener(e -> {
                     Log.e(TAG, "Firestore write failed", e);
@@ -877,7 +882,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                 });
     }
 
-    private void showQrPreparationDialog(String title, String qrPayload) {
+    private void showQrPreparationDialog(String title, String qrPayload, String eventId) {
         Dialog preparingDialog = createCardDialog(R.layout.dialog_event_created);
         TextView subtitle = preparingDialog.findViewById(R.id.tvSubtitle);
         TextView header = preparingDialog.findViewById(R.id.tvTitle);
@@ -891,12 +896,12 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
 
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
             preparingDialog.dismiss();
-            showQrDialog(title, qrPayload);
+            showQrDialog(title, qrPayload, eventId);
         }, 1200);
     }
 
 
-    private void showQrDialog(String title, String qrPayload) {
+    private void showQrDialog(String title, String qrPayload, String eventId) {
         Dialog dialog = createCardDialog(R.layout.dialog_qr_preview);
         TextView titleView = dialog.findViewById(R.id.tvEventTitle);
         ImageView imgQr = dialog.findViewById(R.id.imgQr);
@@ -917,6 +922,19 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                 imgQr.setImageResource(R.drawable.ic_event_poster_placeholder);
             }
         }
+
+        // Flag to prevent double navigation
+        final boolean[] hasNavigated = {false};
+
+        // Helper method to navigate to event page
+        Runnable navigateToEvent = () -> {
+            if (hasNavigated[0]) return; // Prevent double navigation
+            hasNavigated[0] = true;
+            Intent intent = new Intent(OrganizerCreateEventActivity.this, OrganizerWaitlistActivity.class);
+            intent.putExtra("eventId", eventId);
+            startActivity(intent);
+            finish(); // Close the create event activity
+        };
 
         if (btnShare != null) {
             btnShare.setOnClickListener(v -> {
@@ -953,8 +971,14 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         if (btnViewEvents != null) {
             btnViewEvents.setOnClickListener(v -> {
                 dialog.dismiss();
+                navigateToEvent.run();
             });
         }
+
+        // Navigate when dialog is dismissed (e.g., back button)
+        dialog.setOnDismissListener(d -> {
+            navigateToEvent.run();
+        });
 
         dialog.show();
     }

@@ -118,6 +118,11 @@ public class Event implements Serializable {
         m.put("createdAtEpochMs", createdAtEpochMs);
         m.put("qrPayload", qrPayload);
         m.put("interests", interests != null ? interests : new ArrayList<>());
+        // CRITICAL: Initialize selection tracking fields to false
+        // These fields are required for the Cloud Function to find and process events
+        m.put("selectionProcessed", false);
+        m.put("selectionNotificationSent", false);
+        m.put("sorryNotificationSent", false);
         return m;
     }
     

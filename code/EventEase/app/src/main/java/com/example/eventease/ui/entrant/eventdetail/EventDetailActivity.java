@@ -169,18 +169,17 @@ public class EventDetailActivity extends AppCompatActivity {
             declineInvitation();
         });
 
-        // Set up opt-out button
+        // Set up opt-out button (leave waitlist button removed - using only opt-out)
         if (btnOptOut != null) {
             btnOptOut.setOnClickListener(v -> {
                 showOptOutDialog();
             });
         }
 
-        // Set up leave waitlist button
-        if (btnLeaveWaitlist != null) {
-            btnLeaveWaitlist.setOnClickListener(v -> {
-                performOptOut(); // Reuse the opt-out functionality
-            });
+        // Hide leave waitlist button - using only opt-out button
+        if (btnLeaveWaitlist != null && leaveWaitlistCard != null) {
+            btnLeaveWaitlist.setVisibility(View.GONE);
+            leaveWaitlistCard.setVisibility(View.GONE);
         }
 
         // Check for invitation in real-time (in case it wasn't passed in Intent)
@@ -663,6 +662,7 @@ public class EventDetailActivity extends AppCompatActivity {
             if (btnOptOut != null) {
                 btnOptOut.setVisibility(View.GONE);
             }
+            // Leave waitlist button is always hidden (removed duplicate)
             if (btnLeaveWaitlist != null && leaveWaitlistCard != null) {
                 btnLeaveWaitlist.setVisibility(View.GONE);
                 leaveWaitlistCard.setVisibility(View.GONE);
@@ -683,9 +683,10 @@ public class EventDetailActivity extends AppCompatActivity {
             if (btnOptOut != null) {
                 btnOptOut.setVisibility(View.VISIBLE);
             }
+            // Leave waitlist button is always hidden (removed duplicate - using only opt-out)
             if (btnLeaveWaitlist != null && leaveWaitlistCard != null) {
-                btnLeaveWaitlist.setVisibility(View.VISIBLE);
-                leaveWaitlistCard.setVisibility(View.VISIBLE);
+                btnLeaveWaitlist.setVisibility(View.GONE);
+                leaveWaitlistCard.setVisibility(View.GONE);
             }
             
             this.invitationId = null;

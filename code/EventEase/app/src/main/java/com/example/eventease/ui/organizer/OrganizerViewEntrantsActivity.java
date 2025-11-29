@@ -525,6 +525,13 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
             Toast.makeText(this, "Event ID not found", Toast.LENGTH_SHORT).show();
             return;
         }
+        String name = data != null && data.get("name") != null ? String.valueOf(data.get("name")) : "(unknown)";
+        Log.d(TAG, "ENTRANT_MOVE: eventId=" + eventId +
+                ", userId=" + userId +
+                ", name=" + name +
+                ", from=SelectedEntrants" +
+                ", to=CancelledEntrants" +
+                ", reason=organizer_selected_to_cancelled");
         db.collection("events").document(eventId)
                 .collection("AdmittedEntrants").document(userId).delete();
         Map<String, Object> payload = data != null ? new HashMap<>(data) : new HashMap<>();
@@ -537,6 +544,13 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
             Toast.makeText(this, "Event ID not found", Toast.LENGTH_SHORT).show();
             return;
         }
+        String name = data != null && data.get("name") != null ? String.valueOf(data.get("name")) : "(unknown)";
+        Log.d(TAG, "ENTRANT_MOVE: eventId=" + eventId +
+                ", userId=" + userId +
+                ", name=" + name +
+                ", from=SelectedEntrants" +
+                ", to=NonSelectedEntrants" +
+                ", reason=organizer_selected_to_not_selected");
         db.collection("events").document(eventId)
                 .collection("AdmittedEntrants").document(userId).delete();
         Map<String, Object> payload = data != null ? new HashMap<>(data) : new HashMap<>();
@@ -1489,7 +1503,24 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
             batch.delete(fromRef);
         }
 
-        Log.d(TAG, "Moving entrant " + userId + " from " + fromCollection + " to " + toCollection);
+        // Try to resolve a human-readable name
+        String displayName = null;
+        if (entrantData != null) {
+            Object nameObj = entrantData.get("name");
+            if (nameObj instanceof String && !((String) nameObj).trim().isEmpty()) {
+                displayName = ((String) nameObj).trim();
+            }
+        }
+        if (displayName == null) {
+            displayName = "(unknown)";
+        }
+
+        Log.d(TAG, "ENTRANT_MOVE: eventId=" + eventId +
+                ", userId=" + userId +
+                ", name=" + displayName +
+                ", from=" + fromCollection +
+                ", to=" + toCollection +
+                ", reason=organizer_manual_move_or_system_call");
 
         batch.commit()
                 .addOnSuccessListener(aVoid -> {

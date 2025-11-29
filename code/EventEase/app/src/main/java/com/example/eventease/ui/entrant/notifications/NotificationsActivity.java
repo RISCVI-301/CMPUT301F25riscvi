@@ -9,8 +9,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import com.example.eventease.R;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
+import com.example.eventease.auth.DeviceAuthManager;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
@@ -34,7 +33,7 @@ public class NotificationsActivity extends AppCompatActivity {
     private View emptyView;
     private NotificationsAdapter adapter;
     private FirebaseFirestore db;
-    private FirebaseAuth mAuth;
+    private DeviceAuthManager authManager;
     private ListenerRegistration notificationListener;
     private Set<String> loadedNotificationIds = new HashSet<>();
     private boolean isFirstLoad = true;
@@ -47,7 +46,7 @@ public class NotificationsActivity extends AppCompatActivity {
         setContentView(R.layout.entrant_activity_notifications);
 
         db = FirebaseFirestore.getInstance();
-        mAuth = FirebaseAuth.getInstance();
+        authManager = new DeviceAuthManager(this);
         
         SharedPreferences prefs = getSharedPreferences("EventEasePrefs", Context.MODE_PRIVATE);
         lastSeenTime = prefs.getLong("lastNotificationSeenTime", 0);
@@ -97,12 +96,10 @@ public class NotificationsActivity extends AppCompatActivity {
             return;
         }
 
-        FirebaseUser currentUser = mAuth.getCurrentUser();
-        if (currentUser == null) {
+        String uid = authManager.getUid();
+        if (uid == null || uid.isEmpty()) {
             return;
         }
-
-        String uid = currentUser.getUid();
 
         notificationListener = db.collection("notificationRequests")
                 .addSnapshotListener((querySnapshot, e) -> {
@@ -165,13 +162,12 @@ public class NotificationsActivity extends AppCompatActivity {
     }
 
     private void loadNotifications() {
-        FirebaseUser currentUser = mAuth.getCurrentUser();
-        if (currentUser == null) {
+        String uid = authManager.getUid();
+        if (uid == null || uid.isEmpty()) {
             showEmpty();
             return;
         }
 
-        String uid = currentUser.getUid();
         setLoading(true);
 
         loadNotificationRequests(uid, new ArrayList<>());
