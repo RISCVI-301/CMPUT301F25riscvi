@@ -62,6 +62,7 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
     private ProgressBar progressBar;
     private ImageButton shareButton;
     private Button waitlistButton;
+    private androidx.cardview.widget.CardView waitlistCard;
     private String guidelinesBody;
 
     private ListenerRegistration eventRegistration;
@@ -129,6 +130,7 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
         contentContainer = findViewById(R.id.eventDetailContent);
         shareButton = findViewById(R.id.btnShare);
         waitlistButton = findViewById(R.id.waitlist_join);
+        waitlistCard = findViewById(R.id.waitlistCard);
         Button guidelinesButton = findViewById(R.id.btnGuidelines);
         ImageButton backButton = findViewById(R.id.btnBack);
 
@@ -582,17 +584,32 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
         if (isUserInWaitlist) {
             waitlistButton.setText("Opt Out");
             waitlistButton.setEnabled(true);
+            // Change CardView background to red and text to white for Opt Out
+            if (waitlistCard != null) {
+                waitlistCard.setCardBackgroundColor(android.graphics.Color.parseColor("#E57373"));
+            }
+            waitlistButton.setTextColor(android.graphics.Color.WHITE);
         } else {
             // Check if capacity is full
             boolean isCapacityFull = isCapacityFull();
             if (isCapacityFull) {
                 waitlistButton.setText("Capacity Full");
                 waitlistButton.setEnabled(false);
+                // Keep blue color for disabled state
+                if (waitlistCard != null) {
+                    waitlistCard.setCardBackgroundColor(android.graphics.Color.parseColor("#7FDBDA"));
+                }
+                waitlistButton.setTextColor(android.graphics.Color.parseColor("#2C4A6E"));
             } else {
                 // Check if registration period has ended or other restrictions
                 boolean canJoin = canJoinWaitlist();
                 waitlistButton.setText("Join Waitlist");
                 waitlistButton.setEnabled(canJoin);
+                // Change CardView background to blue for Join Waitlist
+                if (waitlistCard != null) {
+                    waitlistCard.setCardBackgroundColor(android.graphics.Color.parseColor("#7FDBDA"));
+                }
+                waitlistButton.setTextColor(android.graphics.Color.parseColor("#2C4A6E"));
             }
         }
     }

@@ -56,7 +56,15 @@ public class NotificationsActivity extends AppCompatActivity {
 
         ImageButton btnBack = findViewById(R.id.btnBack);
         if (btnBack != null) {
-            btnBack.setOnClickListener(v -> finish());
+            btnBack.setOnClickListener(v -> {
+                android.util.Log.d(TAG, "Back button clicked");
+                finish();
+            });
+            // Ensure the button is clickable
+            btnBack.setClickable(true);
+            btnBack.setFocusable(true);
+        } else {
+            android.util.Log.e(TAG, "Back button not found in layout");
         }
 
         recyclerView = findViewById(R.id.notificationsRecyclerView);
@@ -89,6 +97,12 @@ public class NotificationsActivity extends AppCompatActivity {
             notificationListener.remove();
             notificationListener = null;
         }
+    }
+    
+    @Override
+    public void onBackPressed() {
+        super.onBackPressed();
+        finish();
     }
 
     private void setupRealtimeListener() {

@@ -45,15 +45,7 @@ public class OrganizerAccountActivity extends AppCompatActivity {
     private String organizerId;
     private boolean isResolvingOrganizerId;
     private String userEmail;
-
-    /**
-     * Handles the result of the image picker to select a new avatar.
-     * On selection, triggers the upload process.
-     */
-    private final androidx.activity.result.ActivityResultLauncher<String> pickImage =
-            registerForActivityResult(new ActivityResultContracts.GetContent(), uri -> {
-                if (uri != null) uploadNewAvatar(uri);
-            });
+    private com.google.firebase.firestore.ListenerRegistration profileListener;
     /**
      * Initializes the activity, view components, and loads the organizer's profile data.
      * @param savedInstanceState If the activity is being re-initialized, this Bundle contains the most recent data.
@@ -87,22 +79,54 @@ public class OrganizerAccountActivity extends AppCompatActivity {
         }
 
         loadProfile(userId);
+        setupProfileListener(userId);
         resolveOrganizerId(null);
 
-        ivAvatar.setOnClickListener(v -> pickImage.launch("image/*"));
+        // Remove click listener from avatar - profile picture editing is done in edit profile screen
+        // ivAvatar.setOnClickListener(v -> pickImage.launch("image/*"));
 
         if (btnEditProfile != null) {
-            btnEditProfile.setOnClickListener(v ->
-                    new MaterialAlertDialogBuilder(this)
-                            .setMessage("Open Edit Profile screen?")
-                            .setPositiveButton("Yes", (d, w) -> {
-                            })
-                            .setNegativeButton("Cancel", null)
-                            .show()
-            );
+            btnEditProfile.setOnClickListener(v -> {
+                // Navigate to edit profile activity
+                Intent intent = new Intent(this, OrganizerEditProfileActivity.class);
+                startActivity(intent);
+            });
         }
 
         setupBottomNavigation();
+    }
+    
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (profileListener != null) {
+            profileListener.remove();
+            profileListener = null;
+        }
+    }
+    
+    /**
+     * Sets up a real-time listener for profile changes so the UI updates automatically
+     * when the profile picture is changed from another view.
+     */
+    private void setupProfileListener(String userId) {
+        if (userId == null || userId.isEmpty()) {
+            return;
+        }
+        
+        profileListener = FirebaseFirestore.getInstance()
+                .collection("users")
+                .document(userId)
+                .addSnapshotListener((snapshot, error) -> {
+                    if (error != null) {
+                        Log.e(TAG, "Profile listener error", error);
+                        return;
+                    }
+                    
+                    if (snapshot != null && snapshot.exists()) {
+                        applyProfileFromDoc(snapshot);
+                    }
+                });
     }
 
     private void resolveOrganizerId(@Nullable Runnable onReady) {
@@ -247,8 +271,17 @@ public class OrganizerAccountActivity extends AppCompatActivity {
         tvFullName.setText((name != null && !name.isEmpty()) ? name : "Organizer");
 
         if (photoUrl != null && !photoUrl.isEmpty()) {
-            Glide.with(this).load(photoUrl).circleCrop().into(ivAvatar);
+            // Clear any existing image first
+            Glide.with(this).clear(ivAvatar);
+            // Load the image
+            Glide.with(this)
+                .load(photoUrl)
+                .skipMemoryCache(false) // Allow memory cache for performance
+                .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.ALL) // Cache on disk
+                .circleCrop()
+                .into(ivAvatar);
         } else {
+            Glide.with(this).clear(ivAvatar);
             Glide.with(this).load(R.drawable.entrant_icon).circleCrop().into(ivAvatar);
         }
 
@@ -256,7 +289,8 @@ public class OrganizerAccountActivity extends AppCompatActivity {
     }
     /**
      * Uploads a new avatar image to Firebase Storage and updates the URL
-     * in the user's Firestore document.
+     * in the user's Firestore document. Uses the same storage path and pattern
+     * as the entrant view to ensure consistency across both views.
      *
      * @param uri The local URI of the image to be uploaded.
      */
@@ -267,36 +301,273 @@ public class OrganizerAccountActivity extends AppCompatActivity {
             return;
         }
 
-        if (organizerId == null || organizerId.trim().isEmpty()) {
-            Toast.makeText(this, "Organizer profile not ready", Toast.LENGTH_SHORT).show();
-            resolveOrganizerId(() -> uploadNewAvatar(uri));
+        // Ensure we're authenticated for Storage upload
+        FirebaseAuth.getInstance().signInAnonymously()
+            .addOnSuccessListener(authResult -> {
+                // Use the same storage path and naming pattern as entrant view
+                StorageReference ref = FirebaseStorage.getInstance()
+                        .getReference("profile_pictures")
+                        .child(userId + "_" + System.currentTimeMillis() + ".jpg");
+
+                ref.putFile(uri)
+                        .continueWithTask(task -> {
+                            if (!task.isSuccessful()) throw task.getException();
+                            return ref.getDownloadUrl();
+                        })
+                        .addOnSuccessListener(download -> {
+                            Map<String, Object> update = new HashMap<>();
+                            update.put("photoUrl", download.toString());
+                            update.put("updatedAt", System.currentTimeMillis());
+                            
+                            // Update the user document (same document used by entrant view)
+                            FirebaseFirestore.getInstance().collection("users")
+                                    .document(userId)
+                                    .set(update, com.google.firebase.firestore.SetOptions.merge())
+                                .addOnSuccessListener(v -> {
+                                    String newPhotoUrl = download.toString();
+                                    
+                                    // Clear Glide cache for the old image if it exists
+                                    if (ivAvatar != null) {
+                                        Glide.with(this).clear(ivAvatar);
+                                    }
+                                    
+                                    // Update the avatar immediately with cache busting using signature
+                                    if (ivAvatar != null) {
+                                        com.bumptech.glide.request.RequestOptions options = 
+                                            new com.bumptech.glide.request.RequestOptions()
+                                                .signature(new com.bumptech.glide.signature.ObjectKey(System.currentTimeMillis()))
+                                                .circleCrop();
+                                        
+                                        Glide.with(this)
+                                            .load(newPhotoUrl)
+                                            .apply(options)
+                                            .into(ivAvatar);
+                                    }
+                                    
+                                    // Reload profile to ensure UI is updated (this will also update via listener)
+                                    loadProfile(userId);
+                                    
+                                    Toast.makeText(this, "Profile photo updated", Toast.LENGTH_SHORT).show();
+                                    
+                                    // Update event subcollections to keep entrant data in sync
+                                    updateEventSubcollections(userId);
+                                })
+                                .addOnFailureListener(e -> {
+                                    Log.e(TAG, "Failed to save photoUrl to Firestore", e);
+                                    Toast.makeText(this, "Save URL failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                                });
+                        })
+                        .addOnFailureListener(e -> {
+                            Log.e(TAG, "Failed to upload image", e);
+                            Toast.makeText(this, "Upload failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                        });
+            })
+            .addOnFailureListener(e -> {
+                Log.e(TAG, "Failed to sign in anonymously for upload", e);
+                Toast.makeText(this, "Authentication failed. Please try again.", Toast.LENGTH_SHORT).show();
+            });
+    }
+    
+    /**
+     * Updates all event subcollections where this user appears as an entrant.
+     * This ensures that when a user updates their profile from organizer view,
+     * all event-specific entrant documents are also updated with the latest information.
+     * 
+     * @param uid the user ID
+     */
+    private void updateEventSubcollections(String uid) {
+        // Get the updated user document
+        FirebaseFirestore.getInstance().collection("users").document(uid).get()
+            .addOnSuccessListener(userDoc -> {
+                if (userDoc == null || !userDoc.exists()) {
+                    return;
+                }
+                
+                // Build the updated entrant data from the user document
+                Map<String, Object> updatedEntrantData = buildEntrantDataFromUser(userDoc);
+                
+                // List of subcollection names to check
+                String[] subcollections = {
+                    "WaitlistedEntrants",
+                    "SelectedEntrants",
+                    "NonSelectedEntrants",
+                    "CancelledEntrants"
+                };
+                
+                // Query all events once
+                FirebaseFirestore.getInstance().collection("events").get()
+                    .addOnSuccessListener(eventsSnapshot -> {
+                        if (eventsSnapshot == null || eventsSnapshot.isEmpty()) {
+                            return;
+                        }
+                        
+                        // Collect all entrant document references across all events and subcollections
+                        java.util.List<DocumentReference> allEntrantRefs = new java.util.ArrayList<>();
+                        
+                        for (DocumentSnapshot eventDoc : eventsSnapshot.getDocuments()) {
+                            String eventId = eventDoc.getId();
+                            DocumentReference eventRef = FirebaseFirestore.getInstance()
+                                    .collection("events").document(eventId);
+                            
+                            // Check each subcollection for this event
+                            for (String subcollectionName : subcollections) {
+                                DocumentReference entrantRef = eventRef
+                                    .collection(subcollectionName)
+                                    .document(uid);
+                                allEntrantRefs.add(entrantRef);
+                            }
+                        }
+                        
+                        // Check which documents exist and update them
+                        checkAndUpdateEntrantDocuments(allEntrantRefs, updatedEntrantData);
+                    })
+                    .addOnFailureListener(e -> {
+                        Log.e(TAG, "Failed to query events for subcollection update", e);
+                    });
+            })
+            .addOnFailureListener(e -> {
+                Log.e(TAG, "Failed to get user document for subcollection update", e);
+            });
+    }
+    
+    /**
+     * Checks which entrant documents exist and updates them in batches.
+     * 
+     * @param entrantRefs list of document references to check and update
+     * @param updatedData the data to update with
+     */
+    private void checkAndUpdateEntrantDocuments(java.util.List<DocumentReference> entrantRefs, 
+                                                Map<String, Object> updatedData) {
+        if (entrantRefs.isEmpty()) {
             return;
         }
         
-        StorageReference ref = FirebaseStorage.getInstance()
-                .getReference("profilePhotos/" + organizerId + ".jpg");
-
-        ref.putFile(uri)
-                .continueWithTask(task -> {
-                    if (!task.isSuccessful()) throw task.getException();
-                    return ref.getDownloadUrl();
+        // Check each document and collect those that exist
+        java.util.List<DocumentReference> existingRefs = new java.util.ArrayList<>();
+        final int[] checkedCount = {0};
+        final int totalCount = entrantRefs.size();
+        
+        for (DocumentReference ref : entrantRefs) {
+            ref.get()
+                .addOnSuccessListener(doc -> {
+                    if (doc != null && doc.exists()) {
+                        existingRefs.add(ref);
+                    }
+                    checkedCount[0]++;
+                    
+                    // Once all documents are checked, update them in batches
+                    if (checkedCount[0] >= totalCount) {
+                        updateDocumentsInBatches(existingRefs, updatedData);
+                    }
                 })
-                .addOnSuccessListener(download -> {
-                    Map<String, Object> update = new HashMap<>();
-                    update.put("photoUrl", download.toString());
-                    FirebaseFirestore.getInstance().collection("users")
-                            .document(organizerId)
-                            .set(update, com.google.firebase.firestore.SetOptions.merge())
-                        .addOnSuccessListener(v -> {
-                            if (ivAvatar != null)
-                                Glide.with(this).load(download).circleCrop().into(ivAvatar);
-                            Toast.makeText(this, "Profile photo updated", Toast.LENGTH_SHORT).show();
-                        })
-                        .addOnFailureListener(e ->
-                                Toast.makeText(this, "Save URL failed: " + e.getMessage(), Toast.LENGTH_LONG).show());
+                .addOnFailureListener(e -> {
+                    Log.w(TAG, "Failed to check entrant document", e);
+                    checkedCount[0]++;
+                    if (checkedCount[0] >= totalCount) {
+                        updateDocumentsInBatches(existingRefs, updatedData);
+                    }
+                });
+        }
+    }
+    
+    /**
+     * Updates documents in batches to avoid exceeding Firestore limits.
+     * 
+     * @param refs list of document references to update
+     * @param updatedData the data to update with
+     */
+    private void updateDocumentsInBatches(java.util.List<DocumentReference> refs,
+                                         Map<String, Object> updatedData) {
+        if (refs.isEmpty()) {
+            Log.d(TAG, "No entrant documents found to update");
+            return;
+        }
+        
+        final int MAX_BATCH_SIZE = 500; // Firestore batch limit
+        final int totalToUpdate = refs.size();
+        int batchCount = 0;
+        com.google.firebase.firestore.WriteBatch batch = FirebaseFirestore.getInstance().batch();
+        
+        for (DocumentReference ref : refs) {
+            // Use merge to preserve fields like joinedAt
+            batch.set(ref, updatedData, com.google.firebase.firestore.SetOptions.merge());
+            batchCount++;
+            
+            // Commit batch if it's getting large
+            if (batchCount >= MAX_BATCH_SIZE) {
+                final com.google.firebase.firestore.WriteBatch currentBatch = batch;
+                final int currentBatchCount = batchCount;
+                currentBatch.commit()
+                    .addOnSuccessListener(aVoid -> {
+                        Log.d(TAG, "Updated batch of " + currentBatchCount + " entrant documents");
+                    })
+                    .addOnFailureListener(e -> {
+                        Log.e(TAG, "Failed to update batch of entrant documents", e);
+                    });
+                batch = FirebaseFirestore.getInstance().batch();
+                batchCount = 0;
+            }
+        }
+        
+        // Commit any remaining updates
+        if (batchCount > 0) {
+            final int finalBatchCount = batchCount;
+            batch.commit()
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "Updated final batch of " + finalBatchCount + " entrant documents. " +
+                        "Total updated: " + totalToUpdate);
                 })
-                .addOnFailureListener(e ->
-                        Toast.makeText(this, "Upload failed: " + e.getMessage(), Toast.LENGTH_LONG).show());
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to update final batch of entrant documents", e);
+                });
+        } else if (totalToUpdate > 0) {
+            Log.d(TAG, "Total entrant documents updated: " + totalToUpdate);
+        }
+    }
+    
+    /**
+     * Builds entrant data map from a user document snapshot.
+     * This replicates the structure used in buildWaitlistEntry.
+     * 
+     * @param userDoc the user document snapshot
+     * @return a map containing the entrant data
+     */
+    private Map<String, Object> buildEntrantDataFromUser(DocumentSnapshot userDoc) {
+        Map<String, Object> data = new HashMap<>();
+        String uid = userDoc.getId();
+        data.put("userId", uid);
+        
+        // Compute displayName from available name fields
+        String displayName = userDoc.getString("fullName");
+        if (displayName == null || displayName.trim().isEmpty()) {
+            displayName = userDoc.getString("name");
+        }
+        if (displayName == null || displayName.trim().isEmpty()) {
+            String first = userDoc.getString("firstName");
+            String last = userDoc.getString("lastName");
+            displayName = ((first != null ? first : "") + " " + (last != null ? last : "")).trim();
+        }
+        
+        // Add all relevant fields
+        putIfString(data, "displayName", displayName);
+        putIfString(data, "fullName", userDoc.getString("fullName"));
+        putIfString(data, "name", userDoc.getString("name"));
+        putIfString(data, "firstName", userDoc.getString("firstName"));
+        putIfString(data, "lastName", userDoc.getString("lastName"));
+        putIfString(data, "email", userDoc.getString("email"));
+        putIfString(data, "phoneNumber", userDoc.getString("phoneNumber"));
+        putIfString(data, "photoUrl", userDoc.getString("photoUrl"));
+        
+        return data;
+    }
+    
+    /**
+     * Helper method to add a string value to a map only if it's not null or empty.
+     */
+    private void putIfString(Map<String, Object> target, String key, String value) {
+        if (value != null && !value.trim().isEmpty()) {
+            target.put(key, value);
+        }
     }
 
     private void deleteProfile() {
