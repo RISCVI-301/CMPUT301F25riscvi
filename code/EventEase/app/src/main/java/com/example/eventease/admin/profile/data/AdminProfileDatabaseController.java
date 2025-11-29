@@ -210,6 +210,52 @@ public class AdminProfileDatabaseController {
             Log.w(TAG, "removeUserFromEventLists: UID is null or empty, skipping");
             return;
         }
+        db.collection("events")
+                .get()
+                .addOnSuccessListener((QuerySnapshot qs) -> {
+                    if (qs == null || qs.isEmpty()) {
+                        Log.d(TAG, "removeUserFromEventLists: No events found when cleaning up uid=" + uid);
+                        return;
+                    }
+
+                    String[] entrantCollections = new String[] {
+                            "WaitlistedEntrants",
+                            "SelectedEntrants",
+                            "NonSelectedEntrants",
+                            "CancelledEntrants",
+                            "AdmittedEntrants"
+                    };
+
+                    for (DocumentSnapshot eventDoc : qs.getDocuments()) {
+                        final String eventId = eventDoc.getId();
+                        DocumentReference eventRef = eventDoc.getReference();
+
+                        // Remove from any array fields on the event document (no-op if they don't exist)
+                        eventRef.update(
+                                        "waitlist", FieldValue.arrayRemove(uid),
+                                        "admitted", FieldValue.arrayRemove(uid)
+                                )
+                                .addOnSuccessListener(aVoid ->
+                                        Log.d(TAG, "removeUserFromEventLists: Removed uid " + uid +
+                                                " from arrays for event " + eventId))
+                                .addOnFailureListener(e ->
+                                        Log.w(TAG, "removeUserFromEventLists: Failed to update arrays for event "
+                                                + eventId + " and uid " + uid, e));
+
+                        // Remove documents from entrant subcollections (if they exist)
+                        for (String subPath : entrantCollections) {
+                            eventRef.collection(subPath)
+                                    .document(uid)
+                                    .delete()
+                                    .addOnSuccessListener(aVoid ->
+                                            Log.d(TAG, "removeUserFromEventLists: Deleted " + subPath + "/" + uid +
+                                                    " for event " + eventId))
+                                    .addOnFailureListener(e ->
+                                            Log.w(TAG, "removeUserFromEventLists: Failed to delete " + subPath +
+                                                    "/" + uid + " for event " + eventId, e));
+                        }
+                    }
+                });
     }
 
 
