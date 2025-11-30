@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="72dp"
+    android:background="#A7D4D4"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp">
+
+    <!-- EventEase Title -->
+    <TextView
+        android:id="@+id/tvTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:text="EventEase"
+        android:textStyle="bold"
+        android:textSize="32sp"
+        android:textColor="@color/header_text_green"/>
+
+    <!-- Admin label (replaces logout button, no click) -->
+    <TextView
+        android:id="@+id/adminLogoutButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentEnd="true"
+        android:layout_centerVertical="true"
+        android:text="Admin"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:textColor="#1A2C44" />
+
+</RelativeLayout>
+

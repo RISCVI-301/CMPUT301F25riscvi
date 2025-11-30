@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#223C65"
+    android:fitsSystemWindows="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+    <!-- Top Bar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="16dp"
+        android:paddingTop="24dp"
+        android:gravity="center_vertical"
+        android:background="#A7D4D4">
+
+        <ImageButton
+            android:id="@+id/backButton"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:minWidth="48dp"
+            android:minHeight="48dp"
+            android:src="@drawable/entrant_ic_back_arrow"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            app:tint="#223C65"
+            android:contentDescription="Back"
+            android:clickable="true"
+            android:focusable="true"
+            android:padding="8dp"/>
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Edit Profile"
+            android:textSize="32sp"
+            android:textColor="#223C65"
+            android:textStyle="bold"
+            android:gravity="center"/>
+
+        <Space
+            android:layout_width="32dp"
+            android:layout_height="32dp"/>
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="24dp"
+            android:paddingTop="8dp">
+
+            <!-- Profile Picture -->
+            <FrameLayout
+                android:layout_width="120dp"
+                android:layout_height="120dp"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginBottom="32dp">
+
+                <com.google.android.material.imageview.ShapeableImageView
+                    android:id="@+id/profileImageEdit"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="centerCrop"
+                    app:shapeAppearanceOverlay="@style/CircularImageView"
+                    android:src="@drawable/entrant_icon"/>
+
+                <ImageView
+                    android:id="@+id/editProfilePicture"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:src="@drawable/entrant_edit_pencil"
+                    android:background="@drawable/entrant_ellipse"
+                    android:padding="6dp"
+                    android:layout_gravity="bottom|end"/>
+            </FrameLayout>
+
+            <!-- Name Input -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Name"
+                android:textSize="24sp"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold"
+                android:layout_marginBottom="8dp"/>
+
+            <EditText
+                android:id="@+id/editNameField"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/entrant_edit_text_background"
+                android:padding="16dp"
+                android:textSize="18sp"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#80FFFFFF"
+                android:layout_marginBottom="24dp"/>
+
+            <!-- Phone Number Input -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Phone No."
+                android:textSize="24sp"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold"
+                android:layout_marginBottom="8dp"/>
+
+            <EditText
+                android:id="@+id/editPhoneField"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/entrant_edit_text_background"
+                android:padding="16dp"
+                android:textSize="18sp"
+                android:inputType="phone"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#80FFFFFF"
+                android:layout_marginBottom="32dp"/>
+
+            <!-- Save Button -->
+            <androidx.cardview.widget.CardView
+                android:id="@+id/saveButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardCornerRadius="16dp"
+                app:cardBackgroundColor="#A7D4D4"
+                android:elevation="8dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Save Changes"
+                    android:textSize="24sp"
+                    android:textColor="#223C65"
+                    android:textStyle="bold"
+                    android:gravity="center"
+                    android:padding="16dp"/>
+            </androidx.cardview.widget.CardView>
+        </LinearLayout>
+    </ScrollView>
+    </LinearLayout>
+</androidx.coordinatorlayout.widget.CoordinatorLayout>
+

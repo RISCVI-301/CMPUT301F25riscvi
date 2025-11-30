@@ -6,7 +6,6 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 
 import com.example.eventease.ui.entrant.profile.ProfileDeletionHelper;
-import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -20,7 +19,6 @@ public class AdminProfileDatabaseController {
 
     private static final String TAG = "AdminProfileDB";
     private final FirebaseFirestore db = FirebaseFirestore.getInstance();
-    private final FirebaseAuth auth = FirebaseAuth.getInstance();
 
     public interface ProfilesCallback {
         void onLoaded(@NonNull List<UserProfile> profiles);
@@ -33,13 +31,7 @@ public class AdminProfileDatabaseController {
     }
 
     public void fetchProfiles(@NonNull final ProfilesCallback cb) {
-        if (auth.getCurrentUser() == null) {
-            Log.e(TAG, "fetchProfiles: User is not authenticated");
-            cb.onError(new IllegalStateException("Not authenticated"));
-            return;
-        }
-
-        // Use UserRoleChecker to verify admin role (more reliable)
+        // Use UserRoleChecker to verify admin role
         com.example.eventease.auth.UserRoleChecker.isAdmin()
                 .addOnCompleteListener(task -> {
                     if (!task.isSuccessful()) {

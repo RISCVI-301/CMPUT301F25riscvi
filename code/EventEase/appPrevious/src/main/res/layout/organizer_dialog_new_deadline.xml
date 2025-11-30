@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#80000000">
+
+    <androidx.cardview.widget.CardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="32dp"
+        android:layout_gravity="center"
+        app:cardCornerRadius="20dp"
+        app:cardElevation="24dp"
+        android:backgroundTint="#FFFFFF">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="24dp">
+
+            <!-- Title -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Set New Accept/Decline Deadline"
+                android:textSize="24sp"
+                android:textColor="#A7D4D4"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:paddingBottom="16dp"/>
+
+            <!-- Message -->
+            <TextView
+                android:id="@+id/tvDeadlineMessage"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Please select a new deadline for accept/decline. It must be after the previous deadline and at least 48 hours before the event date."
+                android:textSize="16sp"
+                android:textColor="#A7D4D4"
+                android:textStyle="bold"
+                android:paddingBottom="20dp"
+                android:gravity="center"/>
+
+            <!-- Date Button -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnSelectNewDeadline"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:text="Select New Deadline"
+                android:textColor="#A7D4D4"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="16dp"
+                app:backgroundTint="#FFFFFF"
+                app:strokeColor="#A7D4D4"
+                app:strokeWidth="2dp"
+                app:rippleColor="#A7D4D4"
+                app:cornerRadius="12dp"/>
+
+            <!-- Selected Deadline Display -->
+            <TextView
+                android:id="@+id/tvSelectedDeadline"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="No deadline selected"
+                android:textSize="14sp"
+                android:textColor="#666666"
+                android:gravity="center"
+                android:paddingBottom="20dp"
+                android:visibility="gone"/>
+
+            <!-- Buttons Row -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="end">
+
+                <Button
+                    android:id="@+id/btnCancelDeadline"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Cancel"
+                    android:textColor="#A7D4D4"
+                    android:textStyle="bold"
+                    android:backgroundTint="#E0E0E0"
+                    android:layout_marginEnd="12dp"
+                    android:paddingStart="24dp"
+                    android:paddingEnd="24dp"/>
+
+                <Button
+                    android:id="@+id/btnConfirmDeadline"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Confirm"
+                    android:textColor="#FFFFFF"
+                    android:textStyle="bold"
+                    android:backgroundTint="#A7D4D4"
+                    android:paddingStart="24dp"
+                    android:paddingEnd="24dp"
+                    android:enabled="false"/>
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </androidx.cardview.widget.CardView>
+
+</FrameLayout>
+

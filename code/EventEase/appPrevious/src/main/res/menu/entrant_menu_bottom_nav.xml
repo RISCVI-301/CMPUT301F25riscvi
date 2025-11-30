@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/eventsSelectionFragment"
+        android:icon="@drawable/entrant_sel_ic_my_events"
+        android:title="My Events"/>
+    <item
+        android:id="@+id/discoverFragment"
+        android:icon="@drawable/entrant_sel_ic_discover"
+        android:title="Discover"/>
+    <item
+        android:id="@+id/accountFragment"
+        android:icon="@drawable/entrant_sel_ic_account"
+        android:title="Account"/>
+</menu>
+
