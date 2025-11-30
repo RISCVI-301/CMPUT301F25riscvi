@@ -25,11 +25,6 @@ public class AdminNotificationLogDatabaseController {
         void onError(@NonNull Exception e);
     }
 
-    /**
-     * Asynchronously fetch all notification logs from Firestore.
-     * Call this from your Activity/Fragment and update the adapter
-     * in the onLoaded callback.
-     */
     public void fetchNotifications(@NonNull final NotificationsCallback cb) {
         db.collection(COLLECTION_NOTIFICATION_REQUESTS)
                 .orderBy("createdAt", Query.Direction.DESCENDING)
@@ -66,11 +61,6 @@ public class AdminNotificationLogDatabaseController {
         Notification notification =
                 new Notification(createdAt, title, message, eventTitle, organizerId);
 
-        // Optional organizer name, if stored
-        String organizerName = getStr(d, "organizerName");
-        if (!organizerName.isEmpty()) {
-            notification.setOrganizerName(organizerName);
-        }
 
         return notification;
     }
@@ -80,10 +70,6 @@ public class AdminNotificationLogDatabaseController {
         return v != null ? String.valueOf(v) : "";
     }
 
-    /**
-     * Returns the last loaded list of notifications.
-     * Call after fetchNotifications() has completed.
-     */
     public List<Notification> getNotifications() {
         return new ArrayList<>(notifications);
     }
