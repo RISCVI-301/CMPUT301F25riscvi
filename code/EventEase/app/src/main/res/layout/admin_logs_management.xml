@@ -1,13 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/adminLogsRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#223C65"
-    android:gravity="center">
+    android:background="#223C65">
 
-    <!-- Top bar with logout button -->
     <include
         android:id="@+id/admin_topbar"
         layout="@layout/admin_include_topbar"
@@ -37,17 +36,18 @@
             app:layout_constraintWidth_percent="0.8"/>
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-    <!-- Not implemented message -->
-    <TextView
-        android:id="@+id/tvNotImplemented"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Logs feature is not yet implemented."
-        android:textSize="16sp"
-        android:textColor="#FFFFFF"
-        android:gravity="center"
-        android:padding="32dp"
-        android:layout_marginTop="64dp" />
+
+    <!-- Scrollable list of notification log items -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvNotificationLogs"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="12dp"
+        android:clipToPadding="false"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp" />
 
 </LinearLayout>
-

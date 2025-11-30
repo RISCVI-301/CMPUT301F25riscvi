@@ -15,6 +15,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.eventease.R;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.DocumentChange;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -220,7 +221,9 @@ public class OrganizerMyEventActivity extends AppCompatActivity {
                         return;
                     }
 
-                    mergeSnapshotsAndDisplay(primarySnap, legacySnap);
+                    // For initial load, clear items first to ensure clean state
+                    items.clear();
+                    mergeSnapshotsAndDisplayFromQuery(primarySnap, legacySnap);
                     backfillLegacy(legacySnap);
                 });
     }
@@ -265,7 +268,7 @@ public class OrganizerMyEventActivity extends AppCompatActivity {
                         Toast.makeText(this, "Listen failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
                         return;
                     }
-                    if (snapshots != null) mergeSnapshotsAndDisplay(snapshots, null);
+                    if (snapshots != null) mergeSnapshotsAndDisplayFromQuery(snapshots, null);
                     else loadAllEventsFallback();
                 }
         );
@@ -278,11 +281,105 @@ public class OrganizerMyEventActivity extends AppCompatActivity {
                         return;
                     }
                     if (snapshots != null && !snapshots.isEmpty()) {
-                        mergeSnapshotsAndDisplay(null, snapshots);
+                        mergeSnapshotsAndDisplayFromQuery(null, snapshots);
                         backfillLegacy(snapshots);
                     }
                 }
         );
+    }
+
+    /**
+     * Handles QuerySnapshot objects and processes DocumentChange events to properly handle deletions.
+     * This method processes ADDED, MODIFIED, and REMOVED changes from Firestore snapshots.
+     * For initial loads, items should be cleared before calling this method.
+     */
+    private void mergeSnapshotsAndDisplayFromQuery(@Nullable QuerySnapshot primary,
+                                                    @Nullable QuerySnapshot legacy) {
+        // Start with current items to preserve state (for incremental updates)
+        // If items is empty (initial load), this will start empty
+        Map<String, Map<String, Object>> merged = new LinkedHashMap<>();
+        for (Map<String, Object> item : items) {
+            String id = (String) item.get("id");
+            if (id != null) {
+                merged.put(id, item);
+            }
+        }
+
+        // Process primary snapshot changes
+        if (primary != null) {
+            List<DocumentChange> changes = primary.getDocumentChanges();
+            if (!changes.isEmpty()) {
+                // Process changes from snapshot listener
+                for (DocumentChange change : changes) {
+                    String docId = change.getDocument().getId();
+                    DocumentChange.Type changeType = change.getType();
+                    
+                    if (changeType == DocumentChange.Type.REMOVED) {
+                        // Remove deleted event from the map
+                        merged.remove(docId);
+                        Log.d("OrganizerMyEventActivity", "Removed event: " + docId);
+                    } else if (changeType == DocumentChange.Type.ADDED || changeType == DocumentChange.Type.MODIFIED) {
+                        // Add or update event
+                        Map<String, Object> m = toAdapterMap(change.getDocument());
+                        if (m != null) {
+                            merged.put(docId, m);
+                            Log.d("OrganizerMyEventActivity", "Added/Modified event: " + docId);
+                        }
+                    }
+                }
+            } else {
+                // Fallback: if no changes (e.g., from .get() call), process all documents as ADDED
+                for (DocumentSnapshot doc : primary) {
+                    String docId = doc.getId();
+                    Map<String, Object> m = toAdapterMap(doc);
+                    if (m != null) {
+                        merged.put(docId, m);
+                        Log.d("OrganizerMyEventActivity", "Added event (fallback): " + docId);
+                    }
+                }
+            }
+        }
+
+        // Process legacy snapshot changes
+        if (legacy != null) {
+            List<DocumentChange> changes = legacy.getDocumentChanges();
+            if (!changes.isEmpty()) {
+                // Process changes from snapshot listener
+                for (DocumentChange change : changes) {
+                    String docId = change.getDocument().getId();
+                    DocumentChange.Type changeType = change.getType();
+                    
+                    if (changeType == DocumentChange.Type.REMOVED) {
+                        // Remove deleted event from the map
+                        merged.remove(docId);
+                        Log.d("OrganizerMyEventActivity", "Removed legacy event: " + docId);
+                    } else if (changeType == DocumentChange.Type.ADDED || changeType == DocumentChange.Type.MODIFIED) {
+                        // Add or update event
+                        Map<String, Object> m = toAdapterMap(change.getDocument());
+                        if (m != null) {
+                            merged.put(docId, m);
+                            Log.d("OrganizerMyEventActivity", "Added/Modified legacy event: " + docId);
+                        }
+                    }
+                }
+            } else {
+                // Fallback: if no changes (e.g., from .get() call), process all documents as ADDED
+                for (DocumentSnapshot doc : legacy) {
+                    String docId = doc.getId();
+                    Map<String, Object> m = toAdapterMap(doc);
+                    if (m != null) {
+                        merged.put(docId, m);
+                        Log.d("OrganizerMyEventActivity", "Added legacy event (fallback): " + docId);
+                    }
+                }
+            }
+        }
+
+        // Update the UI with the merged results
+        items.clear();
+        items.addAll(merged.values());
+        adapter.setData(items);
+        toggleEmpty(!items.isEmpty());
     }
 
     private void mergeSnapshotsAndDisplay(@Nullable Iterable<? extends DocumentSnapshot> primary,

@@ -308,6 +308,8 @@ public class FirebaseInvitationRepository implements InvitationRepository {
                                 inv.setStatus(Status.DECLINED);
                             }
                             notifyUid(uid);
+                            
+                            // NOTE: Automatic replacement is disabled - organizer must manually replace via button
                         } else {
                             Log.e(TAG, "FAILED to decline invitation and move to cancelled", commitTask.getException());
                         }
