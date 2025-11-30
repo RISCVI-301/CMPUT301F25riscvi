@@ -4,6 +4,7 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -12,14 +13,15 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.eventease.R;
+import com.example.eventease.admin.logs.data.AdminNotificationLogDatabaseController;
 import com.example.eventease.admin.logs.data.Notification;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public class AdminLogsFragment extends Fragment {
 
     private AdminLogsAdapter adapter;
+    private AdminNotificationLogDatabaseController controller;
 
     @Nullable
     @Override
@@ -37,8 +39,8 @@ public class AdminLogsFragment extends Fragment {
         setupLogoutButton(view);
         setupRecyclerView(view);
 
-        // DEMO DATA for now. Later replace with AdminNotificationLogDatabaseController.
-        adapter.setItems(createDemoData());
+        controller = new AdminNotificationLogDatabaseController();
+        loadNotifications();
     }
 
     private void setupLogoutButton(View view) {
@@ -58,35 +60,22 @@ public class AdminLogsFragment extends Fragment {
         rv.setAdapter(adapter);
     }
 
-    private List<Notification> createDemoData() {
-        List<Notification> list = new ArrayList<>();
+    private void loadNotifications() {
+        controller.fetchNotifications(new AdminNotificationLogDatabaseController.NotificationsCallback() {
+            @Override
+            public void onLoaded(@NonNull List<Notification> notifications) {
+                if (!isAdded()) return; // Fragment might be detached
+                adapter.setItems(notifications);
+            }
 
-        long now = System.currentTimeMillis();
-
-        list.add(new Notification(
-                now - 1 * 60 * 60 * 1000L,           // 1 hour ago
-                "Event Reminder",
-                "Don’t forget, the Developer Meetup starts in 1 hour.",
-                "Developer Meetup 2025",
-                "organizer_123"
-        ));
-
-        list.add(new Notification(
-                now - 2 * 24 * 60 * 60 * 1000L,      // 2 days ago
-                "Waitlist Opened",
-                "The event is full. You can now join the waitlist.",
-                "AI in Education",
-                "organizer_456"
-        ));
-
-        list.add(new Notification(
-                now - 10 * 24 * 60 * 60 * 1000L,     // 10 days ago
-                "Registration Closing Soon",
-                "Registration ends tonight at 11:59 PM.",
-                "Hackathon 2025",
-                "organizer_789"
-        ));
-
-        return list;
+            @Override
+            public void onError(@NonNull Exception e) {
+                if (!isAdded()) return;
+                Toast.makeText(requireContext(),
+                        "Failed to load notification logs",
+                        Toast.LENGTH_SHORT
+                ).show();
+            }
+        });
     }
 }
