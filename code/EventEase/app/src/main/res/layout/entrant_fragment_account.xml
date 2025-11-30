@@ -142,6 +142,29 @@
             android:padding="16dp"/>
     </androidx.cardview.widget.CardView>
 
+
+    <androidx.cardview.widget.CardView
+        android:id="@+id/switchAdminCard"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginVertical="8dp"
+        app:cardCornerRadius="16dp"
+        app:cardBackgroundColor="#F4B5AE"
+        android:elevation="8dp"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Switch to Admin View"
+            android:textSize="24sp"
+            android:textColor="#223C65"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:padding="16dp" />
+    </androidx.cardview.widget.CardView>
+
     <androidx.cardview.widget.CardView
         android:id="@+id/deleteProfileButton"
         android:layout_width="match_parent"
