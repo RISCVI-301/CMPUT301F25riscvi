@@ -33,14 +33,14 @@
 
         <TextView
             android:id="@+id/titleText"
-            android:layout_width="wrap_content"
+            android:layout_width="321dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="12dp"
+            android:gravity="center"
             android:text="EventEase"
             android:textColor="@color/header_text_green"
             android:textSize="32sp"
-            android:textStyle="bold"
-            android:gravity="center"/>
+            android:textStyle="bold" />
     </LinearLayout>
 
     <!-- Selected Entrants Title Row -->

@@ -250,7 +250,16 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
                 }
             }
 
+            // Check for event start date with fallback to legacy field names for backward compatibility
             Long startsAtEpochMs = documentSnapshot.getLong("startsAtEpochMs");
+            if (startsAtEpochMs == null || startsAtEpochMs == 0) {
+                // Fallback to eventStartEpochMs (with "event" prefix)
+                startsAtEpochMs = documentSnapshot.getLong("eventStartEpochMs");
+            }
+            if (startsAtEpochMs == null || startsAtEpochMs == 0) {
+                // Fallback to eventStart (without EpochMs suffix)
+                startsAtEpochMs = documentSnapshot.getLong("eventStart");
+            }
             if (tvEventStart != null) {
                 if (startsAtEpochMs != null && startsAtEpochMs > 0) {
                     tvEventStart.setText("Event Start Date: " + dateFormat.format(new Date(startsAtEpochMs)));

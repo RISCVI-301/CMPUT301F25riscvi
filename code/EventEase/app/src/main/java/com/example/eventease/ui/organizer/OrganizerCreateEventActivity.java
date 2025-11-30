@@ -844,7 +844,8 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         doc.put("registrationStart", regStartEpochMs);
         doc.put("registrationEnd", regEndEpochMs);
         doc.put("deadlineEpochMs", deadlineEpochMs);
-        doc.put("eventStart", eventStartEpochMs);
+        doc.put("startsAtEpochMs", eventStartEpochMs); // Primary field name used by Event model and display screens
+        doc.put("eventStart", eventStartEpochMs); // Legacy fallback
         doc.put("eventStartEpochMs", eventStartEpochMs); // Also save with consistent naming
         doc.put("capacity", chosenCapacity);
         doc.put("sampleSize", chosenSampleSize);
