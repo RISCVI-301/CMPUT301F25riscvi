@@ -20,6 +20,11 @@ import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.RadioButton;
 import android.widget.TextView;
+import android.content.Intent;
+import android.widget.Button;
+import android.util.Log;
+import com.example.eventease.MainActivity;
+
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -86,6 +91,18 @@ public class AdminEventsFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+
+        Button switchButton = view.findViewById(R.id.btnSwitchToEntrantView);
+        if (switchButton != null) {
+            switchButton.setOnClickListener(v -> {
+                android.util.Log.d("AdminToEntrant", "Admin to Entrant Clicked");
+                Intent intent = new Intent(requireContext(), com.example.eventease.MainActivity.class);
+                intent.putExtra("force_entrant", true);
+                startActivity(intent);
+                requireActivity().finish();
+            });
+        }
+
 
         rv = view.findViewById(R.id.rvEvents);
         if (rv != null) {

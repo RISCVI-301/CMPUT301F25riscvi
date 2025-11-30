@@ -11,6 +11,9 @@ import android.view.View;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Button;
+import android.content.Intent;
+
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.activity.result.ActivityResultLauncher;
@@ -28,6 +31,8 @@ import com.example.eventease.auth.UserRoleChecker;
 import com.example.eventease.notifications.FCMTokenManager;
 import com.example.eventease.util.ToastUtil;
 import com.google.firebase.FirebaseApp;
+
+import com.example.eventease.MainActivity;
 
 /**
  * Main activity for admin users.
@@ -61,6 +66,7 @@ public class AdminMainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
 
         // Firebase initialization
         FirebaseApp.initializeApp(this);

@@ -20,6 +20,11 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import java.util.ArrayList;
 import java.util.List;
 
+import android.content.Intent;
+import android.widget.Button;
+import android.util.Log;
+import com.example.eventease.MainActivity;
+
 /**
  * Fragment for admin users to view and manage all user profiles in the system.
  * 
@@ -56,6 +61,17 @@ public class AdminProfilesFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+
+        Button switchButton = view.findViewById(R.id.btnSwitchToEntrantView);
+        if (switchButton != null) {
+            switchButton.setOnClickListener(v -> {
+                android.util.Log.d("AdminToEntrant", "Admin to Entrant Clicked");
+                Intent intent = new Intent(requireContext(), com.example.eventease.MainActivity.class);
+                intent.putExtra("force_entrant", true);
+                startActivity(intent);
+                requireActivity().finish();
+            });
+        }
 
         rv = view.findViewById(R.id.rvProfiles);
         if (rv != null) {

@@ -1,9 +1,11 @@
 package com.example.eventease.admin.image.ui;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -19,6 +21,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+
+import android.content.Intent;
+import android.widget.Button;
+import android.util.Log;
+import com.example.eventease.MainActivity;
 
 public class AdminImagesFragment extends Fragment {
 
@@ -36,6 +43,17 @@ public class AdminImagesFragment extends Fragment {
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+
+        Button switchButton = view.findViewById(R.id.btnSwitchToEntrantView);
+        if (switchButton != null) {
+            switchButton.setOnClickListener(v -> {
+                android.util.Log.d("AdminToEntrant", "Admin to Entrant Clicked");
+                Intent intent = new Intent(requireContext(), com.example.eventease.MainActivity.class);
+                intent.putExtra("force_entrant", true);
+                startActivity(intent);
+                requireActivity().finish();
+            });
+        }
 
         ImageData = new ArrayList<>();
 

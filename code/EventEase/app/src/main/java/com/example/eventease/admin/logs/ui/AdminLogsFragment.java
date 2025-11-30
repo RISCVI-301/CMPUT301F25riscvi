@@ -15,6 +15,12 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.eventease.R;
 import com.example.eventease.admin.logs.data.AdminNotificationLogDatabaseController;
 import com.example.eventease.admin.logs.data.Notification;
+import android.util.Log;
+
+import android.content.Intent;
+import android.widget.Button;
+
+import com.example.eventease.MainActivity;
 
 import java.util.List;
 
@@ -36,10 +42,22 @@ public class AdminLogsFragment extends Fragment {
                               @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
+        Button switchButton = view.findViewById(R.id.btnSwitchToEntrantView);
+        if (switchButton != null) {
+            switchButton.setOnClickListener(v -> {
+                android.util.Log.d("AdminToEntrant", "Admin to Entrant Clicked");
+                Intent intent = new Intent(requireContext(), com.example.eventease.MainActivity.class);
+                intent.putExtra("force_entrant", true);
+                startActivity(intent);
+                requireActivity().finish();
+            });
+        }
+
         setupRecyclerView(view);
 
         controller = new AdminNotificationLogDatabaseController();
         loadNotifications();
+
     }
 
     private void setupRecyclerView(@NonNull View view) {
