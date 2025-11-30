@@ -552,6 +552,8 @@ public class MyEventsFragment extends Fragment {
                 if (hasInvite && eventIdToInvitationId.containsKey(event.getId())) {
                     intent.putExtra("invitationId", eventIdToInvitationId.get(event.getId()));
                 }
+                // Mark that this is from waitlisted events (not upcoming)
+                intent.putExtra("isWaitlistedEvent", true);
                 startActivity(intent);
             });
         }
