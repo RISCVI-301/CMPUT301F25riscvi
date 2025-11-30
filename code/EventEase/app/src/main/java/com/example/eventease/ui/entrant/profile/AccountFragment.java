@@ -66,6 +66,7 @@ public class AccountFragment extends Fragment {
     private ShapeableImageView profileImage;
     private FirebaseFirestore db;
     private CardView organizerSwitchCard;
+    private CardView switchAdminCard;          // NEW
     private String organizerIdForSwitch;
     private ActivityResultLauncher<String> notificationPermissionLauncher;
     private View notificationBadge;
@@ -76,7 +77,7 @@ public class AccountFragment extends Fragment {
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        
+
         // Initialize notification permission launcher
         notificationPermissionLauncher = registerForActivityResult(
                 new ActivityResultContracts.RequestPermission(),
@@ -94,17 +95,17 @@ public class AccountFragment extends Fragment {
                     }
                 });
     }
-    
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
-                           @Nullable ViewGroup container,
-                           @Nullable Bundle savedInstanceState) {
+                             @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
         View root = inflater.inflate(R.layout.entrant_fragment_account, container, false);
-        
+
         // Initialize Firebase instances
         db = FirebaseFirestore.getInstance();
-        
+
         // Initialize views
         fullNameText = root.findViewById(R.id.fullNameText);
         profileImage = root.findViewById(R.id.profileImage);
@@ -123,13 +124,26 @@ public class AccountFragment extends Fragment {
             });
         }
 
+        // NEW: admin switch card
+        switchAdminCard = root.findViewById(R.id.switchAdminCard);
+        if (switchAdminCard != null) {
+            switchAdminCard.setVisibility(View.GONE);
+            switchAdminCard.setOnClickListener(v -> {
+                if (getContext() == null) return;
+                // No force_entrant extra: MainActivity will redirect admins to AdminMainActivity
+                Intent intent = new Intent(requireContext(), com.example.eventease.MainActivity.class);
+                startActivity(intent);
+                requireActivity().finish();
+            });
+        }
+
         // Set up notification preferences card click listener
         CardView notificationPreferencesCard = root.findViewById(R.id.notificationPreferencesCard);
         if (notificationPreferencesCard != null) {
             notificationPreferencesCard.setOnClickListener(v -> {
                 // First check/request permission, then show preferences dialog
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.POST_NOTIFICATIONS) 
+                    if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.POST_NOTIFICATIONS)
                             != PackageManager.PERMISSION_GRANTED) {
                         // Request permission first
                         notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS);
@@ -143,13 +157,13 @@ public class AccountFragment extends Fragment {
 
         root.findViewById(R.id.deleteProfileButton).setOnClickListener(v -> showDeleteConfirmationDialog());
 
-        root.findViewById(R.id.settingsButton).setOnClickListener(v -> 
-            Navigation.findNavController(v).navigate(R.id.action_accountFragment_to_editProfileFragment));
-        
+        root.findViewById(R.id.settingsButton).setOnClickListener(v ->
+                Navigation.findNavController(v).navigate(R.id.action_accountFragment_to_editProfileFragment));
+
         // Set up notification bell button
         android.widget.ImageView notificationBellButton = root.findViewById(R.id.notificationBellButton);
         notificationBadge = root.findViewById(R.id.notificationBadge);
-        
+
         if (notificationBellButton != null) {
             notificationBellButton.setOnClickListener(v -> {
                 if (getContext() != null) {
@@ -158,26 +172,26 @@ public class AccountFragment extends Fragment {
                 }
             });
         }
-        
+
         // Check for new notifications and update badge
         checkForNewNotifications();
-        
+
         // Load user data with real-time updates
         loadUserData();
-        
+
         return root;
     }
-    
+
     /**
      * Handles notification permission click from account page.
      * Checks current permission status and requests if needed.
      */
     private void handleNotificationPermissionClick() {
         if (getContext() == null) return;
-        
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             // Android 13+ requires runtime permission
-            if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.POST_NOTIFICATIONS) 
+            if (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.POST_NOTIFICATIONS)
                     == PackageManager.PERMISSION_GRANTED) {
                 // Permission already granted
                 ToastUtil.showShort(getContext(), "Notification permission is already enabled ✓");
@@ -197,22 +211,22 @@ public class AccountFragment extends Fragment {
             ToastUtil.showShort(getContext(), "Notifications are enabled (Android 12 and below)");
         }
     }
-    
-    
+
+
     /**
      * Enables notifications at the device level by ensuring the notification channel is enabled.
      */
     private void enableDeviceNotifications() {
         if (getContext() == null) return;
-        
+
         // Use centralized channel manager to ensure channel exists and is properly configured
         com.example.eventease.notifications.NotificationChannelManager.createNotificationChannel(getContext());
-        
-        NotificationManager notificationManager = 
-            (NotificationManager) getContext().getSystemService(Context.NOTIFICATION_SERVICE);
-        
+
+        NotificationManager notificationManager =
+                (NotificationManager) getContext().getSystemService(Context.NOTIFICATION_SERVICE);
+
         if (notificationManager == null) return;
-        
+
         // If notifications are disabled at app level, open settings
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             if (!notificationManager.areNotificationsEnabled()) {
@@ -220,7 +234,7 @@ public class AccountFragment extends Fragment {
                 return;
             }
         }
-        
+
         // Check if channel is enabled
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             boolean channelEnabled = com.example.eventease.notifications.NotificationChannelManager.isChannelEnabled(getContext());
@@ -230,38 +244,38 @@ public class AccountFragment extends Fragment {
                 return;
             }
         }
-        
+
         ToastUtil.showShort(getContext(), "Notifications enabled ✓");
         if (getContext() != null) {
             FCMTokenManager.getInstance().initialize(getContext());
         }
     }
-    
+
     /**
      * Disables notifications at the device level.
-     * 
+     *
      * IMPORTANT: We do NOT set the channel to IMPORTANCE_NONE here because:
      * 1. Once set to NONE, Android prevents programmatic re-enabling
      * 2. The user must manually enable it in device settings
      * 3. This causes a poor user experience
-     * 
+     *
      * Instead, we just save the preference and let the user control it via device settings.
      * The app will respect the user's Firestore preference when sending notifications.
      */
     private void disableDeviceNotifications() {
         if (getContext() == null) return;
-        
+
         // Don't modify the channel - just save the preference
         // The user can control notifications via device settings if they want
         ToastUtil.showShort(getContext(), "Notifications preference saved. You can control notifications in device settings.");
     }
-    
+
     /**
      * Opens device notification settings for this app.
      */
     private void openNotificationSettings() {
         if (getContext() == null) return;
-        
+
         Intent intent = new Intent();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             intent.setAction(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS);
@@ -270,7 +284,7 @@ public class AccountFragment extends Fragment {
             intent.setAction(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
             intent.setData(android.net.Uri.parse("package:" + getContext().getPackageName()));
         }
-        
+
         try {
             startActivity(intent);
             ToastUtil.showShort(getContext(), "Please enable notifications in device settings");
@@ -279,7 +293,7 @@ public class AccountFragment extends Fragment {
             ToastUtil.showShort(getContext(), "Could not open settings. Please enable notifications manually.");
         }
     }
-    
+
     /**
      * Saves notification preference to Firestore.
      */
@@ -294,7 +308,7 @@ public class AccountFragment extends Fragment {
                     ToastUtil.showShort(getContext(), "Failed to save preference. Please try again.");
                 });
     }
-    
+
     /**
      * Shows the notification preferences dialog with toggles for invited and not invited notifications.
      */
@@ -373,7 +387,7 @@ public class AccountFragment extends Fragment {
      * Loads notification preferences from Firestore and sets the switches.
      */
     private void loadNotificationPreferences(com.google.android.material.switchmaterial.SwitchMaterial switchInvited,
-                                           com.google.android.material.switchmaterial.SwitchMaterial switchNotInvited) {
+                                             com.google.android.material.switchmaterial.SwitchMaterial switchNotInvited) {
         String currentUserId = com.example.eventease.auth.AuthHelper.getUid(requireContext());
         if (currentUserId == null || currentUserId.isEmpty() || switchInvited == null || switchNotInvited == null) {
             // Default to both enabled if no user ID
@@ -445,8 +459,8 @@ public class AccountFragment extends Fragment {
                     Log.e(TAG, "Failed to save notification preferences", e);
                     ToastUtil.showShort(getContext(), "Failed to save preferences. Please try again.");
                 });
-        }
-        
+    }
+
     /**
      * Checks for new notifications and updates the badge visibility.
      * Listens to notificationRequests and invitations collections in real-time.
@@ -460,7 +474,7 @@ public class AccountFragment extends Fragment {
         String uid = currentUserId;
         SharedPreferences prefs = getContext().getSharedPreferences("EventEasePrefs", Context.MODE_PRIVATE);
         long lastSeenTime = prefs.getLong("lastNotificationSeenTime", 0);
-        
+
         Log.d(TAG, "Setting up real-time notification badge listener for user: " + uid);
         Log.d(TAG, "Initial last seen time: " + lastSeenTime);
 
@@ -474,12 +488,12 @@ public class AccountFragment extends Fragment {
                         Log.e(TAG, "Error in notification badge listener", e);
                         return;
                     }
-                    
+
                     if (querySnapshot == null) {
                         Log.w(TAG, "Query snapshot is null");
                         return;
                     }
-                    
+
                     if (getView() == null) {
                         Log.w(TAG, "View is null, cannot update badge");
                         return;
@@ -487,13 +501,13 @@ public class AccountFragment extends Fragment {
 
                     Log.d(TAG, "Real-time update: notificationRequests changed, checking " + querySnapshot.size() + " documents");
 
-                    SharedPreferences currentPrefs = getContext() != null ? 
-                        getContext().getSharedPreferences("EventEasePrefs", Context.MODE_PRIVATE) : null;
+                    SharedPreferences currentPrefs = getContext() != null ?
+                            getContext().getSharedPreferences("EventEasePrefs", Context.MODE_PRIVATE) : null;
                     if (currentPrefs == null) {
                         Log.w(TAG, "Cannot get SharedPreferences");
                         return;
                     }
-                    
+
                     long currentLastSeenTime = currentPrefs.getLong("lastNotificationSeenTime", 0);
                     Log.d(TAG, "Current last seen time from prefs: " + currentLastSeenTime);
 
@@ -502,15 +516,15 @@ public class AccountFragment extends Fragment {
                     for (com.google.firebase.firestore.QueryDocumentSnapshot doc : querySnapshot) {
                         Object userIdsObj = doc.get("userIds");
                         Long createdAt = doc.getLong("createdAt");
-                        
+
                         if (createdAt != null && createdAt > currentLastSeenTime && userIdsObj instanceof List) {
                             @SuppressWarnings("unchecked")
                             List<String> userIds = (List<String>) userIdsObj;
                             if (userIds.contains(uid)) {
                                 hasNewNotifications = true;
                                 matchingCount++;
-                                Log.d(TAG, "Found new notificationRequest: " + doc.getId() + 
-                                    " created at " + createdAt + " (newer than " + currentLastSeenTime + ")");
+                                Log.d(TAG, "Found new notificationRequest: " + doc.getId() +
+                                        " created at " + createdAt + " (newer than " + currentLastSeenTime + ")");
                             }
                         }
                     }
@@ -518,14 +532,14 @@ public class AccountFragment extends Fragment {
                     Log.d(TAG, "Found " + matchingCount + " new notificationRequests for this user");
 
                     final boolean hasNotificationRequests = hasNewNotifications;
-                    
+
                     db.collection("invitations")
                             .whereEqualTo("uid", uid)
                             .whereEqualTo("status", "PENDING")
                             .get()
                             .addOnSuccessListener(invitationSnapshot -> {
                                 Log.d(TAG, "Checking " + invitationSnapshot.size() + " pending invitations");
-                                
+
                                 boolean hasNewInvitations = false;
                                 int newInvCount = 0;
                                 for (com.google.firebase.firestore.DocumentSnapshot invDoc : invitationSnapshot.getDocuments()) {
@@ -533,29 +547,29 @@ public class AccountFragment extends Fragment {
                                     if (issuedAt != null && issuedAt > currentLastSeenTime) {
                                         hasNewInvitations = true;
                                         newInvCount++;
-                                        Log.d(TAG, "Found new invitation: " + invDoc.getId() + 
-                                            " issued at " + issuedAt + " (newer than " + currentLastSeenTime + ")");
+                                        Log.d(TAG, "Found new invitation: " + invDoc.getId() +
+                                                " issued at " + issuedAt + " (newer than " + currentLastSeenTime + ")");
                                     }
                                 }
-                                
+
                                 Log.d(TAG, "Found " + newInvCount + " new invitations");
-                                
+
                                 boolean shouldShowBadge = hasNotificationRequests || hasNewInvitations;
-                                
-                                Log.d(TAG, "Badge decision: shouldShowBadge=" + shouldShowBadge + 
-                                    " (notificationRequests=" + hasNotificationRequests + 
-                                    ", invitations=" + hasNewInvitations + ")");
-                                
+
+                                Log.d(TAG, "Badge decision: shouldShowBadge=" + shouldShowBadge +
+                                        " (notificationRequests=" + hasNotificationRequests +
+                                        ", invitations=" + hasNewInvitations + ")");
+
                                 if (getView() != null && notificationBadge != null) {
                                     if (getActivity() != null) {
                                         getActivity().runOnUiThread(() -> {
                                             if (notificationBadge != null) {
                                                 notificationBadge.setVisibility(shouldShowBadge ? View.VISIBLE : View.GONE);
-                                                Log.d(TAG, "Badge visibility updated to: " + 
-                                                    (shouldShowBadge ? "VISIBLE" : "GONE"));
+                                                Log.d(TAG, "Badge visibility updated to: " +
+                                                        (shouldShowBadge ? "VISIBLE" : "GONE"));
                                             }
-            });
-        }
+                                        });
+                                    }
                                 }
                             })
                             .addOnFailureListener(error -> {
@@ -566,20 +580,20 @@ public class AccountFragment extends Fragment {
                                         getActivity().runOnUiThread(() -> {
                                             if (notificationBadge != null) {
                                                 notificationBadge.setVisibility(hasNotificationRequests ? View.VISIBLE : View.GONE);
-        }
+                                            }
                                         });
                                     }
                                 }
                             });
                 });
     }
-    
+
     private void loadUserData() {
         String currentUserId = com.example.eventease.auth.AuthHelper.getUid(requireContext());
         if (currentUserId != null && !currentUserId.isEmpty()) {
             // Get the current user's document in the users collection
             DocumentReference userRef = db.collection("users").document(currentUserId);
-            
+
             // Listen for real-time updates
             userRef.addSnapshotListener((documentSnapshot, e) -> {
                 if (e != null) {
@@ -593,19 +607,20 @@ public class AccountFragment extends Fragment {
                     if (name != null && !name.isEmpty()) {
                         fullNameText.setText(name);
                     }
-                    
+
                     // Get and load the profile photo
                     String photoUrl = documentSnapshot.getString("photoUrl");
                     if (photoUrl != null && !photoUrl.isEmpty() && getContext() != null) {
                         // Use Glide to load and cache the image
                         Glide.with(getContext())
-                            .load(photoUrl)
-                            .placeholder(R.drawable.entrant_icon)
-                            .error(R.drawable.entrant_icon)
-                            .into(profileImage);
+                                .load(photoUrl)
+                                .placeholder(R.drawable.entrant_icon)
+                                .error(R.drawable.entrant_icon)
+                                .into(profileImage);
                     }
 
                     updateOrganizerSwitchVisibility(documentSnapshot);
+                    updateAdminSwitchVisibility(documentSnapshot);   // NEW
                 }
             });
         }
@@ -626,6 +641,20 @@ public class AccountFragment extends Fragment {
         } else {
             organizerIdForSwitch = null;
             organizerSwitchCard.setVisibility(View.GONE);
+        }
+    }
+
+    // NEW: show/hide admin switch card
+    private void updateAdminSwitchVisibility(@NonNull DocumentSnapshot documentSnapshot) {
+        if (switchAdminCard == null) return;
+
+        boolean hasAdminRole = hasRole(documentSnapshot, "admin");
+        boolean hasEntrantRole = hasRole(documentSnapshot, "entrant");
+
+        if (hasAdminRole && hasEntrantRole) {
+            switchAdminCard.setVisibility(View.VISIBLE);
+        } else {
+            switchAdminCard.setVisibility(View.GONE);
         }
     }
 
@@ -666,7 +695,7 @@ public class AccountFragment extends Fragment {
             dialog.getWindow().setAttributes(layoutParams);
             dialog.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
         }
-        
+
         // Capture screenshot and blur it for the background
         Bitmap screenshot = captureScreenshot();
         if (screenshot != null) {
@@ -678,7 +707,7 @@ public class AccountFragment extends Fragment {
                 }
             }
         }
-        
+
         // Make the background clickable to dismiss
         android.view.View blurBackground = dialog.findViewById(R.id.dialogBlurBackground);
         if (blurBackground != null) {
@@ -700,13 +729,13 @@ public class AccountFragment extends Fragment {
         }
 
         dialog.show();
-        
+
         // Apply animations after dialog is shown
         View card = dialog.findViewById(R.id.dialogCard);
         if (blurBackground != null && card != null) {
             android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(getContext(), R.anim.entrant_dialog_fade_in);
             android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(getContext(), R.anim.entrant_dialog_zoom_in);
-            
+
             blurBackground.startAnimation(fadeIn);
             card.startAnimation(zoomIn);
         }
@@ -725,29 +754,29 @@ public class AccountFragment extends Fragment {
             return null;
         }
     }
-    
+
     private Bitmap blurBitmap(Bitmap bitmap, float radius) {
         if (bitmap == null || getContext() == null) return null;
-        
+
         try {
             // Scale down for better performance
             int width = Math.round(bitmap.getWidth() * 0.4f);
             int height = Math.round(bitmap.getHeight() * 0.4f);
             Bitmap inputBitmap = Bitmap.createScaledBitmap(bitmap, width, height, false);
             Bitmap outputBitmap = Bitmap.createBitmap(inputBitmap);
-            
+
             RenderScript rs = RenderScript.create(getContext());
             ScriptIntrinsicBlur blurScript = ScriptIntrinsicBlur.create(rs, Element.U8_4(rs));
             Allocation tmpIn = Allocation.createFromBitmap(rs, inputBitmap);
             Allocation tmpOut = Allocation.createFromBitmap(rs, outputBitmap);
-            
+
             blurScript.setRadius(radius);
             blurScript.setInput(tmpIn);
             blurScript.forEach(tmpOut);
             tmpOut.copyTo(outputBitmap);
-            
+
             rs.destroy();
-            
+
             // Scale back up
             return Bitmap.createScaledBitmap(outputBitmap, bitmap.getWidth(), bitmap.getHeight(), true);
         } catch (Exception e) {
@@ -766,7 +795,7 @@ public class AccountFragment extends Fragment {
         }
 
         String uid = currentUserId;
-        
+
         ToastUtil.showShort(getContext(), "Deleting profile...");
 
         ProfileDeletionHelper deletionHelper = new ProfileDeletionHelper(getContext());
@@ -787,42 +816,42 @@ public class AccountFragment extends Fragment {
     private void deleteUserDocumentAndAuth(String uid) {
         // Sign in anonymously to get Firebase Auth token for Firestore rules
         com.google.firebase.auth.FirebaseAuth.getInstance().signInAnonymously()
-            .addOnSuccessListener(authResult -> {
-                // Now delete with authenticated context
-                DocumentReference userRef = db.collection("users").document(uid);
-                userRef.delete()
-                    .addOnSuccessListener(aVoid -> {
-                        // Device auth - clear cache to trigger profile setup on next launch
-                        com.example.eventease.auth.DeviceAuthManager authManager = 
-                            new com.example.eventease.auth.DeviceAuthManager(requireContext());
-                        authManager.clearCache();
-                        clearPreferences();
-                        ToastUtil.showShort(getContext(), "Profile deleted successfully");
-                        launchProfileSetupScreen();
-                    })
-                    .addOnFailureListener(e -> {
-                        android.util.Log.e("AccountFragment", "Failed to delete user document", e);
-                        ToastUtil.showLong(getContext(), "Failed to delete profile: " + e.getMessage());
-                    });
-            })
-            .addOnFailureListener(e -> {
-                android.util.Log.e("AccountFragment", "Failed to sign in anonymously", e);
-                // Try deleting anyway (might work if rules allow)
-                DocumentReference userRef = db.collection("users").document(uid);
-                userRef.delete()
-                    .addOnSuccessListener(aVoid -> {
-                        com.example.eventease.auth.DeviceAuthManager authManager = 
-                            new com.example.eventease.auth.DeviceAuthManager(requireContext());
-                        authManager.clearCache();
-                        clearPreferences();
-                        ToastUtil.showShort(getContext(), "Profile deleted successfully");
-                        launchProfileSetupScreen();
-                    })
-                    .addOnFailureListener(deleteError -> {
-                        android.util.Log.e("AccountFragment", "Failed to delete user document", deleteError);
-                        ToastUtil.showLong(getContext(), "Failed to delete profile: " + deleteError.getMessage());
-                    });
-            });
+                .addOnSuccessListener(authResult -> {
+                    // Now delete with authenticated context
+                    DocumentReference userRef = db.collection("users").document(uid);
+                    userRef.delete()
+                            .addOnSuccessListener(aVoid -> {
+                                // Device auth - clear cache to trigger profile setup on next launch
+                                com.example.eventease.auth.DeviceAuthManager authManager =
+                                        new com.example.eventease.auth.DeviceAuthManager(requireContext());
+                                authManager.clearCache();
+                                clearPreferences();
+                                ToastUtil.showShort(getContext(), "Profile deleted successfully");
+                                launchProfileSetupScreen();
+                            })
+                            .addOnFailureListener(e -> {
+                                android.util.Log.e("AccountFragment", "Failed to delete user document", e);
+                                ToastUtil.showLong(getContext(), "Failed to delete profile: " + e.getMessage());
+                            });
+                })
+                .addOnFailureListener(e -> {
+                    android.util.Log.e("AccountFragment", "Failed to sign in anonymously", e);
+                    // Try deleting anyway (might work if rules allow)
+                    DocumentReference userRef = db.collection("users").document(uid);
+                    userRef.delete()
+                            .addOnSuccessListener(aVoid -> {
+                                com.example.eventease.auth.DeviceAuthManager authManager =
+                                        new com.example.eventease.auth.DeviceAuthManager(requireContext());
+                                authManager.clearCache();
+                                clearPreferences();
+                                ToastUtil.showShort(getContext(), "Profile deleted successfully");
+                                launchProfileSetupScreen();
+                            })
+                            .addOnFailureListener(deleteError -> {
+                                android.util.Log.e("AccountFragment", "Failed to delete user document", deleteError);
+                                ToastUtil.showLong(getContext(), "Failed to delete profile: " + deleteError.getMessage());
+                            });
+                });
     }
 
     @Override
@@ -838,11 +867,11 @@ public class AccountFragment extends Fragment {
         if (getContext() == null) return;
         SharedPreferences prefs = getContext().getSharedPreferences("EventEasePrefs", Context.MODE_PRIVATE);
         prefs.edit()
-            .putBoolean("rememberMe", false)
-            .remove("savedUid")
-            .remove("savedEmail")
-            .remove("savedPassword")
-            .apply();
+                .putBoolean("rememberMe", false)
+                .remove("savedUid")
+                .remove("savedEmail")
+                .remove("savedPassword")
+                .apply();
     }
 
     private void launchProfileSetupScreen() {
