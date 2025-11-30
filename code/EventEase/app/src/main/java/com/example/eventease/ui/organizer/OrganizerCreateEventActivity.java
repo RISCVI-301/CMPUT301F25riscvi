@@ -135,8 +135,6 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                     if (posterPreview != null) {
                         loadImageIntoPreview(uri);
                     }
-                    // Also update the button icon to show image was selected
-                    Glide.with(this).load(uri).into(btnPickPoster);
                     
                     // Automatically open crop dialog when first selecting an image
                     // Use post to ensure UI is ready
@@ -221,7 +219,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         btnEnd.setOnClickListener(v -> pickDateTime(false));
         btnDeadline.setOnClickListener(v -> pickDeadline());
         btnEventStart.setOnClickListener(v -> pickEventStartDate());
-        btnBack.setOnClickListener(v -> finish());
+        btnBack.setOnClickListener(v -> goToMyEvents());
         btnPickPoster.setOnClickListener(v -> pickImage.launch("image/*"));
         
         // Setup crop button
@@ -1153,7 +1151,8 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
     }
     
     /**
-     * Applies initial centerCrop transformation to the image
+     * Applies initial transformation to the image
+     * Ensures the image always fills the width of the container (no gaps on sides)
      */
     private void applyInitialCrop(android.graphics.Bitmap bitmap) {
         if (posterPreview == null || bitmap == null || imageMatrix == null) return;
@@ -1170,16 +1169,14 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         float bitmapWidth = bitmap.getWidth();
         float bitmapHeight = bitmap.getHeight();
         
-        // Calculate scale to fill view (centerCrop)
-        float scaleX = viewWidth / bitmapWidth;
-        float scaleY = viewHeight / bitmapHeight;
-        float scale = Math.max(scaleX, scaleY);
+        // Always scale to fill width (ensures no gaps on left/right)
+        float scale = viewWidth / bitmapWidth;
         
-        // Center the image
+        // Center the image vertically
         float scaledWidth = bitmapWidth * scale;
         float scaledHeight = bitmapHeight * scale;
-        float dx = (viewWidth - scaledWidth) / 2f;
-        float dy = (viewHeight - scaledHeight) / 2f;
+        float dx = 0; // No horizontal offset - image fills width
+        float dy = (viewHeight - scaledHeight) / 2f; // Center vertically
         
         imageMatrix.reset();
         imageMatrix.postScale(scale, scale);
@@ -1246,6 +1243,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
     
     /**
      * Sets up the crop view with initial image
+     * Ensures image fills width with no gaps
      */
     private void setupCropView(ImageView cropView, android.graphics.Bitmap bitmap) {
         if (cropView == null || bitmap == null) return;
@@ -1265,15 +1263,14 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         float bitmapWidth = bitmap.getWidth();
         float bitmapHeight = bitmap.getHeight();
         
-        // Initial centerCrop
-        float scaleX = viewWidth / bitmapWidth;
-        float scaleY = viewHeight / bitmapHeight;
-        float scale = Math.max(scaleX, scaleY);
+        // Always scale to fill width (ensures no gaps on sides)
+        float scale = viewWidth / bitmapWidth;
         
+        // Center vertically
         float scaledWidth = bitmapWidth * scale;
         float scaledHeight = bitmapHeight * scale;
-        float dx = (viewWidth - scaledWidth) / 2f;
-        float dy = (viewHeight - scaledHeight) / 2f;
+        float dx = 0; // No horizontal offset - fills width
+        float dy = (viewHeight - scaledHeight) / 2f; // Center vertically
         
         matrix.postScale(scale, scale);
         matrix.postTranslate(dx, dy);
@@ -1321,19 +1318,85 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
     
     /**
      * Applies the crop from dialog to the preview
+     * Ensures the image fills the preview width with no gaps
      */
     private void applyCropToPreview(ImageView cropView) {
-        android.graphics.Matrix matrix = (android.graphics.Matrix) cropView.getTag();
-        if (matrix != null && posterPreview != null) {
-            imageMatrix.set(matrix);
-            posterPreview.setImageMatrix(imageMatrix);
-            
-            // Extract scale and translation
-            float[] values = new float[9];
-            matrix.getValues(values);
-            scaleFactor = values[android.graphics.Matrix.MSCALE_X];
-            translateX = values[android.graphics.Matrix.MTRANS_X];
-            translateY = values[android.graphics.Matrix.MTRANS_Y];
+        android.graphics.Matrix cropMatrix = (android.graphics.Matrix) cropView.getTag();
+        if (cropMatrix != null && posterPreview != null && posterUri != null) {
+            // Reload the bitmap to recalculate transformation for preview dimensions
+            Glide.with(this)
+                    .asBitmap()
+                    .load(posterUri)
+                    .into(new com.bumptech.glide.request.target.CustomTarget<android.graphics.Bitmap>() {
+                        @Override
+                        public void onResourceReady(@NonNull android.graphics.Bitmap bitmap, 
+                                                    @Nullable com.bumptech.glide.request.transition.Transition<? super android.graphics.Bitmap> transition) {
+                            if (posterPreview == null) return;
+                            
+                            int previewWidth = posterPreview.getWidth();
+                            int previewHeight = posterPreview.getHeight();
+                            
+                            if (previewWidth == 0 || previewHeight == 0) {
+                                posterPreview.post(() -> applyCropToPreview(cropView));
+                                return;
+                            }
+                            
+                            int cropWidth = cropView.getWidth();
+                            int cropHeight = cropView.getHeight();
+                            
+                            if (cropWidth == 0 || cropHeight == 0) {
+                                // Fallback: just copy matrix
+                                imageMatrix.set(cropMatrix);
+                                posterPreview.setImageBitmap(bitmap);
+                                posterPreview.setImageMatrix(imageMatrix);
+                                return;
+                            }
+                            
+                            // Extract crop transformation
+                            float[] cropValues = new float[9];
+                            cropMatrix.getValues(cropValues);
+                            float cropScale = cropValues[android.graphics.Matrix.MSCALE_X];
+                            float cropDx = cropValues[android.graphics.Matrix.MTRANS_X];
+                            float cropDy = cropValues[android.graphics.Matrix.MTRANS_Y];
+                            
+                            // Calculate visible region in bitmap coordinates
+                            // In bitmap space: visible region starts at (-dx/scale, -dy/scale)
+                            // and has size (cropWidth/scale, cropHeight/scale)
+                            float visibleStartX = -cropDx / cropScale;
+                            float visibleStartY = -cropDy / cropScale;
+                            float visibleWidth = cropWidth / cropScale;
+                            float visibleHeight = cropHeight / cropScale;
+                            
+                            // Scale to fill preview width
+                            float scale = previewWidth / visibleWidth;
+                            
+                            // Calculate translation: map visible region to preview
+                            // We want visibleStartX to map to 0, and visibleStartX+visibleWidth to map to previewWidth
+                            float dx = -visibleStartX * scale;
+                            float dy = (previewHeight - visibleHeight * scale) / 2f - visibleStartY * scale;
+                            
+                            // Ensure width is filled
+                            if (visibleWidth * scale < previewWidth) {
+                                scale = previewWidth / visibleWidth;
+                                dx = -visibleStartX * scale;
+                                dy = (previewHeight - visibleHeight * scale) / 2f - visibleStartY * scale;
+                            }
+                            
+                            imageMatrix.reset();
+                            imageMatrix.postScale(scale, scale);
+                            imageMatrix.postTranslate(dx, dy);
+                            
+                            posterPreview.setImageBitmap(bitmap);
+                            posterPreview.setImageMatrix(imageMatrix);
+                            
+                            scaleFactor = scale;
+                            translateX = dx;
+                            translateY = dy;
+                        }
+                        
+                        @Override
+                        public void onLoadCleared(@Nullable android.graphics.drawable.Drawable placeholder) {}
+                    });
         }
     }
     

@@ -9,31 +9,14 @@
 
     <!-- Header -->
     <LinearLayout
+        android:id="@+id/linearLayout"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="56dp"
         android:background="@color/ee_topbar_bg"
-        android:padding="16dp"
+        android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:gravity="center_vertical">
+        android:padding="16dp">
 
-        <ImageButton
-            android:id="@+id/btnBack"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:background="@android:color/transparent"
-            android:contentDescription="Back"
-            android:src="@android:drawable/ic_media_previous"
-            android:tint="@color/ee_navy_dark"/>
-
-        <TextView
-            android:layout_marginStart="12dp"
-            android:text="EventEase"
-            android:textStyle="bold"
-            android:textSize="32sp"
-            android:textColor="@color/ee_topbar_text"
-            android:gravity="center"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"/>
     </LinearLayout>
 
     <ScrollView
@@ -49,22 +32,45 @@
             android:orientation="vertical"
             android:padding="20dp">
 
-            <!-- Title bar -->
-            <TextView
-                android:text="Create New Event"
-                android:textStyle="bold"
-                android:textSize="24sp"
-                android:textColor="@color/ee_text_light"
-                android:background="@drawable/ee_card_bg"
-                android:padding="12dp"
-                android:gravity="center"
-                android:textAlignment="center"
+            <!-- Back button and Create New Event title -->
+            <androidx.constraintlayout.widget.ConstraintLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"/>
+                android:layout_height="48dp"
+                android:layout_marginBottom="8dp">
+
+                <ImageButton
+                    android:id="@+id/btnBack"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="Back"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:srcCompat="@drawable/ic_arrow_back_24"
+                    app:tint="#FFFFFF" />
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:ellipsize="end"
+                    android:singleLine="true"
+                    android:text="Create New Event"
+                    android:textColor="@color/ee_text_light"
+                    android:textSize="20sp"
+                    android:textStyle="bold"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toEndOf="@id/btnBack"
+                    app:layout_constraintTop_toTopOf="parent" />
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
 
             <!-- Event Name + poster camera -->
+
             <TextView
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="8dp"
                 android:layout_marginBottom="8dp"
                 android:text="Event Name"
                 android:textStyle="bold"
@@ -140,20 +146,22 @@
                 android:visibility="gone"
                 app:cardCornerRadius="12dp"
                 app:cardElevation="4dp"
-                app:cardBackgroundColor="@color/ee_card">
+                app:cardBackgroundColor="@color/ee_card"
+                app:cardUseCompatPadding="false"
+                app:cardPreventCornerOverlap="false">
 
                 <FrameLayout
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:clipChildren="true">
+                    android:clipChildren="true"
+                    android:clipToPadding="false">
 
                     <ImageView
                         android:id="@+id/posterPreview"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         android:scaleType="matrix"
-                        android:contentDescription="Poster preview"
-                        android:background="@drawable/ee_card_bg"/>
+                        android:contentDescription="Poster preview"/>
 
                 </FrameLayout>
 
@@ -582,4 +590,16 @@
             app:rippleColor="@color/ee_card"
             app:cornerRadius="12dp"/>
     </LinearLayout>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:gravity="center"
+        android:text="EventEase"
+        android:textColor="@color/ee_topbar_text"
+        android:textSize="32sp"
+        android:textStyle="bold"
+        app:layout_anchor="@+id/linearLayout"
+        app:layout_anchorGravity="center" />
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
