@@ -10,6 +10,7 @@ import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QuerySnapshot;
+import com.google.firebase.firestore.FieldValue;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -105,7 +106,14 @@ public class AdminProfileDatabaseController {
         }
 
         Log.d(TAG, "Starting deletion of profile: " + uid);
-        
+        removeUserFromEventLists(uid);
+
+        // If the user is an organizer, delete all of their events first
+        if (profile.getRoles() != null && profile.getRoles().contains("organizer")) {
+            Log.d(TAG, "deleteProfile: User is an organizer, deleting their events. uid=" + uid);
+            deleteOrganizerEvents(uid);
+        }
+
         // Use ProfileDeletionHelper to delete all user references first
         ProfileDeletionHelper deletionHelper = new ProfileDeletionHelper(context);
         deletionHelper.deleteAllUserReferences(uid, new ProfileDeletionHelper.DeletionCallback() {
@@ -123,7 +131,7 @@ public class AdminProfileDatabaseController {
             }
         });
     }
-    
+
     private void deleteUserDocument(@NonNull String uid, @NonNull DeleteCallback callback) {
         DocumentReference userRef = db.collection("users").document(uid);
         userRef.delete()
@@ -136,5 +144,113 @@ public class AdminProfileDatabaseController {
                     callback.onError(e);
                 });
     }
-}
 
+    public void removeOrganizerRole(@NonNull String uid, @NonNull DeleteCallback callback) {
+        if (uid == null || uid.trim().isEmpty()) {
+            callback.onError(new IllegalArgumentException("UID is null or empty"));
+            return;
+        }
+
+        DocumentReference userRef = db.collection("users").document(uid);
+        userRef.update("roles", FieldValue.arrayRemove("organizer"))
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "Removed organizer role for user: " + uid);
+                    this.deleteOrganizerEvents(uid);
+                    callback.onSuccess();
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to remove organizer role for user: " + uid, e);
+                    callback.onError(e);
+                });
+    }
+
+    private void deleteOrganizerEvents(@NonNull String uid) {
+        if (uid == null || uid.trim().isEmpty()) {
+            Log.w(TAG, "deleteOrganizerEvents: UID is null or empty, skipping delete");
+            return;
+        }
+
+        db.collection("events")
+                .whereEqualTo("organizerId", uid)
+                .get()
+                .addOnSuccessListener((QuerySnapshot qs) -> {
+                    if (qs == null || qs.isEmpty()) {
+                        Log.d(TAG, "deleteOrganizerEvents: No events found for organizer: " + uid);
+                        return;
+                    }
+
+                    for (DocumentSnapshot d : qs.getDocuments()) {
+                        final String eventId = d.getId();
+                        d.getReference()
+                                .delete()
+                                .addOnSuccessListener(aVoid ->
+                                        Log.d(TAG, "deleteOrganizerEvents: Deleted event " + eventId +
+                                                " for organizer: " + uid))
+                                .addOnFailureListener(e ->
+                                        Log.e(TAG, "deleteOrganizerEvents: Failed to delete event " +
+                                                eventId + " for organizer: " + uid, e));
+                    }
+                })
+                .addOnFailureListener(e ->
+                        Log.e(TAG, "deleteOrganizerEvents: Failed to fetch events for organizer: "
+                                + uid, e));
+
+
+    }
+
+    private void removeUserFromEventLists(@NonNull String uid) {
+        if (uid == null || uid.trim().isEmpty()) {
+            Log.w(TAG, "removeUserFromEventLists: UID is null or empty, skipping");
+            return;
+        }
+        db.collection("events")
+                .get()
+                .addOnSuccessListener((QuerySnapshot qs) -> {
+                    if (qs == null || qs.isEmpty()) {
+                        Log.d(TAG, "removeUserFromEventLists: No events found when cleaning up uid=" + uid);
+                        return;
+                    }
+
+                    String[] entrantCollections = new String[] {
+                            "WaitlistedEntrants",
+                            "SelectedEntrants",
+                            "NonSelectedEntrants",
+                            "CancelledEntrants",
+                            "AdmittedEntrants"
+                    };
+
+                    for (DocumentSnapshot eventDoc : qs.getDocuments()) {
+                        final String eventId = eventDoc.getId();
+                        DocumentReference eventRef = eventDoc.getReference();
+
+                        // Remove from any array fields on the event document (no-op if they don't exist)
+                        eventRef.update(
+                                        "waitlist", FieldValue.arrayRemove(uid),
+                                        "admitted", FieldValue.arrayRemove(uid)
+                                )
+                                .addOnSuccessListener(aVoid ->
+                                        Log.d(TAG, "removeUserFromEventLists: Removed uid " + uid +
+                                                " from arrays for event " + eventId))
+                                .addOnFailureListener(e ->
+                                        Log.w(TAG, "removeUserFromEventLists: Failed to update arrays for event "
+                                                + eventId + " and uid " + uid, e));
+
+                        // Remove documents from entrant subcollections (if they exist)
+                        for (String subPath : entrantCollections) {
+                            eventRef.collection(subPath)
+                                    .document(uid)
+                                    .delete()
+                                    .addOnSuccessListener(aVoid ->
+                                            Log.d(TAG, "removeUserFromEventLists: Deleted " + subPath + "/" + uid +
+                                                    " for event " + eventId))
+                                    .addOnFailureListener(e ->
+                                            Log.w(TAG, "removeUserFromEventLists: Failed to delete " + subPath +
+                                                    "/" + uid + " for event " + eventId, e));
+                        }
+                    }
+                })
+                .addOnFailureListener(e ->
+                        Log.e(TAG, "removeUserFromEventLists: Failed to load events when cleaning up uid=" + uid, e));
+    }
+
+}
