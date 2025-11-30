@@ -36,21 +36,10 @@ public class AdminLogsFragment extends Fragment {
                               @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        setupLogoutButton(view);
         setupRecyclerView(view);
 
         controller = new AdminNotificationLogDatabaseController();
         loadNotifications();
-    }
-
-    private void setupLogoutButton(View view) {
-        View logoutButton = view.findViewById(R.id.adminLogoutButton);
-        if (logoutButton != null
-                && getActivity() instanceof com.example.eventease.admin.AdminMainActivity) {
-            logoutButton.setOnClickListener(v ->
-                    ((com.example.eventease.admin.AdminMainActivity) getActivity()).performLogout()
-            );
-        }
     }
 
     private void setupRecyclerView(@NonNull View view) {
