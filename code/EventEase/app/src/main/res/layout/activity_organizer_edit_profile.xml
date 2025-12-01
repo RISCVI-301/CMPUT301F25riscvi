@@ -128,6 +128,28 @@
                 android:inputType="phone"
                 android:textColor="#FFFFFF"
                 android:textColorHint="#80FFFFFF"
+                android:layout_marginBottom="24dp"/>
+
+            <!-- Email Input -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Email"
+                android:textSize="24sp"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold"
+                android:layout_marginBottom="8dp"/>
+
+            <EditText
+                android:id="@+id/editEmailField"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/entrant_edit_text_background"
+                android:padding="16dp"
+                android:textSize="18sp"
+                android:inputType="textEmailAddress"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#80FFFFFF"
                 android:layout_marginBottom="32dp"/>
 
             <!-- Save Button -->

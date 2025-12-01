@@ -30,6 +30,7 @@ public class OrganizerEditProfileActivity extends AppCompatActivity {
     
     private EditText nameField;
     private EditText phoneField;
+    private EditText emailField;
     private ShapeableImageView profileImage;
     private FirebaseFirestore db;
     
@@ -49,6 +50,7 @@ public class OrganizerEditProfileActivity extends AppCompatActivity {
         // Initialize views
         nameField = findViewById(R.id.editNameField);
         phoneField = findViewById(R.id.editPhoneField);
+        emailField = findViewById(R.id.editEmailField);
         profileImage = findViewById(R.id.profileImageEdit);
         
         // Initialize helper
@@ -150,12 +152,16 @@ public class OrganizerEditProfileActivity extends AppCompatActivity {
                 // Set the hints with current data
                 String currentName = documentSnapshot.getString("name");
                 String currentPhone = documentSnapshot.getString("phoneNumber");
+                String currentEmail = documentSnapshot.getString("email");
                 
                 if (currentName != null) {
                     nameField.setHint(currentName);
                 }
                 if (currentPhone != null) {
                     phoneField.setHint(currentPhone);
+                }
+                if (currentEmail != null && emailField != null) {
+                    emailField.setHint(currentEmail);
                 }
                 
                 // Load profile image
@@ -177,9 +183,10 @@ public class OrganizerEditProfileActivity extends AppCompatActivity {
     private void saveChanges() {
         String newName = nameField.getText().toString().trim();
         String newPhone = phoneField.getText().toString().trim();
+        String newEmail = emailField != null ? emailField.getText().toString().trim() : "";
         
         // Use ProfileUpdateHelper to save changes (same as entrant view)
-        updateHelper.saveChanges(newName, newPhone, selectedImageUri, new ProfileUpdateHelper.UpdateCallback() {
+        updateHelper.saveChanges(newName, newPhone, newEmail, selectedImageUri, new ProfileUpdateHelper.UpdateCallback() {
             @Override
             public void onUpdateSuccess() {
                 Toast.makeText(OrganizerEditProfileActivity.this, "Profile updated successfully", Toast.LENGTH_SHORT).show();

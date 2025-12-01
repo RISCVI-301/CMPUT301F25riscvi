@@ -23,6 +23,7 @@ import com.example.eventease.R;
 public class EditProfileFragment extends Fragment {
     private EditText nameField;
     private EditText phoneField;
+    private EditText emailField;
     private ShapeableImageView profileImage;
     private FirebaseFirestore db;
     
@@ -49,7 +50,7 @@ public class EditProfileFragment extends Fragment {
         
         // Initialize views
         nameField = root.findViewById(R.id.editNameField);
-        // email field removed from layout; change handled via button
+        emailField = root.findViewById(R.id.editEmailField);
         phoneField = root.findViewById(R.id.editPhoneField);
         profileImage = root.findViewById(R.id.profileImageEdit);
         
@@ -99,6 +100,9 @@ public class EditProfileFragment extends Fragment {
                     // Set the hints with current data
                     nameField.setHint(documentSnapshot.getString("name"));
                     phoneField.setHint(documentSnapshot.getString("phoneNumber"));
+                    if (emailField != null) {
+                        emailField.setHint(documentSnapshot.getString("email"));
+                    }
                     
                     // Load profile image
                     String photoUrl = documentSnapshot.getString("photoUrl");
@@ -117,9 +121,10 @@ public class EditProfileFragment extends Fragment {
     private void saveChanges() {
         String newName = nameField.getText().toString();
         String newPhone = phoneField.getText().toString();
+        String newEmail = emailField != null ? emailField.getText().toString() : "";
         Uri imageUri = imageHelper.getSelectedImageUri();
         
-        updateHelper.saveChanges(newName, newPhone, imageUri, new ProfileUpdateHelper.UpdateCallback() {
+        updateHelper.saveChanges(newName, newPhone, newEmail, imageUri, new ProfileUpdateHelper.UpdateCallback() {
             @Override
             public void onUpdateSuccess() {
                 navigateBackSafely();
