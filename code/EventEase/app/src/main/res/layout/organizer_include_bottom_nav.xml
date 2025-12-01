@@ -59,7 +59,7 @@
             android:id="@+id/nav_icon_create"
             android:layout_width="44dp"
             android:layout_height="44dp"
-            android:src="@drawable/organizer_ic_add_circle"
+            android:src="@drawable/organizer_ic_add_circle_dark"
             android:contentDescription="Create Event"/>
 
         <TextView

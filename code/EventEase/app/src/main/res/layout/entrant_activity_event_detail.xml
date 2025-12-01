@@ -316,13 +316,5 @@
 
     </androidx.core.widget.NestedScrollView>
 
-    <!-- Bottom Navigation (custom glass style) -->
-    <include
-        android:id="@+id/include_bottom"
-        layout="@layout/entrant_include_bottom_nav"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom"/>
-
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
 

@@ -19,6 +19,7 @@ import androidx.core.content.ContextCompat;
 import androidx.core.view.WindowCompat;
 import androidx.navigation.NavController;
 import androidx.navigation.NavDestination;
+import androidx.navigation.NavOptions;
 import androidx.navigation.fragment.NavHostFragment;
 
 import com.google.firebase.FirebaseApp;
@@ -560,17 +561,35 @@ public class MainActivity extends AppCompatActivity {
 
     private void setupCustomNavigation() {
         navButtonMyEvents.setOnClickListener(v -> {
-            nav.navigate(R.id.eventsSelectionFragment);
+            NavOptions navOptions = new NavOptions.Builder()
+                    .setEnterAnim(0)
+                    .setExitAnim(0)
+                    .setPopEnterAnim(0)
+                    .setPopExitAnim(0)
+                    .build();
+            nav.navigate(R.id.eventsSelectionFragment, null, navOptions);
             updateNavigationSelection(R.id.eventsSelectionFragment);
         });
 
         navButtonDiscover.setOnClickListener(v -> {
-            nav.navigate(R.id.discoverFragment);
+            NavOptions navOptions = new NavOptions.Builder()
+                    .setEnterAnim(0)
+                    .setExitAnim(0)
+                    .setPopEnterAnim(0)
+                    .setPopExitAnim(0)
+                    .build();
+            nav.navigate(R.id.discoverFragment, null, navOptions);
             updateNavigationSelection(R.id.discoverFragment);
         });
 
         navButtonAccount.setOnClickListener(v -> {
-            nav.navigate(R.id.accountFragment);
+            NavOptions navOptions = new NavOptions.Builder()
+                    .setEnterAnim(0)
+                    .setExitAnim(0)
+                    .setPopEnterAnim(0)
+                    .setPopExitAnim(0)
+                    .build();
+            nav.navigate(R.id.accountFragment, null, navOptions);
             updateNavigationSelection(R.id.accountFragment);
         });
     }

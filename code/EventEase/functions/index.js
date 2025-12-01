@@ -126,13 +126,48 @@ exports.sendNotification = functions.firestore
                         }
                     }
                     
+                    // CRITICAL: Also check specific notification preferences based on groupType
+                    // This ensures users who have disabled specific notification types don't receive them
+                    let preferenceEnabled = true; // Default to enabled
+                    if (groupType === 'selected' || groupType === 'selection') {
+                        // For selected/invited notifications, check notificationPreferenceInvited
+                        const invitedPref = userData.notificationPreferenceInvited;
+                        if (invitedPref !== undefined && invitedPref !== null) {
+                            if (typeof invitedPref === 'boolean') {
+                                preferenceEnabled = invitedPref;
+                            } else if (typeof invitedPref === 'string') {
+                                preferenceEnabled = invitedPref.toLowerCase() === 'true';
+                            } else {
+                                preferenceEnabled = Boolean(invitedPref);
+                            }
+                        }
+                        // If not set, default to true (enabled)
+                    } else if (groupType === 'nonSelected' || groupType === 'sorry') {
+                        // For not-invited/sorry notifications, check notificationPreferenceNotInvited
+                        const notInvitedPref = userData.notificationPreferenceNotInvited;
+                        if (notInvitedPref !== undefined && notInvitedPref !== null) {
+                            if (typeof notInvitedPref === 'boolean') {
+                                preferenceEnabled = notInvitedPref;
+                            } else if (typeof notInvitedPref === 'string') {
+                                preferenceEnabled = notInvitedPref.toLowerCase() === 'true';
+                            } else {
+                                preferenceEnabled = Boolean(notInvitedPref);
+                            }
+                        }
+                        // If not set, default to true (enabled)
+                    }
+                    // For other groupTypes (waitlist, cancelled, general), don't check specific preferences
+                    
                     console.log(`User ${userIds[index]}:`);
                     console.log(`  - Token exists: ${!!fcmToken}`);
                     console.log(`  - Token length: ${fcmToken ? fcmToken.length : 0}`);
                     console.log(`  - notificationsEnabled (raw): ${notificationsEnabledRaw} (type: ${typeof notificationsEnabledRaw})`);
                     console.log(`  - notificationsEnabled (parsed): ${notificationsEnabled}`);
+                    console.log(`  - Group type: ${groupType}`);
+                    console.log(`  - Preference enabled: ${preferenceEnabled}`);
                     
-                    if (fcmToken && notificationsEnabled) {
+                    // User must have both notificationsEnabled AND the specific preference enabled
+                    if (fcmToken && notificationsEnabled && preferenceEnabled) {
                         const firstName = getUserFirstName(userData);
                         const personalizedMessage = personalizeMessage(message, firstName);
                         
@@ -145,10 +180,17 @@ exports.sendNotification = functions.firestore
                         
                         console.log(`✓ Added token for user ${userIds[index]} (firstName: ${firstName || 'N/A'}, token preview: ${fcmToken.substring(0, 20)}...)`);
                     } else {
-                        const reason = !fcmToken ? 'no FCM token' : 'notifications disabled in Firestore';
+                        let reason = '';
+                        if (!fcmToken) {
+                            reason = 'no FCM token';
+                        } else if (!notificationsEnabled) {
+                            reason = 'notifications disabled in Firestore';
+                        } else if (!preferenceEnabled) {
+                            reason = `notification preference disabled for ${groupType} notifications`;
+                        }
                         console.log(`✗ User ${userIds[index]}: ${reason}`);
                         
-                        if (!fcmToken && notificationsEnabled) {
+                        if (!fcmToken && notificationsEnabled && preferenceEnabled) {
                             usersWithoutTokens.push({
                                 userId: userIds[index],
                                 deviceId: userIds[index]
@@ -1049,7 +1091,25 @@ exports.retryFailedNotifications = functions.pubsub
                             const fcmToken = userData.fcmToken;
                             const notificationsEnabled = userData.notificationsEnabled !== false; // Default to true
                             
-                            if (fcmToken && notificationsEnabled) {
+                            // CRITICAL: Also check specific notification preferences based on groupType
+                            let preferenceEnabled = true; // Default to enabled
+                            const retryGroupType = requestData.groupType || 'general';
+                            if (retryGroupType === 'selected' || retryGroupType === 'selection') {
+                                // For selected/invited notifications, check notificationPreferenceInvited
+                                const invitedPref = userData.notificationPreferenceInvited;
+                                if (invitedPref !== undefined && invitedPref !== null) {
+                                    preferenceEnabled = Boolean(invitedPref);
+                                }
+                            } else if (retryGroupType === 'nonSelected' || retryGroupType === 'sorry') {
+                                // For not-invited/sorry notifications, check notificationPreferenceNotInvited
+                                const notInvitedPref = userData.notificationPreferenceNotInvited;
+                                if (notInvitedPref !== undefined && notInvitedPref !== null) {
+                                    preferenceEnabled = Boolean(notInvitedPref);
+                                }
+                            }
+                            
+                            // User must have both notificationsEnabled AND the specific preference enabled
+                            if (fcmToken && notificationsEnabled && preferenceEnabled) {
                                 // Get first name for personalization
                                 let firstName = null;
                                 if (userData.firstName && userData.firstName.trim()) {
@@ -1079,7 +1139,7 @@ exports.retryFailedNotifications = functions.pubsub
                                         body: personalizedMessage,
                                     },
                                     data: {
-                                        type: requestData.groupType || 'general',
+                                        type: retryGroupType,
                                         eventId: requestData.eventId || '',
                                         eventTitle: requestData.eventTitle || 'Event',
                                         title: requestData.title || 'Event Update',

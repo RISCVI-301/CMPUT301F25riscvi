@@ -8,6 +8,7 @@ import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QuerySnapshot;
+import com.google.firebase.firestore.Source;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -465,9 +466,10 @@ public class NotificationHelper {
         List<String> filteredUserIds = new ArrayList<>();
         List<Task<DocumentSnapshot>> tasks = new ArrayList<>();
         
-        // Fetch all user documents
+        // Fetch all user documents from SERVER (not cache) to ensure we get the latest preference values
+        // This prevents race conditions where cached preference values might be stale
         for (String userId : userIds) {
-            tasks.add(db.collection("users").document(userId).get());
+            tasks.add(db.collection("users").document(userId).get(Source.SERVER));
         }
         
         // Wait for all tasks to complete
@@ -483,25 +485,38 @@ public class NotificationHelper {
                         
                         if (userDoc != null && userDoc.exists()) {
                             // Check the appropriate preference field
-                            Boolean preferenceValue;
+                            Boolean preferenceValue = null;
                             if (checkInvitedPreference) {
-                                preferenceValue = userDoc.getBoolean("notificationPreferenceInvited");
+                                Object invitedPref = userDoc.get("notificationPreferenceInvited");
+                                if (invitedPref instanceof Boolean) {
+                                    preferenceValue = (Boolean) invitedPref;
+                                } else if (invitedPref instanceof String) {
+                                    // Handle string values (shouldn't happen, but be defensive)
+                                    preferenceValue = Boolean.parseBoolean((String) invitedPref);
+                                }
                             } else {
-                                preferenceValue = userDoc.getBoolean("notificationPreferenceNotInvited");
+                                Object notInvitedPref = userDoc.get("notificationPreferenceNotInvited");
+                                if (notInvitedPref instanceof Boolean) {
+                                    preferenceValue = (Boolean) notInvitedPref;
+                                } else if (notInvitedPref instanceof String) {
+                                    // Handle string values (shouldn't happen, but be defensive)
+                                    preferenceValue = Boolean.parseBoolean((String) notInvitedPref);
+                                }
                             }
                             
-                            // Default to true (enabled) if preference not set
+                            // Default to true (enabled) if preference not set or invalid
+                            // This ensures users receive notifications by default unless they explicitly opt out
                             boolean isEnabled = preferenceValue != null ? preferenceValue : true;
                             
                             if (isEnabled) {
                                 filteredUserIds.add(userId);
                                 Log.d(TAG, "User " + userId + " has " + 
                                     (checkInvitedPreference ? "invited" : "not invited") + 
-                                    " notifications enabled");
+                                    " notifications enabled - will receive notification");
                             } else {
-                                Log.d(TAG, "User " + userId + " has " + 
+                                Log.w(TAG, "User " + userId + " has " + 
                                     (checkInvitedPreference ? "invited" : "not invited") + 
-                                    " notifications disabled - skipping");
+                                    " notifications disabled - skipping (preference: " + preferenceValue + ")");
                             }
                         } else {
                             // User document doesn't exist or no preference set - default to enabled
