@@ -108,7 +108,7 @@ public class LocationPermissionFragment extends Fragment {
                         captureAndSaveLocation();
                     } else {
                         // Location permission was denied, just navigate to discover
-                        navigateToDiscover();
+                    navigateToDiscover();
                     }
                 });
     }

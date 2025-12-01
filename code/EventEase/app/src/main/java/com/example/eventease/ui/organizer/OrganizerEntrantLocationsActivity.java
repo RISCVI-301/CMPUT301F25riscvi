@@ -98,12 +98,23 @@ public class OrganizerEntrantLocationsActivity extends AppCompatActivity impleme
 
     @Override
     public void onMapReady(GoogleMap googleMap) {
+        Log.d(TAG, "Map is ready");
         mMap = googleMap;
         
+        if (mMap == null) {
+            Log.e(TAG, "GoogleMap is null after onMapReady");
+            Toast.makeText(this, "Failed to initialize map", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        try {
         // Configure map settings
         mMap.getUiSettings().setZoomControlsEnabled(true);
         mMap.getUiSettings().setCompassEnabled(true);
         mMap.getUiSettings().setMyLocationButtonEnabled(false);
+            
+            // Set map type to normal (not satellite)
+            mMap.setMapType(GoogleMap.MAP_TYPE_NORMAL);
         
         // Set custom info window adapter to show entrant names
         mMap.setInfoWindowAdapter(new GoogleMap.InfoWindowAdapter() {
@@ -117,9 +128,18 @@ public class OrganizerEntrantLocationsActivity extends AppCompatActivity impleme
                 return null; // Use default info window
             }
         });
+            
+            // Set a default location first to ensure map is visible
+            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(0, 0), 2f));
+            
+            Log.d(TAG, "Map configured successfully, loading waitlisted entrants");
         
         // Load and display entrant locations
         loadWaitlistedEntrants();
+        } catch (Exception e) {
+            Log.e(TAG, "Error configuring map", e);
+            Toast.makeText(this, "Error configuring map: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
     }
     
     private void loadEventData() {
@@ -128,18 +148,33 @@ public class OrganizerEntrantLocationsActivity extends AppCompatActivity impleme
     }
     
     private void loadWaitlistedEntrants() {
-        if (eventId == null || eventId.isEmpty() || mMap == null) return;
+        if (eventId == null || eventId.isEmpty()) {
+            Log.e(TAG, "Event ID is null or empty");
+            return;
+        }
+        
+        if (mMap == null) {
+            Log.e(TAG, "Map is not ready yet");
+            return;
+        }
         
         // Clear existing markers
         mMap.clear();
         entrantInfoMap.clear();
+        
+        Log.d(TAG, "Loading waitlisted entrants for event: " + eventId);
         
         // Get all waitlisted entrants from the subcollection
         db.collection("events").document(eventId).collection("WaitlistedEntrants")
                 .get()
                 .addOnSuccessListener(querySnapshot -> {
                     if (querySnapshot == null || querySnapshot.isEmpty()) {
+                        Log.d(TAG, "No waitlisted entrants found");
                         Toast.makeText(this, "No waitlisted entrants found", Toast.LENGTH_SHORT).show();
+                        // Set a default location so map is visible
+                        if (mMap != null) {
+                            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(0, 0), 2f));
+                        }
                         return;
                     }
                     
@@ -149,12 +184,18 @@ public class OrganizerEntrantLocationsActivity extends AppCompatActivity impleme
                         userIds.add(userId);
                     }
                     
+                    Log.d(TAG, "Found " + userIds.size() + " waitlisted entrants");
+                    
                     // Load user locations for all waitlisted entrants
                     loadUserLocations(userIds);
                 })
                 .addOnFailureListener(e -> {
                     Log.e(TAG, "Failed to load waitlisted entrants", e);
                     Toast.makeText(this, "Failed to load entrants: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    // Set a default location so map is visible even on error
+                    if (mMap != null) {
+                        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(0, 0), 2f));
+                    }
                 });
     }
     
@@ -187,6 +228,12 @@ public class OrganizerEntrantLocationsActivity extends AppCompatActivity impleme
                                     double latitude = ((Number) latObj).doubleValue();
                                     double longitude = ((Number) lngObj).doubleValue();
                                     
+                                    // Validate coordinates are reasonable (not 0,0 unless that's a valid location)
+                                    if (latitude != 0.0 || longitude != 0.0) {
+                                        // Validate latitude is between -90 and 90
+                                        if (latitude >= -90.0 && latitude <= 90.0 && 
+                                            longitude >= -180.0 && longitude <= 180.0) {
+                                    
                                     // Create marker
                                     LatLng location = new LatLng(latitude, longitude);
                                     MarkerOptions markerOptions = new MarkerOptions()
@@ -199,7 +246,18 @@ public class OrganizerEntrantLocationsActivity extends AppCompatActivity impleme
                                     // Store entrant info
                                     entrantInfoMap.put(marker.getId(), new EntrantInfo(name, userId, latitude, longitude));
                                     allLocations.add(location);
+                                            Log.d(TAG, "Added marker for " + name + " at (" + latitude + ", " + longitude + ")");
+                                        } else {
+                                            Log.w(TAG, "Invalid coordinates for user " + userId + ": (" + latitude + ", " + longitude + ")");
+                                        }
+                                    } else {
+                                        Log.w(TAG, "Location is (0,0) for user " + userId + " - skipping");
+                                    }
+                                } else {
+                                    Log.w(TAG, "Location data type mismatch for user " + userId + ": lat=" + latObj + ", lng=" + lngObj);
                                 }
+                            } else {
+                                Log.w(TAG, "No location data found for user " + userId);
                             }
                         }
                         

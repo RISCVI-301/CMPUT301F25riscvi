@@ -130,7 +130,7 @@ public class PermissionRequestActivity extends AppCompatActivity {
                         captureAndSaveLocation();
                     } else {
                         // Location permission was denied, just navigate to main app
-                        navigateToMainApp();
+                    navigateToMainApp();
                     }
                 });
         

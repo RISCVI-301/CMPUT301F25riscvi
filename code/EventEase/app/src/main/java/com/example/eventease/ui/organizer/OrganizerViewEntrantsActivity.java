@@ -1005,12 +1005,7 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
                                                                 toReplace, toReplace == 1 ? "" : "s"
                                                         );
 
-                                                        new MaterialAlertDialogBuilder(this)
-                                                                .setTitle("Manual Replacement Selection")
-                                                                .setMessage(message)
-                                                                .setPositiveButton("Select", (dialog, which) -> showDeadlinePickerAndPerformReplacement(toReplace, eventDoc))
-                                                                .setNegativeButton("Cancel", null)
-                                                                .show();
+                                                        showReplacementRequestDialog(message, () -> showDeadlinePickerAndPerformReplacement(toReplace, eventDoc));
                                                     })
                                                     .addOnFailureListener(e -> {
                                                         Log.e(TAG, "Failed to load non-selected entrants", e);
@@ -1031,6 +1026,81 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
                     Log.e(TAG, "Failed to load event", e);
                     Toast.makeText(this, "Failed to load event details", Toast.LENGTH_SHORT).show();
                 });
+    }
+
+    private void showReplacementRequestDialog(String message, Runnable onConfirm) {
+        // Capture screenshot and blur it
+        Bitmap screenshot = captureScreenshot();
+        Bitmap blurredBitmap = blurBitmap(screenshot, 25f);
+        
+        // Create custom dialog with full screen to show blur background
+        android.app.Dialog dialog = new android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        dialog.setContentView(R.layout.dialog_replacement_request);
+        
+        // Set window properties
+        android.view.Window window = dialog.getWindow();
+        if (window != null) {
+            window.setLayout(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT
+            );
+            window.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+            
+            // Disable dim since we have our own blur background
+            android.view.WindowManager.LayoutParams layoutParams = window.getAttributes();
+            layoutParams.dimAmount = 0f;
+            window.setAttributes(layoutParams);
+            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+        }
+        
+        // Apply blurred background
+        android.view.View blurBackground = dialog.findViewById(R.id.dialogBlurBackground);
+        if (blurredBitmap != null && blurBackground != null) {
+            blurBackground.setBackground(new android.graphics.drawable.BitmapDrawable(getResources(), blurredBitmap));
+        }
+        
+        // Make the background clickable to dismiss
+        if (blurBackground != null) {
+            blurBackground.setOnClickListener(v -> dialog.dismiss());
+        }
+        
+        // Get the CardView for animation
+        androidx.cardview.widget.CardView cardView = dialog.findViewById(R.id.dialogCardView);
+        
+        // Set up dialog views
+        TextView tvMessage = dialog.findViewById(R.id.tvReplacementMessage);
+        com.google.android.material.button.MaterialButton btnCancel = dialog.findViewById(R.id.btnReplacementCancel);
+        com.google.android.material.button.MaterialButton btnSelect = dialog.findViewById(R.id.btnReplacementSelect);
+        
+        // Set content
+        if (tvMessage != null) {
+            tvMessage.setText(message);
+        }
+        
+        // Set button click listeners
+        if (btnCancel != null) {
+            btnCancel.setOnClickListener(v -> dialog.dismiss());
+        }
+        
+        if (btnSelect != null && onConfirm != null) {
+            btnSelect.setOnClickListener(v -> {
+                dialog.dismiss();
+                onConfirm.run();
+            });
+        }
+        
+        dialog.show();
+        
+        // Apply animations after dialog is shown
+        android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_fade_in);
+        android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_zoom_in);
+        
+        if (blurBackground != null) {
+            blurBackground.startAnimation(fadeIn);
+        }
+        if (cardView != null) {
+            cardView.startAnimation(zoomIn);
+        }
     }
 
     private void showDeadlinePickerAndPerformReplacement(int count, DocumentSnapshot eventDoc) {
@@ -1082,12 +1152,6 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
                 // Perform replacement with selected deadline
                 performReplacementSwap(count, selectedDeadline);
             }, defaultHour, defaultMinute, false);
-            // Make time picker background use the EventEase top bar color
-            tp.setOnShowListener(dialog -> {
-                if (tp.getWindow() != null) {
-                    tp.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
-                }
-            });
             tp.show();
         }, now.get(Calendar.YEAR), now.get(Calendar.MONTH), now.get(Calendar.DAY_OF_MONTH));
         
