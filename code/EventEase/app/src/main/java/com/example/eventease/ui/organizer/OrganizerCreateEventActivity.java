@@ -923,9 +923,10 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
             cardView.startAnimation(zoomIn);
         }
 
+        final String finalEventId = eventId; // Store eventId for use in delayed callback
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
             preparingDialog.dismiss();
-            showQrDialog(title, qrPayload, eventId);
+            showQrDialog(title, qrPayload, finalEventId);
         }, 1200);
     }
 
@@ -958,12 +959,13 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
 
         // Flag to prevent double navigation
         final boolean[] hasNavigated = {false};
+        final String finalEventId = eventId; // Store for use in lambda
 
         // Helper method to navigate to event page
         Runnable navigateToEvent = () -> {
             if (hasNavigated[0]) return; // Prevent double navigation
             hasNavigated[0] = true;
-            navigateToEventAfterDialog(eventId);
+            navigateToEventAfterDialog(finalEventId);
         };
 
         if (btnShare != null) {

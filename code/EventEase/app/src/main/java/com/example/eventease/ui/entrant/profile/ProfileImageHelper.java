@@ -52,9 +52,38 @@ public class ProfileImageHelper {
             uri -> {
                 if (uri != null) {
                     selectedImageUri = uri;
-                    profileImage.setImageURI(uri);
-                    if (imageSelectedCallback != null) {
-                        imageSelectedCallback.onImageSelected(uri);
+                    // Show circle crop dialog instead of directly setting image
+                    if (context != null) {
+                        CircleCropHelper.showCircleCropDialog(context, uri, 
+                            croppedBitmap -> {
+                                // Save cropped bitmap to a file and update URI
+                                try {
+                                    java.io.File croppedFile = new java.io.File(
+                                        context.getCacheDir(), 
+                                        "cropped_profile_" + System.currentTimeMillis() + ".jpg"
+                                    );
+                                    java.io.FileOutputStream fos = new java.io.FileOutputStream(croppedFile);
+                                    croppedBitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, fos);
+                                    fos.flush();
+                                    fos.close();
+                                    
+                                    selectedImageUri = androidx.core.content.FileProvider.getUriForFile(
+                                        context,
+                                        context.getPackageName() + ".fileprovider",
+                                        croppedFile
+                                    );
+                                    
+                                    // Update profile image with cropped version
+                                    profileImage.setImageBitmap(croppedBitmap);
+                                    if (imageSelectedCallback != null) {
+                                        imageSelectedCallback.onImageSelected(selectedImageUri);
+                                    }
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                    ToastUtil.showShort(context, "Failed to save cropped image");
+                                }
+                            }
+                        );
                     }
                 }
             }
@@ -74,11 +103,38 @@ public class ProfileImageHelper {
         this.takePicture = fragment.registerForActivityResult(
             new ActivityResultContracts.TakePicture(),
             success -> {
-                if (success && selectedImageUri != null) {
-                    profileImage.setImageURI(selectedImageUri);
-                    if (imageSelectedCallback != null) {
-                        imageSelectedCallback.onImageSelected(selectedImageUri);
-                    }
+                if (success && selectedImageUri != null && context != null) {
+                    // Show circle crop dialog for camera image too
+                    CircleCropHelper.showCircleCropDialog(context, selectedImageUri, 
+                        croppedBitmap -> {
+                            // Save cropped bitmap to a file and update URI
+                            try {
+                                java.io.File croppedFile = new java.io.File(
+                                    context.getCacheDir(), 
+                                    "cropped_profile_" + System.currentTimeMillis() + ".jpg"
+                                );
+                                java.io.FileOutputStream fos = new java.io.FileOutputStream(croppedFile);
+                                croppedBitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, fos);
+                                fos.flush();
+                                fos.close();
+                                
+                                selectedImageUri = androidx.core.content.FileProvider.getUriForFile(
+                                    context,
+                                    context.getPackageName() + ".fileprovider",
+                                    croppedFile
+                                );
+                                
+                                // Update profile image with cropped version
+                                profileImage.setImageBitmap(croppedBitmap);
+                                if (imageSelectedCallback != null) {
+                                    imageSelectedCallback.onImageSelected(selectedImageUri);
+                                }
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                                ToastUtil.showShort(context, "Failed to save cropped image");
+                            }
+                        }
+                    );
                 }
             }
         );
