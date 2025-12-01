@@ -46,9 +46,7 @@ public class LocationPermissionFragment extends Fragment {
     private static final String PERMISSION_WHILE_USING = "whileUsing";
     private static final String PERMISSION_DENIED = "denied";
 
-    private Button btnAllowOnce;
-    private Button btnWhileUsingApp;
-    private Button btnDontAllow;
+    private Button btnAllowPermission;
     private ProgressBar progressBar;
 
     private FusedLocationProviderClient fusedLocationClient;
@@ -71,13 +69,15 @@ public class LocationPermissionFragment extends Fragment {
                     Boolean coarseLocationGranted = result.get(Manifest.permission.ACCESS_COARSE_LOCATION);
 
                     if (Boolean.TRUE.equals(fineLocationGranted) || Boolean.TRUE.equals(coarseLocationGranted)) {
-                        // Permission granted
+                        // Permission granted - determine type based on what user selected in system dialog
+                        // If user selected "While using the app" in system dialog, use that
+                        // Note: We can't detect which option user chose, so we'll default to "whileUsing"
+                        selectedPermissionType = PERMISSION_WHILE_USING;
                         savePermissionPreference(selectedPermissionType);
                         captureAndSaveLocation();
                     } else {
                         // Permission denied
                         savePermissionPreference(PERMISSION_DENIED);
-                        Toast.makeText(requireContext(), "Location permission denied", Toast.LENGTH_SHORT).show();
                         // Still request notification permission even if location was denied
                         requestNotificationPermission();
                     }
@@ -120,55 +120,18 @@ public class LocationPermissionFragment extends Fragment {
         db = FirebaseFirestore.getInstance();
 
         // Initialize views
-        btnAllowOnce = view.findViewById(R.id.btnAllowOnce);
-        btnWhileUsingApp = view.findViewById(R.id.btnWhileUsingApp);
-        btnDontAllow = view.findViewById(R.id.btnDontAllow);
+        btnAllowPermission = view.findViewById(R.id.btnAllowPermission);
         progressBar = view.findViewById(R.id.progressBar);
 
-        // Set click listeners
-        btnAllowOnce.setOnClickListener(v -> handleAllowOnce());
-        btnWhileUsingApp.setOnClickListener(v -> handleWhileUsingApp());
-        btnDontAllow.setOnClickListener(v -> handleDontAllow());
+        // Set click listener
+        btnAllowPermission.setOnClickListener(v -> handleAllowPermission());
     }
 
-    private void handleAllowOnce() {
-        selectedPermissionType = PERMISSION_ONCE;
-        requestLocationPermission();
-    }
-
-    private void handleWhileUsingApp() {
+    private void handleAllowPermission() {
+        // Set permission type to "while using app" as default
         selectedPermissionType = PERMISSION_WHILE_USING;
+        // Request location permission first, then notification permission will be requested after
         requestLocationPermission();
-    }
-
-    private void handleDontAllow() {
-        selectedPermissionType = PERMISSION_DENIED;
-        savePermissionPreference(PERMISSION_DENIED);
-        
-        // Save null location to Firestore
-        com.example.eventease.auth.DeviceAuthManager authManager = 
-            new com.example.eventease.auth.DeviceAuthManager(requireContext());
-        String uid = authManager.getUid();
-        if (uid != null) {
-            Map<String, Object> updates = new HashMap<>();
-            updates.put("location", null);
-            updates.put("locationPermission", PERMISSION_DENIED);
-            
-            db.collection("users").document(uid)
-                    .update(updates)
-                    .addOnSuccessListener(aVoid -> {
-                        // Still request notification permission even if location was denied
-                        requestNotificationPermission();
-                    })
-                    .addOnFailureListener(e -> {
-                        Toast.makeText(requireContext(), "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                        // Still request notification permission even if location save failed
-                        requestNotificationPermission();
-                    });
-        } else {
-            // Still request notification permission
-            requestNotificationPermission();
-        }
     }
 
     private void requestLocationPermission() {
@@ -262,7 +225,7 @@ public class LocationPermissionFragment extends Fragment {
         updates.put("locationPermission", selectedPermissionType);
 
         db.collection("users").document(uid)
-                .update(updates)
+                .set(updates, com.google.firebase.firestore.SetOptions.merge())
                 .addOnSuccessListener(aVoid -> {
                     setLoading(false);
                     Toast.makeText(requireContext(), "Location saved successfully!", Toast.LENGTH_SHORT).show();
@@ -271,6 +234,7 @@ public class LocationPermissionFragment extends Fragment {
                 })
                 .addOnFailureListener(e -> {
                     setLoading(false);
+                    Log.e(TAG, "Failed to save location: " + e.getMessage(), e);
                     Toast.makeText(requireContext(), "Failed to save location: " + e.getMessage(), Toast.LENGTH_LONG).show();
                     // Still request notification permission even if location save failed
                     requestNotificationPermission();
@@ -323,9 +287,9 @@ public class LocationPermissionFragment extends Fragment {
 
     private void setLoading(boolean loading) {
         progressBar.setVisibility(loading ? View.VISIBLE : View.GONE);
-        btnAllowOnce.setEnabled(!loading);
-        btnWhileUsingApp.setEnabled(!loading);
-        btnDontAllow.setEnabled(!loading);
+        if (btnAllowPermission != null) {
+            btnAllowPermission.setEnabled(!loading);
+        }
     }
 }
 

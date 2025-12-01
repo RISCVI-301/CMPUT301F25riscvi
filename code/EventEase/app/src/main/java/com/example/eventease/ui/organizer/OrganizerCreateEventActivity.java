@@ -70,30 +70,8 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Activity for an organizer to create a new event.
- * 
- * <p>This class provides a comprehensive form for organizers to input event details including:
- * <ul>
- *   <li>Event title, description, location, and guidelines</li>
- *   <li>Registration period (start and end times)</li>
- *   <li>Deadline to accept/decline invitations</li>
- *   <li>Event date and event start date</li>
- *   <li>Event deadline (for replacements)</li>
- *   <li>Event capacity</li>
- *   <li>Event poster image</li>
- *   <li>QR code generation options</li>
- *   <li>Geolocation tracking options</li>
- * </ul>
- * 
- * <p>The activity performs validation on user input before saving the event. The creation process involves:
- * <ol>
- *   <li>Uploading the poster image to Firebase Storage (if provided)</li>
- *   <li>Generating a QR code for the event (if enabled)</li>
- *   <li>Creating a new document in the 'events' collection in Firestore</li>
- *   <li>Initializing subcollections for waitlist, admitted entrants, etc.</li>
- * </ol>
- * 
- * <p>After successful creation, the organizer is returned to the event list view.
+ * Activity for creating a new event.
+ * Handles event creation form, validation, and saving to Firestore.
  */
 public class OrganizerCreateEventActivity extends AppCompatActivity {
     private static final String TAG = "CreateEvent";
@@ -125,10 +103,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
     private float translateX = 0f;
     private float translateY = 0f;
 
-    /**
-     * Handles the result of the image picker intent.
-     * When an image is selected from the gallery, its URI is stored and automatically opens crop dialog.
-     */
+    // Handles image picker result
     private final ActivityResultLauncher<String> pickImage =
             registerForActivityResult(new ActivityResultContracts.GetContent(), uri -> {
                 if (uri != null) {
@@ -156,11 +131,9 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                     });
                 }
             });
-    /**
-     * Initializes the activity, sets up UI components, and attaches click listeners.
-     * @param savedInstanceState If the activity is being re-initialized, this Bundle contains the most recent data.
-     */
-    @Override protected void onCreate(@Nullable Bundle savedInstanceState) {
+
+    @Override
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.organizer_create_event);
 
@@ -317,11 +290,8 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         chipGroupTags.addView(chip);
     }
     /**
-     * Displays a DatePickerDialog followed by a spinner-based TimePickerDialog to allow the user
-     * to select a specific date and time.
-     *
-     * @param isStart A boolean flag to determine if the selected date/time is for the
-     *                registration start or end.
+     * Shows date and time pickers for registration start/end.
+     * @param isStart true for start time, false for end time
      */
     private void pickDateTime(boolean isStart) {
         final Calendar now = Calendar.getInstance();
@@ -481,10 +451,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         dp.show();
     }
 
-    /**
-     * Starts the process of saving the event. It first ensures the user is authenticated,
-     * signing in anonymously if necessary, before proceeding to validation.
-     */
+    // Starts saving the event
     private void beginSaveEvent() {
         // Device auth - no need to sign in, just save
         doValidateAndSave();
@@ -614,14 +581,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         btnSave.setText("Saving…");
         doUploadAndSave(title, chosenCapacity, chosenSampleSize);
     }
-    /**
-     * Uploads the selected event poster to Firebase Storage and then calls
-     * {@link #writeEventDoc} to save the event details to Firestore.
-     *
-     * @param title          The validated title of the event.
-     * @param chosenCapacity The validated capacity of the event (-1 for unlimited).
-     * @param chosenSampleSize The validated sample size (number of initial invitations).
-     */
+    // Uploads poster and saves event
     private void doUploadAndSave(String title, int chosenCapacity, int chosenSampleSize) {
         // Ensure organizer ID is available (device auth)
         if (organizerId == null || organizerId.trim().isEmpty()) {
@@ -823,15 +783,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
             btnSave.setText("SAVE CHANGES");
         }
     }
-    /**
-     * Writes the complete event document to the 'events' collection in Firestore.
-     *
-     * @param id             The unique ID generated for this event.
-     * @param title          The title of the event.
-     * @param chosenCapacity The maximum number of attendees (-1 for no limit).
-     * @param chosenSampleSize The number of initial invitations to send.
-     * @param posterUrl      The public URL of the uploaded poster in Firebase Storage.
-     */
+    // Saves event to Firestore
     private void writeEventDoc(String id, String title, int chosenCapacity, int chosenSampleSize, String posterUrl) {
         if (organizerId == null || organizerId.trim().isEmpty()) {
             toast("Organizer profile not configured.");

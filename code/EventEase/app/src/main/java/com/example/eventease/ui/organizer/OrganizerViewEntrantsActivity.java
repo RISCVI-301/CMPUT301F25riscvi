@@ -43,10 +43,13 @@ import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.app.DatePickerDialog;
+import android.app.TimePickerDialog;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.cardview.widget.CardView;
+import androidx.core.content.ContextCompat;
 
 import com.example.eventease.R;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
@@ -1042,24 +1045,35 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
         final Long eventStart = eventStartTemp; // Make final for lambda
         
         // Initialize calendar to current time (let user pick any time in future before event starts)
-        Calendar cal = Calendar.getInstance();
+        final Calendar now = Calendar.getInstance();
+        final int defaultHour = now.get(Calendar.HOUR_OF_DAY);
+        final int defaultMinute = now.get(Calendar.MINUTE);
         
-        // Show date picker
-        new android.app.DatePickerDialog(this, (view, year, month, dayOfMonth) -> {
-            cal.set(year, month, dayOfMonth);
-            // Show time picker
-            new android.app.TimePickerDialog(this, (view2, hourOfDay, minute) -> {
-                cal.set(Calendar.HOUR_OF_DAY, hourOfDay);
-                cal.set(Calendar.MINUTE, minute);
-                long selectedDeadline = cal.getTimeInMillis();
+        // Calculate minimum date - prevent past dates and ensure before event start
+        long minDateMs = System.currentTimeMillis();
+        if (eventStart != null && eventStart > 0) {
+            // Deadline must be before event starts
+            minDateMs = Math.min(minDateMs, eventStart - 1);
+        }
+        
+        DatePickerDialog dp = new DatePickerDialog(
+                this, R.style.EventEasePickerDialogTheme, (view, y, m, d) -> {
+            TimePickerDialog tp = new TimePickerDialog(
+                    this, R.style.EventEasePickerDialogTheme, (vv, hh, mm) -> {
+                Calendar chosen = Calendar.getInstance();
+                chosen.set(y, m, d, hh, mm, 0);
+                chosen.set(Calendar.MILLISECOND, 0);
                 
-                // Validate deadline - must be in the future and before event starts
-                long now = System.currentTimeMillis();
-                if (selectedDeadline <= now) {
+                long selectedDeadline = chosen.getTimeInMillis();
+                
+                // Validate deadline - must be in the future
+                long currentTime = System.currentTimeMillis();
+                if (selectedDeadline <= currentTime) {
                     Toast.makeText(this, "Deadline must be in the future", Toast.LENGTH_LONG).show();
                     return;
                 }
                 
+                // Validate deadline is before event starts
                 if (eventStart != null && eventStart > 0 && selectedDeadline >= eventStart) {
                     Toast.makeText(this, "Deadline must be before event start time", Toast.LENGTH_LONG).show();
                     return;
@@ -1067,8 +1081,21 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
                 
                 // Perform replacement with selected deadline
                 performReplacementSwap(count, selectedDeadline);
-            }, cal.get(Calendar.HOUR_OF_DAY), cal.get(Calendar.MINUTE), false).show();
-        }, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH), cal.get(Calendar.DAY_OF_MONTH)).show();
+            }, defaultHour, defaultMinute, false);
+            tp.show();
+        }, now.get(Calendar.YEAR), now.get(Calendar.MONTH), now.get(Calendar.DAY_OF_MONTH));
+        
+        // Prevent selecting past dates and dates after event start
+        dp.getDatePicker().setMinDate(minDateMs - 1000);
+        if (eventStart != null && eventStart > 0) {
+            dp.getDatePicker().setMaxDate(eventStart - 1);
+        }
+        // Make entire calendar background use the EventEase top bar color
+        dp.setOnShowListener(dialog -> {
+            dp.getDatePicker().setBackgroundColor(
+                    ContextCompat.getColor(this, R.color.ee_topbar_bg));
+        });
+        dp.show();
     }
 
     private void performReplacementSwap(int count, long deadlineToAccept) {

@@ -1,17 +1,10 @@
 package com.example.eventease.logic;
 
 /**
- * Utility class for validating event data.
- * 
- * <p>This class provides static methods to validate event fields such as title, capacity, and timing.
- * All validation methods return null if the validation passes, or an error message string if validation fails.
- * 
- * <p>This class follows the utility class pattern with a private constructor to prevent instantiation.
+ * Validates event data.
+ * Returns null if valid, error message string if invalid.
  */
 public final class EventValidator {
-    /**
-     * Private constructor to prevent instantiation.
-     */
     private EventValidator(){}
 
     /**

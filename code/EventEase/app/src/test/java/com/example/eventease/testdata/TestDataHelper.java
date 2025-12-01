@@ -9,16 +9,12 @@ import java.util.Date;
 import java.util.List;
 
 /**
- * Helper class for creating test data for unit tests.
- * Provides realistic test data for events, profiles, and invitations.
+ * Helper for creating test data.
  */
 public class TestDataHelper {
 
     /**
-     * Creates a realistic test event.
-     * 
-     * @param organizerId the organizer ID for the event
-     * @return a test Event instance
+     * Creates a test event.
      */
     public static Event createTestEvent(String organizerId) {
         Event event = Event.newDraft(organizerId);
@@ -37,10 +33,7 @@ public class TestDataHelper {
     }
 
     /**
-     * Creates a realistic test profile.
-     * 
-     * @param uid the user ID
-     * @return a test Profile instance
+     * Creates a test profile.
      */
     public static Profile createTestProfile(String uid) {
         return new Profile(
@@ -53,9 +46,6 @@ public class TestDataHelper {
 
     /**
      * Creates a test profile with phone number.
-     * 
-     * @param uid the user ID
-     * @return a test Profile instance with phone number
      */
     public static Profile createTestProfileWithPhone(String uid) {
         Profile profile = createTestProfile(uid);

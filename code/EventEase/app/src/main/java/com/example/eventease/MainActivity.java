@@ -94,8 +94,11 @@ public class MainActivity extends AppCompatActivity {
                 }
         );
 
-        // Request notification permission if needed (Android 13+)
-        requestNotificationPermission();
+        // Only request notification permission if user has already completed location permission flow
+        // (to avoid showing notification popup before user sees the permission explanation page)
+        if (hasCompletedPermissionFlow()) {
+            requestNotificationPermission();
+        }
 
         // Don't draw behind system bars
         WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
@@ -306,6 +309,16 @@ public class MainActivity extends AppCompatActivity {
 
         // Initialize notifications (permission already requested in onCreate)
         initializeNotifications();
+    }
+
+    /**
+     * Checks if user has completed the permission flow (location permission preference exists).
+     * @return true if user has completed permission flow, false otherwise
+     */
+    private boolean hasCompletedPermissionFlow() {
+        android.content.SharedPreferences prefs = getSharedPreferences("EventEasePrefs", MODE_PRIVATE);
+        String locationPermission = prefs.getString("locationPermission", null);
+        return locationPermission != null;
     }
 
     /**

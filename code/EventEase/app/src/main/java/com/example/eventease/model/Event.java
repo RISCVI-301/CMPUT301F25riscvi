@@ -10,25 +10,11 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Represents an event in the EventEase system.
- *
- * <p>This class serves as a data model (Data Transfer Object pattern) for events in the EventEase
- * application. It encapsulates all event-related information including scheduling, capacity management,
- * waitlist handling, and attendee tracking. Instances of this class are used throughout the application
- * for event creation, display, and management by both organizers and entrants.</p>
- *
- * <p>This class supports serialization to/from Firestore Map format via {@link #toMap()} and
- * {@link #fromMap(Map)} methods, enabling persistence in the Firebase backend. The class follows
- * the Value Object pattern for immutable data representation, though it uses public fields for
- * Firestore compatibility.</p>
- *
- * <p><b>Role in Application:</b> Central data model for the event management system. Used by
- * organizers to create and manage events, by entrants to view and register for events, and by
- * the backend services for event processing and notifications.</p>
- *
- * <p><b>Outstanding Issues:</b> The {@code waitlistCount} field is deprecated in favor of using
- * {@code waitlist.size()}, but is maintained for backwards compatibility with existing Firestore data.
- * The {@code description} field is a legacy field that mirrors {@code notes}.</p>
+ * Event data model.
+ * Stores event information and handles serialization to/from Firestore.
+ * 
+ * Note: waitlistCount is deprecated, use waitlist.size() instead.
+ * description field is legacy, same as notes.
  */
 public class Event implements Serializable {
     private static final long serialVersionUID = 1L;

@@ -16,15 +16,32 @@
             android:id="@+id/tvTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Request Entrants Location"
+            android:text="Enable Location &amp; Notifications"
             android:textSize="24sp"
-            android:textColor="#000000"
+            android:textColor="#FFFFFF"
             android:textStyle="bold"
             android:gravity="center"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             android:layout_marginTop="32dp"/>
+
+        <!-- Explanation Text -->
+        <TextView
+            android:id="@+id/tvExplanation"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:text="We need your location to show nearby events and notifications to keep you updated about your events."
+            android:textSize="16sp"
+            android:textColor="#FFFFFF"
+            android:gravity="center"
+            android:lineSpacingExtra="4dp"
+            app:layout_constraintTop_toBottomOf="@id/tvTitle"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            android:layout_marginTop="16dp"
+            android:layout_marginStart="24dp"
+            android:layout_marginEnd="24dp"/>
 
         <!-- Permission Dialog Card -->
         <androidx.cardview.widget.CardView
@@ -34,10 +51,10 @@
             app:cardCornerRadius="24dp"
             app:cardElevation="12dp"
             app:cardBackgroundColor="#E8F4F8"
-            app:layout_constraintTop_toBottomOf="@id/tvTitle"
+            app:layout_constraintTop_toBottomOf="@id/tvExplanation"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
-            android:layout_marginTop="80dp"
+            android:layout_marginTop="32dp"
             android:layout_marginStart="16dp"
             android:layout_marginEnd="16dp">
 
@@ -84,62 +101,58 @@
                     app:layout_constraintEnd_toEndOf="parent"
                     android:layout_marginTop="24dp"/>
 
-                <!-- Allow Once Button -->
-                <androidx.appcompat.widget.AppCompatButton
-                    android:id="@+id/btnAllowOnce"
+                <!-- Location Explanation -->
+                <TextView
+                    android:id="@+id/tvLocationExplanation"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:text="Allow once"
-                    android:textSize="16sp"
-                    android:textColor="#FFFFFF"
-                    android:textStyle="bold"
-                    android:textAllCaps="false"
-                    android:background="@drawable/entrant_btn_location_permission"
-                    android:paddingTop="14dp"
-                    android:paddingBottom="14dp"
-                    android:elevation="4dp"
+                    android:text="Some organizers may need to verify entrants' location. Don't worry, your location won't be revealed until necessary."
+                    android:textSize="14sp"
+                    android:textColor="#2C4A6E"
+                    android:gravity="center"
+                    android:lineSpacingExtra="2dp"
                     app:layout_constraintTop_toBottomOf="@id/tvPermissionText"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintEnd_toEndOf="parent"
-                    android:layout_marginTop="32dp"/>
+                    android:layout_marginTop="16dp"
+                    android:layout_marginStart="16dp"
+                    android:layout_marginEnd="16dp"/>
 
-                <!-- While Using App Button -->
-                <androidx.appcompat.widget.AppCompatButton
-                    android:id="@+id/btnWhileUsingApp"
+                <!-- Notification Explanation -->
+                <TextView
+                    android:id="@+id/tvNotificationExplanation"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:text="While using the app"
-                    android:textSize="16sp"
-                    android:textColor="#FFFFFF"
-                    android:textStyle="bold"
-                    android:textAllCaps="false"
-                    android:background="@drawable/entrant_btn_location_permission"
-                    android:paddingTop="14dp"
-                    android:paddingBottom="14dp"
-                    android:elevation="4dp"
-                    app:layout_constraintTop_toBottomOf="@id/btnAllowOnce"
-                    app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintEnd_toEndOf="parent"
-                    android:layout_marginTop="16dp"/>
-
-                <!-- Don't Allow Button -->
-                <androidx.appcompat.widget.AppCompatButton
-                    android:id="@+id/btnDontAllow"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:text="Don't Allow"
-                    android:textSize="16sp"
-                    android:textColor="#FFFFFF"
-                    android:textStyle="bold"
-                    android:textAllCaps="false"
-                    android:background="@drawable/entrant_btn_location_permission"
-                    android:paddingTop="14dp"
-                    android:paddingBottom="14dp"
-                    android:elevation="4dp"
-                    app:layout_constraintTop_toBottomOf="@id/btnWhileUsingApp"
+                    android:text="Notifications help you stay updated about your events and important updates."
+                    android:textSize="14sp"
+                    android:textColor="#2C4A6E"
+                    android:gravity="center"
+                    android:lineSpacingExtra="2dp"
+                    app:layout_constraintTop_toBottomOf="@id/tvLocationExplanation"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintEnd_toEndOf="parent"
                     android:layout_marginTop="16dp"
+                    android:layout_marginStart="16dp"
+                    android:layout_marginEnd="16dp"/>
+
+                <!-- Allow Permission Button -->
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/btnAllowPermission"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:text="Allow Permission"
+                    android:textSize="16sp"
+                    android:textColor="#FFFFFF"
+                    android:textStyle="bold"
+                    android:textAllCaps="false"
+                    android:background="@drawable/entrant_btn_location_permission"
+                    android:paddingTop="14dp"
+                    android:paddingBottom="14dp"
+                    android:elevation="4dp"
+                    app:layout_constraintTop_toBottomOf="@id/tvNotificationExplanation"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    android:layout_marginTop="32dp"
                     android:layout_marginBottom="8dp"/>
 
             </androidx.constraintlayout.widget.ConstraintLayout>
