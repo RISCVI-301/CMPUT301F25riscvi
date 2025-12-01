@@ -18,12 +18,13 @@ import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.AppCompatButton;
 import androidx.core.content.ContextCompat;
 
 import com.bumptech.glide.Glide;
 import com.example.eventease.MainActivity;
 import com.example.eventease.R;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.example.eventease.ui.entrant.profile.DialogBlurHelper;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
@@ -190,13 +191,28 @@ public class ProfileSetupActivity extends AppCompatActivity {
     }
     
     private void showImageSourceDialog() {
-        new MaterialAlertDialogBuilder(this)
-                .setTitle("Select Profile Picture")
-                .setMessage("Choose how you want to add your profile picture")
-                .setPositiveButton("Camera", (dialog, which) -> openCamera())
-                .setNeutralButton("Gallery", (dialog, which) -> pickImageLauncher.launch("image/*"))
-                .setNegativeButton("Cancel", null)
-                .show();
+        android.app.Dialog dialog = new android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        DialogBlurHelper.setupBlurredDialog(dialog, this, R.layout.entrant_dialog_image_source);
+
+        AppCompatButton cameraButton = dialog.findViewById(R.id.btnCamera);
+        AppCompatButton galleryButton = dialog.findViewById(R.id.btnGallery);
+
+        if (cameraButton != null) {
+            cameraButton.setOnClickListener(v -> {
+                dialog.dismiss();
+                openCamera();
+            });
+        }
+
+        if (galleryButton != null) {
+            galleryButton.setOnClickListener(v -> {
+                dialog.dismiss();
+                pickImageLauncher.launch("image/*");
+            });
+        }
+
+        dialog.show();
+        DialogBlurHelper.applyDialogAnimations(dialog, this);
     }
     
     private void openCamera() {
