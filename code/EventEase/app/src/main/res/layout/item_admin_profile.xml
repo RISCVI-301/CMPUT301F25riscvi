@@ -66,6 +66,15 @@
                 android:layout_marginEnd="8dp"
                 android:visibility="gone" />
 
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/btnViewApplication"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="VIEW APPLICATION"
+                android:backgroundTint="#4CAF50"
+                android:layout_marginEnd="8dp"
+                android:visibility="gone" />
+
             <View
                 android:layout_width="0dp"
                 android:layout_height="0dp"

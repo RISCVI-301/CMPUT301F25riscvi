@@ -12,6 +12,7 @@ import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.ColorDrawable;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
@@ -19,6 +20,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
@@ -46,6 +48,11 @@ import com.example.eventease.auth.ProfileSetupActivity;
 import com.example.eventease.notifications.FCMTokenManager;
 import com.example.eventease.util.ToastUtil;
 import com.example.eventease.ui.organizer.OrganizerMyEventActivity;
+import com.google.firebase.storage.FirebaseStorage;
+import com.google.firebase.storage.StorageReference;
+
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -66,11 +73,20 @@ public class AccountFragment extends Fragment {
     private ShapeableImageView profileImage;
     private FirebaseFirestore db;
     private CardView organizerSwitchCard;
+    private TextView applyOrganizerText;
     private CardView switchAdminCard;          // NEW
     private String organizerIdForSwitch;
     private ActivityResultLauncher<String> notificationPermissionLauncher;
     private View notificationBadge;
     private ListenerRegistration notificationBadgeListener;
+
+    // Organizer application (ID card) capture state
+    private Uri organizerApplicationImageUri;
+    private ImageView organizerIdPreviewImageView;
+    private Dialog organizerApplicationDialog;
+    private File organizerPhotoFile;
+    private ActivityResultLauncher<String> organizerCameraPermissionLauncher;
+    private ActivityResultLauncher<Uri> organizerTakePictureLauncher;
 
     public AccountFragment() { }
 
@@ -94,6 +110,28 @@ public class AccountFragment extends Fragment {
                         ToastUtil.showShort(getContext(), "Notification permission is required to enable notifications");
                     }
                 });
+
+        // Organizer application camera permission + capture
+        organizerCameraPermissionLauncher = registerForActivityResult(
+                new ActivityResultContracts.RequestPermission(),
+                isGranted -> {
+                    if (isGranted) {
+                        openOrganizerCamera();
+                    } else if (getContext() != null) {
+                        ToastUtil.showShort(getContext(), "Camera permission is required to take ID photo");
+                    }
+                }
+        );
+
+        organizerTakePictureLauncher = registerForActivityResult(
+                new ActivityResultContracts.TakePicture(),
+                success -> {
+                    if (success && organizerApplicationImageUri != null && organizerIdPreviewImageView != null) {
+                        organizerIdPreviewImageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                        organizerIdPreviewImageView.setImageURI(organizerApplicationImageUri);
+                    }
+                }
+        );
     }
 
     @Nullable
@@ -110,18 +148,9 @@ public class AccountFragment extends Fragment {
         fullNameText = root.findViewById(R.id.fullNameText);
         profileImage = root.findViewById(R.id.profileImage);
         organizerSwitchCard = root.findViewById(R.id.applyOrganizerCard);
+        applyOrganizerText = root.findViewById(R.id.applyOrganizerText);
         if (organizerSwitchCard != null) {
             organizerSwitchCard.setVisibility(View.GONE);
-            organizerSwitchCard.setOnClickListener(v -> {
-                if (getContext() == null) return;
-                if (organizerIdForSwitch == null || organizerIdForSwitch.trim().isEmpty()) {
-                    ToastUtil.showShort(getContext(), "Organizer profile not ready yet");
-                    return;
-                }
-                Intent intent = new Intent(getContext(), OrganizerMyEventActivity.class);
-                intent.putExtra(OrganizerMyEventActivity.EXTRA_ORGANIZER_ID, organizerIdForSwitch);
-                startActivity(intent);
-            });
         }
 
         // NEW: admin switch card
@@ -631,13 +660,52 @@ public class AccountFragment extends Fragment {
 
         boolean hasOrganizerRole = hasRole(documentSnapshot, "organizer");
         boolean hasEntrantRole = hasRole(documentSnapshot, "entrant");
+        boolean hasAdminRole = hasRole(documentSnapshot, "admin");
+        String appStatus = documentSnapshot.getString("organizerApplicationStatus");
+
+        organizerSwitchCard.setOnClickListener(null);
 
         if (hasOrganizerRole && hasEntrantRole) {
+            // Entrant who is already an organizer: act as "switch to organizer view"
             organizerIdForSwitch = documentSnapshot.getString("organizerId");
             if (organizerIdForSwitch == null || organizerIdForSwitch.trim().isEmpty()) {
                 organizerIdForSwitch = documentSnapshot.getId();
             }
+            if (applyOrganizerText != null) {
+                applyOrganizerText.setText("Switch to organizer view");
+            }
             organizerSwitchCard.setVisibility(View.VISIBLE);
+            organizerSwitchCard.setOnClickListener(v -> {
+                if (getContext() == null) return;
+                if (organizerIdForSwitch == null || organizerIdForSwitch.trim().isEmpty()) {
+                    ToastUtil.showShort(getContext(), "Organizer profile not ready yet");
+                    return;
+                }
+                Intent intent = new Intent(getContext(), OrganizerMyEventActivity.class);
+                intent.putExtra(OrganizerMyEventActivity.EXTRA_ORGANIZER_ID, organizerIdForSwitch);
+                startActivity(intent);
+            });
+        } else if (hasEntrantRole && !hasOrganizerRole && !hasAdminRole) {
+            // Pure entrant: allow applying to become organizer
+            organizerIdForSwitch = null;
+            organizerSwitchCard.setVisibility(View.VISIBLE);
+
+            if ("PENDING".equalsIgnoreCase(appStatus)) {
+                if (applyOrganizerText != null) {
+                    applyOrganizerText.setText("Organizer application pending");
+                }
+                // No click while pending
+            } else if ("DECLINED".equalsIgnoreCase(appStatus)) {
+                if (applyOrganizerText != null) {
+                    applyOrganizerText.setText("Organizer application declined");
+                }
+                // Could allow re-apply in future; for now, no click
+            } else {
+                if (applyOrganizerText != null) {
+                    applyOrganizerText.setText("Apply to become an organizer");
+                }
+                organizerSwitchCard.setOnClickListener(v -> showOrganizerApplicationDialog());
+            }
         } else {
             organizerIdForSwitch = null;
             organizerSwitchCard.setVisibility(View.GONE);
@@ -739,6 +807,135 @@ public class AccountFragment extends Fragment {
             blurBackground.startAnimation(fadeIn);
             card.startAnimation(zoomIn);
         }
+    }
+
+    private void showOrganizerApplicationDialog() {
+        if (getActivity() == null) return;
+
+        organizerApplicationDialog = new Dialog(requireContext(), android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        com.example.eventease.ui.entrant.profile.DialogBlurHelper.setupBlurredDialog(
+                organizerApplicationDialog, getActivity(), R.layout.entrant_dialog_organizer_application);
+
+        organizerIdPreviewImageView = organizerApplicationDialog.findViewById(R.id.idPreviewImage);
+        AppCompatButton btnUploadId = organizerApplicationDialog.findViewById(R.id.btnUploadId);
+        AppCompatButton btnSubmit = organizerApplicationDialog.findViewById(R.id.btnSubmit);
+        AppCompatButton btnCancel = organizerApplicationDialog.findViewById(R.id.btnCancel);
+
+        organizerApplicationImageUri = null;
+
+        if (btnUploadId != null) {
+            // Open camera to take ID photo
+            btnUploadId.setOnClickListener(v -> handleOrganizerCameraClick());
+        }
+
+        if (btnCancel != null) {
+            btnCancel.setOnClickListener(v -> {
+                organizerApplicationImageUri = null;
+                organizerIdPreviewImageView = null;
+                if (organizerApplicationDialog != null) {
+                    organizerApplicationDialog.dismiss();
+                    organizerApplicationDialog = null;
+                }
+            });
+        }
+
+        if (btnSubmit != null) {
+            btnSubmit.setOnClickListener(v -> {
+                if (organizerApplicationImageUri == null) {
+                    ToastUtil.showShort(getContext(), "Please take a photo of your ID card first");
+                    return;
+                }
+                submitOrganizerApplication();
+            });
+        }
+
+        organizerApplicationDialog.show();
+        com.example.eventease.ui.entrant.profile.DialogBlurHelper.applyDialogAnimations(organizerApplicationDialog, requireContext());
+    }
+
+    private void handleOrganizerCameraClick() {
+        if (getContext() == null) return;
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
+                ContextCompat.checkSelfPermission(getContext(), Manifest.permission.CAMERA)
+                        != PackageManager.PERMISSION_GRANTED) {
+            organizerCameraPermissionLauncher.launch(Manifest.permission.CAMERA);
+        } else {
+            openOrganizerCamera();
+        }
+    }
+
+    private void openOrganizerCamera() {
+        if (getContext() == null) return;
+
+        try {
+            organizerPhotoFile = File.createTempFile(
+                    "organizer_id_" + System.currentTimeMillis(),
+                    ".jpg",
+                    getContext().getCacheDir()
+            );
+
+            organizerApplicationImageUri = androidx.core.content.FileProvider.getUriForFile(
+                    getContext(),
+                    getContext().getPackageName() + ".fileprovider",
+                    organizerPhotoFile
+            );
+
+            organizerTakePictureLauncher.launch(organizerApplicationImageUri);
+        } catch (IOException e) {
+            Log.e(TAG, "Failed to create image file for organizer ID", e);
+            ToastUtil.showShort(getContext(), "Failed to create image file");
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to open camera for organizer ID", e);
+            ToastUtil.showShort(getContext(), "Failed to open camera: " + e.getMessage());
+        }
+    }
+
+    private void submitOrganizerApplication() {
+        if (getContext() == null) return;
+        String uid = com.example.eventease.auth.AuthHelper.getUid(requireContext());
+        if (uid == null || uid.isEmpty()) {
+            ToastUtil.showShort(getContext(), "Profile not set up yet");
+            return;
+        }
+
+        if (organizerApplicationImageUri == null) {
+            ToastUtil.showShort(getContext(), "Please take a photo of your ID card first");
+            return;
+        }
+
+        FirebaseStorage storage = FirebaseStorage.getInstance();
+        StorageReference storageRef = storage.getReference()
+                .child("organizer_applications")
+                .child(uid + "_" + System.currentTimeMillis() + ".jpg");
+
+        ToastUtil.showShort(getContext(), "Submitting application...");
+
+        storageRef.putFile(organizerApplicationImageUri)
+                .addOnSuccessListener(taskSnapshot ->
+                        storageRef.getDownloadUrl().addOnSuccessListener(uri -> {
+                            Map<String, Object> updates = new HashMap<>();
+                            updates.put("organizerApplicationStatus", "PENDING");
+                            updates.put("organizerApplicationIdImageUrl", uri.toString());
+                            updates.put("organizerApplicationSubmittedAt", System.currentTimeMillis());
+
+                            db.collection("users").document(uid)
+                                    .update(updates)
+                                    .addOnSuccessListener(aVoid -> {
+                                        ToastUtil.showShort(getContext(), "Application submitted for review");
+                                        if (organizerApplicationDialog != null) {
+                                            organizerApplicationDialog.dismiss();
+                                            organizerApplicationDialog = null;
+                                        }
+                                        organizerIdPreviewImageView = null;
+                                        organizerApplicationImageUri = null;
+                                    })
+                                    .addOnFailureListener(e ->
+                                            ToastUtil.showShort(getContext(), "Failed to save application: " + e.getMessage()));
+                        }).addOnFailureListener(e ->
+                                ToastUtil.showShort(getContext(), "Failed to get image URL: " + e.getMessage())))
+                .addOnFailureListener(e ->
+                        ToastUtil.showShort(getContext(), "Failed to upload image: " + e.getMessage()));
     }
 
     private Bitmap captureScreenshot() {

@@ -65,7 +65,7 @@ public class AdminProfileDatabaseController {
                         String name = getStr(d, "name");
                         String phoneNumber = getStr(d, "phoneNumber");
                         Long createdAt = d.getLong("createdAt");
-                        
+
                         // Get roles
                         List<String> roles = new ArrayList<>();
                         Object rolesObj = d.get("roles");
@@ -77,7 +77,16 @@ public class AdminProfileDatabaseController {
                             }
                         }
 
-                        list.add(new UserProfile(uid, email, name, phoneNumber, roles, createdAt != null ? createdAt : 0L));
+                        // Organizer application metadata (optional fields on user document)
+                        String organizerApplicationStatus = getStr(d, "organizerApplicationStatus");
+                        String organizerApplicationIdImageUrl = getStr(d, "organizerApplicationIdImageUrl");
+
+                        UserProfile profile = new UserProfile(uid, email, name, phoneNumber,
+                                roles, createdAt != null ? createdAt : 0L);
+                        profile.setOrganizerApplicationStatus(organizerApplicationStatus);
+                        profile.setOrganizerApplicationIdImageUrl(organizerApplicationIdImageUrl);
+
+                        list.add(profile);
                     }
                     Log.d(TAG, "fetchProfiles: Successfully loaded " + list.size() + " profiles");
                     cb.onLoaded(list);
@@ -160,6 +169,56 @@ public class AdminProfileDatabaseController {
                 })
                 .addOnFailureListener(e -> {
                     Log.e(TAG, "Failed to remove organizer role for user: " + uid, e);
+                    callback.onError(e);
+                });
+    }
+
+    /**
+     * Approves a user's organizer application by adding the organizer role and
+     * marking the application as APPROVED.
+     */
+    public void approveOrganizerApplication(@NonNull String uid, @NonNull DeleteCallback callback) {
+        if (uid == null || uid.trim().isEmpty()) {
+            callback.onError(new IllegalArgumentException("UID is null or empty"));
+            return;
+        }
+
+        DocumentReference userRef = db.collection("users").document(uid);
+        userRef.update(
+                        "roles", FieldValue.arrayUnion("organizer"),
+                        "organizerApplicationStatus", "APPROVED",
+                        "organizerApplicationReviewedAt", System.currentTimeMillis()
+                )
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "Approved organizer application for user: " + uid);
+                    callback.onSuccess();
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to approve organizer application for user: " + uid, e);
+                    callback.onError(e);
+                });
+    }
+
+    /**
+     * Declines a user's organizer application by marking it as DECLINED.
+     */
+    public void declineOrganizerApplication(@NonNull String uid, @NonNull DeleteCallback callback) {
+        if (uid == null || uid.trim().isEmpty()) {
+            callback.onError(new IllegalArgumentException("UID is null or empty"));
+            return;
+        }
+
+        DocumentReference userRef = db.collection("users").document(uid);
+        userRef.update(
+                        "organizerApplicationStatus", "DECLINED",
+                        "organizerApplicationReviewedAt", System.currentTimeMillis()
+                )
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "Declined organizer application for user: " + uid);
+                    callback.onSuccess();
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to decline organizer application for user: " + uid, e);
                     callback.onError(e);
                 });
     }

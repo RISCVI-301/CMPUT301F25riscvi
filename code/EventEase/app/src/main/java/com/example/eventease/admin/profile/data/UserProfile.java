@@ -27,6 +27,10 @@ public class UserProfile {
     private List<String> roles;
     private long createdAt;
 
+    // Organizer application fields
+    private String organizerApplicationStatus;
+    private String organizerApplicationIdImageUrl;
+
     /**
      * Default constructor for Firestore deserialization.
      */
@@ -43,7 +47,8 @@ public class UserProfile {
      * @param roles the list of roles assigned to the user
      * @param createdAt the timestamp when the profile was created
      */
-    public UserProfile(String uid, String email, String name, String phoneNumber, List<String> roles, long createdAt) {
+    public UserProfile(String uid, String email, String name, String phoneNumber,
+                       List<String> roles, long createdAt) {
         this.uid = uid;
         this.email = email;
         this.name = name;
@@ -158,6 +163,39 @@ public class UserProfile {
      */
     public void setCreatedAt(long createdAt) {
         this.createdAt = createdAt;
+    }
+
+    /**
+     * Gets the status of the user's organizer application.
+     * Expected values: null, "PENDING", "APPROVED", "DECLINED".
+     */
+    public String getOrganizerApplicationStatus() {
+        return organizerApplicationStatus;
+    }
+
+    /**
+     * Sets the status of the user's organizer application.
+     *
+     * @param organizerApplicationStatus the new application status
+     */
+    public void setOrganizerApplicationStatus(String organizerApplicationStatus) {
+        this.organizerApplicationStatus = organizerApplicationStatus;
+    }
+
+    /**
+     * Gets the download URL of the user's organizer application ID image.
+     */
+    public String getOrganizerApplicationIdImageUrl() {
+        return organizerApplicationIdImageUrl;
+    }
+
+    /**
+     * Sets the download URL of the user's organizer application ID image.
+     *
+     * @param organizerApplicationIdImageUrl the image URL
+     */
+    public void setOrganizerApplicationIdImageUrl(String organizerApplicationIdImageUrl) {
+        this.organizerApplicationIdImageUrl = organizerApplicationIdImageUrl;
     }
 }
 
