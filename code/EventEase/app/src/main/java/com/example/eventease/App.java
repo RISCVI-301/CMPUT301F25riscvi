@@ -21,6 +21,9 @@ public class App extends Application {
         super.onCreate();
         GRAPH = new FirebaseDevGraph();
         
+        // Initialize UserRoleChecker with application context
+        com.example.eventease.auth.UserRoleChecker.initialize(this);
+        
         // Create notification channel early so it's always available
         // This ensures notifications work properly from the start
         NotificationChannelManager.createNotificationChannel(this);

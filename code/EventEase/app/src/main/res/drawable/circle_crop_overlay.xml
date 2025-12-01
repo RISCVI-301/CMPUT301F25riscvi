@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Dark overlay for entire area -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#80000000"/>
+        </shape>
+    </item>
+    <!-- Transparent circle in center (using inset to create hole) -->
+    <item
+        android:left="0dp"
+        android:right="0dp"
+        android:top="0dp"
+        android:bottom="0dp">
+        <shape android:shape="oval">
+            <solid android:color="#00000000"/>
+            <size android:width="300dp" android:height="300dp"/>
+        </shape>
+    </item>
+</layer-list>
+

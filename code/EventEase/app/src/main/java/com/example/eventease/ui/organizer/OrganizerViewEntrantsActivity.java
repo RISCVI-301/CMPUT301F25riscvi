@@ -43,9 +43,13 @@ import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.app.DatePickerDialog;
+import android.app.TimePickerDialog;
 
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.cardview.widget.CardView;
+import androidx.core.content.ContextCompat;
 
 import com.example.eventease.R;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
@@ -58,13 +62,16 @@ import com.google.firebase.firestore.WriteBatch;
 import java.io.OutputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
 
 
@@ -112,9 +119,9 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
         listCancelled.setAdapter(cancelledAdapter);
 
         // Add click listeners for moving entrants between categories
-        listSelected.setOnItemClickListener((parent, view, position, id) -> {
+        listSelected.setOnItemClickListener((parent, view1, position, id) -> {
             String entrantName = selectedList.get(position);
-            showMoveEntrantDialog(entrantName, "SelectedEntrants", position);
+            showSelectedEntrantActions(entrantName);
         });
 
         listNotSelected.setOnItemClickListener((parent, view, position, id) -> {
@@ -187,12 +194,7 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
         int count = selectedList.size();
         String message = "Send notifications to " + count + " selected entrant" + (count > 1 ? "s" : "") + "? They will receive push notifications even when the app is closed.";
 
-        new MaterialAlertDialogBuilder(this)
-                .setTitle("Send Notifications")
-                .setMessage(message)
-                .setPositiveButton("Send", (dialog, which) -> sendNotificationsToSelected())
-                .setNegativeButton("Cancel", null)
-                .show();
+        showNotificationConfirmationDialog("Send Notifications", message, () -> sendNotificationsToSelected());
     }
 
     private void sendNotificationsToSelected() {
@@ -241,12 +243,7 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
         int count = notSelectedList.size();
         String message = "Send notifications to " + count + " not selected entrant" + (count > 1 ? "s" : "") + "? They will receive push notifications even when the app is closed.";
 
-        new MaterialAlertDialogBuilder(this)
-                .setTitle("Send Notifications")
-                .setMessage(message)
-                .setPositiveButton("Send", (dialog, which) -> sendNotificationsToNotSelected())
-                .setNegativeButton("Cancel", null)
-                .show();
+        showNotificationConfirmationDialog("Send Notifications", message, () -> sendNotificationsToNotSelected());
     }
 
     private void sendNotificationsToNotSelected() {
@@ -293,12 +290,7 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
         int count = cancelledList.size();
         String message = "Send notifications to " + count + " cancelled entrant" + (count > 1 ? "s" : "") + "? They will receive push notifications even when the app is closed.";
 
-        new MaterialAlertDialogBuilder(this)
-                .setTitle("Send Notifications")
-                .setMessage(message)
-                .setPositiveButton("Send", (dialog, which) -> sendNotificationsToCancelled())
-                .setNegativeButton("Cancel", null)
-                .show();
+        showNotificationConfirmationDialog("Send Notifications", message, () -> sendNotificationsToCancelled());
     }
 
     private void sendNotificationsToCancelled() {
@@ -400,32 +392,58 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
         notSelectedList.clear();
         cancelledList.clear();
 
+        // Load all three collections simultaneously and filter duplicates
+        // A user should only appear in ONE collection (Selected, NonSelected, or Cancelled)
         db.collection("events").document(eventId).collection("SelectedEntrants").get()
-                .addOnSuccessListener(snap -> {
-                    for (DocumentSnapshot doc : snap.getDocuments()) {
+                .addOnSuccessListener(selectedSnap -> {
+                    // Store userIds to filter duplicates
+                    Set<String> selectedUserIds = new HashSet<>();
+                    for (DocumentSnapshot doc : selectedSnap.getDocuments()) {
+                        selectedUserIds.add(doc.getId());
                         selectedList.add(safeName(doc));
                     }
                     selectedAdapter.notifyDataSetChanged();
-                });
-
-        // Not Selected Entrants are in NonSelectedEntrants collection (moved there after deadline)
-        // Waitlisted entrants stay in WaitlistedEntrants until first random roll happens
-        db.collection("events").document(eventId).collection("NonSelectedEntrants").get()
-                .addOnSuccessListener(snap -> {
-                    for (DocumentSnapshot doc : snap.getDocuments()) {
-                        notSelectedList.add(safeName(doc));
-                    }
-                    notSelectedAdapter.notifyDataSetChanged();
-                });
-
-        db.collection("events").document(eventId).collection("CancelledEntrants").get()
-                .addOnSuccessListener(snap -> {
-                    for (DocumentSnapshot doc : snap.getDocuments()) {
-                        cancelledList.add(safeName(doc));
-                    }
-                    cancelledAdapter.notifyDataSetChanged();
                     
-                    // NOTE: Automatic replacement is disabled - organizer must manually replace via button
+                    // Now load NonSelectedEntrants and filter out duplicates
+                    db.collection("events").document(eventId).collection("NonSelectedEntrants").get()
+                            .addOnSuccessListener(nonSelectedSnap -> {
+                                Set<String> nonSelectedUserIds = new HashSet<>();
+                                for (DocumentSnapshot doc : nonSelectedSnap.getDocuments()) {
+                                    String userId = doc.getId();
+                                    // Only add if NOT already in SelectedEntrants
+                                    if (!selectedUserIds.contains(userId)) {
+                                        nonSelectedUserIds.add(userId);
+                                        notSelectedList.add(safeName(doc));
+                                    } else {
+                                        Log.w(TAG, "Filtered duplicate: " + userId + " appears in both SelectedEntrants and NonSelectedEntrants");
+                                    }
+                                }
+                                notSelectedAdapter.notifyDataSetChanged();
+                                
+                                // Now load CancelledEntrants and filter out duplicates
+                                db.collection("events").document(eventId).collection("CancelledEntrants").get()
+                                        .addOnSuccessListener(cancelledSnap -> {
+                                            for (DocumentSnapshot doc : cancelledSnap.getDocuments()) {
+                                                String userId = doc.getId();
+                                                // Only add if NOT already in SelectedEntrants or NonSelectedEntrants
+                                                if (!selectedUserIds.contains(userId) && !nonSelectedUserIds.contains(userId)) {
+                                                    cancelledList.add(safeName(doc));
+                                                } else {
+                                                    Log.w(TAG, "Filtered duplicate: " + userId + " appears in multiple collections");
+                                                }
+                                            }
+                                            cancelledAdapter.notifyDataSetChanged();
+                                        })
+                                        .addOnFailureListener(e -> {
+                                            Log.e(TAG, "Failed to load CancelledEntrants", e);
+                                        });
+                            })
+                            .addOnFailureListener(e -> {
+                                Log.e(TAG, "Failed to load NonSelectedEntrants", e);
+                            });
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to load SelectedEntrants", e);
                 });
     }
 
@@ -442,6 +460,89 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
             name = "(unknown)";
         }
         return name;
+    }
+
+    private void showSelectedEntrantActions(String entrantName) {
+        if (eventId == null || eventId.isEmpty()) {
+            Toast.makeText(this, "Event ID not found", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        DocumentReference eventRef = db.collection("events").document(eventId);
+        eventRef.collection("SelectedEntrants").get()
+                .addOnSuccessListener(snapshot -> {
+                    DocumentSnapshot targetDoc = null;
+                    if (snapshot != null) {
+                        for (DocumentSnapshot doc : snapshot.getDocuments()) {
+                            if (entrantName.equals(safeName(doc))) {
+                                targetDoc = doc;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (targetDoc == null) {
+                        Toast.makeText(this, "Entrant not found", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    String userId = targetDoc.getId();
+                    Map<String, Object> data = targetDoc.getData() != null ? new HashMap<>(targetDoc.getData()) : new HashMap<>();
+
+                    CharSequence[] options = new CharSequence[]{"Move to Not Selected", "Move to Cancelled", "Close"};
+                    new MaterialAlertDialogBuilder(this)
+                            .setTitle("Selected Entrant")
+                            .setMessage("Choose an action for " + entrantName)
+                            .setItems(options, (dialog, which) -> {
+                                if (which == 0) {
+                                    moveSelectedEntrantToNotSelected(userId, data);
+                                } else if (which == 1) {
+                                    moveSelectedEntrantToCancelled(userId, data);
+                                }
+                            })
+                            .show();
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to load selected entrant", e);
+                    Toast.makeText(this, "Failed to load entrant details", Toast.LENGTH_SHORT).show();
+                });
+    }
+
+    private void moveSelectedEntrantToCancelled(String userId, Map<String, Object> data) {
+        if (eventId == null || eventId.isEmpty()) {
+            Toast.makeText(this, "Event ID not found", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String name = data != null && data.get("name") != null ? String.valueOf(data.get("name")) : "(unknown)";
+        Log.d(TAG, "ENTRANT_MOVE: eventId=" + eventId +
+                ", userId=" + userId +
+                ", name=" + name +
+                ", from=SelectedEntrants" +
+                ", to=CancelledEntrants" +
+                ", reason=organizer_selected_to_cancelled");
+        db.collection("events").document(eventId)
+                .collection("AdmittedEntrants").document(userId).delete();
+        Map<String, Object> payload = data != null ? new HashMap<>(data) : new HashMap<>();
+        payload.put("cancelledAt", System.currentTimeMillis());
+        moveEntrantBetweenCollections(userId, payload, "SelectedEntrants", "CancelledEntrants");
+    }
+
+    private void moveSelectedEntrantToNotSelected(String userId, Map<String, Object> data) {
+        if (eventId == null || eventId.isEmpty()) {
+            Toast.makeText(this, "Event ID not found", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String name = data != null && data.get("name") != null ? String.valueOf(data.get("name")) : "(unknown)";
+        Log.d(TAG, "ENTRANT_MOVE: eventId=" + eventId +
+                ", userId=" + userId +
+                ", name=" + name +
+                ", from=SelectedEntrants" +
+                ", to=NonSelectedEntrants" +
+                ", reason=organizer_selected_to_not_selected");
+        db.collection("events").document(eventId)
+                .collection("AdmittedEntrants").document(userId).delete();
+        Map<String, Object> payload = data != null ? new HashMap<>(data) : new HashMap<>();
+        moveEntrantBetweenCollections(userId, payload, "SelectedEntrants", "NonSelectedEntrants");
     }
 
     private void showFinalEntrantListDialog() {
@@ -756,6 +857,83 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
         }
     }
 
+    private void showNotificationConfirmationDialog(String title, String message, Runnable onConfirm) {
+        // Capture screenshot and blur it
+        Bitmap screenshot = captureScreenshot();
+        Bitmap blurredBitmap = blurBitmap(screenshot, 25f);
+        
+        // Create custom dialog with full screen to show blur background
+        android.app.Dialog dialog = new android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        dialog.setContentView(R.layout.organizer_dialog_notification_confirmation);
+        
+        // Set window properties
+        android.view.Window window = dialog.getWindow();
+        if (window != null) {
+            window.setLayout(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT
+            );
+            window.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+            
+            // Disable dim since we have our own blur background
+            android.view.WindowManager.LayoutParams layoutParams = window.getAttributes();
+            layoutParams.dimAmount = 0f;
+            window.setAttributes(layoutParams);
+            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+        }
+        
+        // Apply blurred background
+        android.view.View blurBackground = dialog.findViewById(R.id.dialogBlurBackground);
+        if (blurredBitmap != null) {
+            blurBackground.setBackground(new BitmapDrawable(getResources(), blurredBitmap));
+        }
+        
+        // Make the background clickable to dismiss
+        blurBackground.setOnClickListener(v -> dialog.dismiss());
+        
+        // Get the CardView for animation
+        androidx.cardview.widget.CardView cardView = dialog.findViewById(R.id.dialogCardView);
+        
+        // Set up dialog views
+        TextView tvTitle = dialog.findViewById(R.id.tvDialogTitle);
+        TextView tvMessage = dialog.findViewById(R.id.tvDialogMessage);
+        android.widget.Button btnCancel = dialog.findViewById(R.id.btnDialogCancel);
+        android.widget.Button btnSend = dialog.findViewById(R.id.btnDialogSend);
+        
+        // Set content
+        if (tvTitle != null) {
+            tvTitle.setText(title);
+        }
+        if (tvMessage != null) {
+            tvMessage.setText(message);
+        }
+        
+        // Set button click listeners
+        if (btnCancel != null) {
+            btnCancel.setOnClickListener(v -> dialog.dismiss());
+        }
+        
+        if (btnSend != null && onConfirm != null) {
+            btnSend.setOnClickListener(v -> {
+                dialog.dismiss();
+                onConfirm.run();
+            });
+        }
+        
+        dialog.show();
+        
+        // Apply animations after dialog is shown
+        android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_fade_in);
+        android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_zoom_in);
+        
+        if (blurBackground != null) {
+            blurBackground.startAnimation(fadeIn);
+        }
+        if (cardView != null) {
+            cardView.startAnimation(zoomIn);
+        }
+    }
+
     private void showReplacementSwapDialog() {
         if (eventId == null || eventId.isEmpty()) {
             Toast.makeText(this, "Event ID not found", Toast.LENGTH_SHORT).show();
@@ -771,54 +949,72 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
                     }
 
                     Long eventDeadline = eventDoc.getLong("eventDeadline");
-                    Long eventStart = eventDoc.getLong("eventStart");
+                    Long startsAtEpochMs = eventDoc.getLong("startsAtEpochMs");
                     long currentTime = System.currentTimeMillis();
 
-                    // Check if event has passed (use eventStart as fallback, no 24-hour offset)
-                    long deadlineMs = (eventDeadline != null) ? eventDeadline : 
-                                     (eventStart != null) ? eventStart : Long.MAX_VALUE;
-                    
-                    if (currentTime >= deadlineMs) {
-                        Toast.makeText(this, "Event has started. No more replacements allowed.", Toast.LENGTH_LONG).show();
+                    // Allow replacements before event starts
+                    if (startsAtEpochMs != null && currentTime >= startsAtEpochMs) {
+                        Toast.makeText(this, "Event has already started. No more replacements allowed.", Toast.LENGTH_LONG).show();
                         return;
                     }
 
-                    // Count cancelled and waitlisted entrants
+                    // Count cancelled and non-selected entrants
                     db.collection("events").document(eventId).collection("CancelledEntrants").get()
                             .addOnSuccessListener(cancelledSnapshot -> {
                                 int cancelledCount = cancelledSnapshot != null ? cancelledSnapshot.size() : 0;
 
-                                db.collection("events").document(eventId).collection("WaitlistedEntrants").get()
-                                        .addOnSuccessListener(waitlistSnapshot -> {
-                                            int waitlistCount = waitlistSnapshot != null ? waitlistSnapshot.size() : 0;
-
-                                            if (cancelledCount == 0) {
-                                                Toast.makeText(this, "No cancelled entrants to replace", Toast.LENGTH_SHORT).show();
+                                // Check how many spots are available (sampleSize - current selected count)
+                                db.collection("events").document(eventId).collection("SelectedEntrants").get()
+                                        .addOnSuccessListener(selectedSnapshot -> {
+                                            int selectedCount = selectedSnapshot != null ? selectedSnapshot.size() : 0;
+                                            Long sampleSizeObj = eventDoc.getLong("sampleSize");
+                                            int sampleSize = sampleSizeObj != null ? sampleSizeObj.intValue() : 0;
+                                            
+                                            // CRITICAL: Replacement should ONLY happen if selectedCount < sampleSize
+                                            if (selectedCount >= sampleSize) {
+                                                Toast.makeText(this, 
+                                                    String.format("Cannot replace: Selected entrants (%d) already equals or exceeds sample size (%d). Sample size limit reached.", 
+                                                        selectedCount, sampleSize), 
+                                                    Toast.LENGTH_LONG).show();
                                                 return;
                                             }
+                                            
+                                            int availableSpots = sampleSize - selectedCount;
 
-                                            if (waitlistCount == 0) {
-                                                Toast.makeText(this, "No waitlisted entrants available for replacement", Toast.LENGTH_SHORT).show();
-                                                return;
-                                            }
+                                            db.collection("events").document(eventId).collection("NonSelectedEntrants").get()
+                                                    .addOnSuccessListener(nonSelectedSnapshot -> {
+                                                        int nonSelectedCount = nonSelectedSnapshot != null ? nonSelectedSnapshot.size() : 0;
 
-                                            int toReplace = Math.min(cancelledCount, waitlistCount);
-                                            String message = String.format(
-                                                    "Replace %d cancelled entrant%s with %d entrant%s from waitlist?",
-                                                    cancelledCount, cancelledCount == 1 ? "" : "s",
-                                                    toReplace, toReplace == 1 ? "" : "s"
-                                            );
+                                                        if (nonSelectedCount == 0) {
+                                                            Toast.makeText(this, "No non-selected entrants available for replacement", Toast.LENGTH_SHORT).show();
+                                                            return;
+                                                        }
 
-                                            new MaterialAlertDialogBuilder(this)
-                                                    .setTitle("Replacement Swap")
-                                                    .setMessage(message)
-                                                    .setPositiveButton("Replace", (dialog, which) -> performReplacementSwap(toReplace))
-                                                    .setNegativeButton("Cancel", null)
-                                                    .show();
+                                                        // Calculate how many can be replaced - NEVER exceed sampleSize
+                                                        int toReplace = Math.min(availableSpots, nonSelectedCount);
+                                                        
+                                                        if (toReplace <= 0) {
+                                                            Toast.makeText(this, "No available spots for replacement (sample size limit reached)", Toast.LENGTH_SHORT).show();
+                                                            return;
+                                                        }
+                                                        
+                                                        Log.d(TAG, "Replacement check: selectedCount=" + selectedCount + ", sampleSize=" + sampleSize + ", availableSpots=" + availableSpots + ", toReplace=" + toReplace);
+
+                                                        String message = String.format(
+                                                                "Select %d entrant%s from Non-Selected to replace cancelled/available spots?\n\nYou will need to set a deadline for them to accept/decline.",
+                                                                toReplace, toReplace == 1 ? "" : "s"
+                                                        );
+
+                                                        showReplacementRequestDialog(message, () -> showDeadlinePickerAndPerformReplacement(toReplace, eventDoc));
+                                                    })
+                                                    .addOnFailureListener(e -> {
+                                                        Log.e(TAG, "Failed to load non-selected entrants", e);
+                                                        Toast.makeText(this, "Failed to load non-selected entrants", Toast.LENGTH_SHORT).show();
+                                                    });
                                         })
                                         .addOnFailureListener(e -> {
-                                            Log.e(TAG, "Failed to load waitlisted entrants", e);
-                                            Toast.makeText(this, "Failed to load waitlisted entrants", Toast.LENGTH_SHORT).show();
+                                            Log.e(TAG, "Failed to load selected entrants", e);
+                                            Toast.makeText(this, "Failed to load selected entrants", Toast.LENGTH_SHORT).show();
                                         });
                             })
                             .addOnFailureListener(e -> {
@@ -832,111 +1028,347 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
                 });
     }
 
-    private void performReplacementSwap(int count) {
+    private void showReplacementRequestDialog(String message, Runnable onConfirm) {
+        // Capture screenshot and blur it
+        Bitmap screenshot = captureScreenshot();
+        Bitmap blurredBitmap = blurBitmap(screenshot, 25f);
+        
+        // Create custom dialog with full screen to show blur background
+        android.app.Dialog dialog = new android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        dialog.setContentView(R.layout.dialog_replacement_request);
+        
+        // Set window properties
+        android.view.Window window = dialog.getWindow();
+        if (window != null) {
+            window.setLayout(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT
+            );
+            window.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+            
+            // Disable dim since we have our own blur background
+            android.view.WindowManager.LayoutParams layoutParams = window.getAttributes();
+            layoutParams.dimAmount = 0f;
+            window.setAttributes(layoutParams);
+            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+        }
+        
+        // Apply blurred background
+        android.view.View blurBackground = dialog.findViewById(R.id.dialogBlurBackground);
+        if (blurredBitmap != null && blurBackground != null) {
+            blurBackground.setBackground(new android.graphics.drawable.BitmapDrawable(getResources(), blurredBitmap));
+        }
+        
+        // Make the background clickable to dismiss
+        if (blurBackground != null) {
+            blurBackground.setOnClickListener(v -> dialog.dismiss());
+        }
+        
+        // Get the CardView for animation
+        androidx.cardview.widget.CardView cardView = dialog.findViewById(R.id.dialogCardView);
+        
+        // Set up dialog views
+        TextView tvMessage = dialog.findViewById(R.id.tvReplacementMessage);
+        com.google.android.material.button.MaterialButton btnCancel = dialog.findViewById(R.id.btnReplacementCancel);
+        com.google.android.material.button.MaterialButton btnSelect = dialog.findViewById(R.id.btnReplacementSelect);
+        
+        // Set content
+        if (tvMessage != null) {
+            tvMessage.setText(message);
+        }
+        
+        // Set button click listeners
+        if (btnCancel != null) {
+            btnCancel.setOnClickListener(v -> dialog.dismiss());
+        }
+        
+        if (btnSelect != null && onConfirm != null) {
+            btnSelect.setOnClickListener(v -> {
+                dialog.dismiss();
+                onConfirm.run();
+            });
+        }
+        
+        dialog.show();
+        
+        // Apply animations after dialog is shown
+        android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_fade_in);
+        android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_zoom_in);
+        
+        if (blurBackground != null) {
+            blurBackground.startAnimation(fadeIn);
+        }
+        if (cardView != null) {
+            cardView.startAnimation(zoomIn);
+        }
+    }
+
+    private void showDeadlinePickerAndPerformReplacement(int count, DocumentSnapshot eventDoc) {
         if (eventId == null || eventId.isEmpty()) {
             return;
         }
 
-        Toast.makeText(this, "Processing replacement swap...", Toast.LENGTH_SHORT).show();
+        Long eventStartTemp = eventDoc.getLong("startsAtEpochMs");
+        if (eventStartTemp == null) {
+            eventStartTemp = eventDoc.getLong("eventStart");
+        }
+        final Long eventStart = eventStartTemp; // Make final for lambda
+        
+        // Initialize calendar to current time (let user pick any time in future before event starts)
+        final Calendar now = Calendar.getInstance();
+        final int defaultHour = now.get(Calendar.HOUR_OF_DAY);
+        final int defaultMinute = now.get(Calendar.MINUTE);
+        
+        // Calculate minimum date - prevent past dates and ensure before event start
+        long minDateMs = System.currentTimeMillis();
+        if (eventStart != null && eventStart > 0) {
+            // Deadline must be before event starts
+            minDateMs = Math.min(minDateMs, eventStart - 1);
+        }
+        
+        DatePickerDialog dp = new DatePickerDialog(
+                this, R.style.EventEasePickerDialogTheme, (view, y, m, d) -> {
+            TimePickerDialog tp = new TimePickerDialog(
+                    this, R.style.EventEasePickerDialogTheme, (vv, hh, mm) -> {
+                Calendar chosen = Calendar.getInstance();
+                chosen.set(y, m, d, hh, mm, 0);
+                chosen.set(Calendar.MILLISECOND, 0);
+                
+                long selectedDeadline = chosen.getTimeInMillis();
+                
+                // Validate deadline - must be in the future
+                long currentTime = System.currentTimeMillis();
+                if (selectedDeadline <= currentTime) {
+                    Toast.makeText(this, "Deadline must be in the future", Toast.LENGTH_LONG).show();
+                    return;
+                }
+                
+                // Validate deadline is before event starts
+                if (eventStart != null && eventStart > 0 && selectedDeadline >= eventStart) {
+                    Toast.makeText(this, "Deadline must be before event start time", Toast.LENGTH_LONG).show();
+                    return;
+                }
+                
+                // Perform replacement with selected deadline
+                performReplacementSwap(count, selectedDeadline);
+            }, defaultHour, defaultMinute, false);
+            tp.show();
+        }, now.get(Calendar.YEAR), now.get(Calendar.MONTH), now.get(Calendar.DAY_OF_MONTH));
+        
+        // Prevent selecting past dates and dates after event start
+        dp.getDatePicker().setMinDate(minDateMs - 1000);
+        if (eventStart != null && eventStart > 0) {
+            dp.getDatePicker().setMaxDate(eventStart - 1);
+        }
+        // Make entire calendar background use the EventEase top bar color
+        dp.setOnShowListener(dialog -> {
+            dp.getDatePicker().setBackgroundColor(
+                    ContextCompat.getColor(this, R.color.ee_topbar_bg));
+        });
+        dp.show();
+    }
 
-        // Get event details for deadline calculation
-        db.collection("events").document(eventId).get()
-                .addOnSuccessListener(eventDoc -> {
-                    Long eventDeadline = eventDoc != null ? eventDoc.getLong("eventDeadline") : null;
-                    Long eventStart = eventDoc != null ? eventDoc.getLong("eventStart") : null;
-                    
-                    // Calculate deadline for replacement invitations
-                    long currentTime = System.currentTimeMillis();
-                    long calculatedDeadline = currentTime + (7L * 24 * 60 * 60 * 1000); // 7 days from now
-                    
-                    if (eventDeadline != null) {
-                        calculatedDeadline = Math.min(calculatedDeadline, eventDeadline);
-                    } else if (eventStart != null) {
-                        // Use event start time as maximum deadline (no 24-hour offset)
-                        calculatedDeadline = Math.min(calculatedDeadline, eventStart);
+    private void performReplacementSwap(int count, long deadlineToAccept) {
+        if (eventId == null || eventId.isEmpty()) {
+            return;
+        }
+
+        Toast.makeText(this, "Processing replacement selection...", Toast.LENGTH_SHORT).show();
+
+        // First, fetch event document to get sampleSize
+        DocumentReference eventRef = db.collection("events").document(eventId);
+        eventRef.get().addOnSuccessListener(eventDoc -> {
+            if (eventDoc == null || !eventDoc.exists()) {
+                Toast.makeText(this, "Event not found", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            
+            Long sampleSizeObj = eventDoc.getLong("sampleSize");
+            int sampleSize = sampleSizeObj != null ? sampleSizeObj.intValue() : 0;
+            String eventTitle = eventDoc.getString("title");
+            
+            // CRITICAL: Fetch ONLY non-selected entrants (NEVER cancelled or already selected)
+            eventRef.collection("NonSelectedEntrants").get()
+                .addOnSuccessListener(nonSelectedSnapshot -> {
+                    if (nonSelectedSnapshot == null || nonSelectedSnapshot.isEmpty()) {
+                        Toast.makeText(this, "No non-selected entrants available", Toast.LENGTH_SHORT).show();
+                        return;
                     }
+
+                    List<DocumentSnapshot> nonSelectedDocs = nonSelectedSnapshot.getDocuments();
                     
-                    // Ensure minimum 2 days
-                    long minDeadline = currentTime + (2L * 24 * 60 * 60 * 1000);
-                    calculatedDeadline = Math.max(calculatedDeadline, minDeadline);
-                    
-                    // Make it final for use in nested lambdas
-                    final long deadlineToAccept = calculatedDeadline;
-
-                    // Fetch waitlisted entrants
-                    db.collection("events").document(eventId).collection("WaitlistedEntrants").get()
-                            .addOnSuccessListener(waitlistSnapshot -> {
-                                if (waitlistSnapshot == null || waitlistSnapshot.isEmpty()) {
-                                    Toast.makeText(this, "No waitlisted entrants available", Toast.LENGTH_SHORT).show();
-                                    return;
-                                }
-
-                                List<DocumentSnapshot> waitlistDocs = waitlistSnapshot.getDocuments();
-                                if (waitlistDocs.size() < count) {
-                                    Toast.makeText(this, "Not enough waitlisted entrants available", Toast.LENGTH_SHORT).show();
-                                    return;
-                                }
-
-                                // Randomly select entrants
-                                List<DocumentSnapshot> selectedForReplacement = randomlySelect(waitlistDocs, count);
-                                
-                                DocumentReference eventRef = db.collection("events").document(eventId);
-                                WriteBatch batch = db.batch();
-                                List<String> userIds = new ArrayList<>();
-
-                                // Move selected entrants from WaitlistedEntrants to SelectedEntrants
-                                for (DocumentSnapshot doc : selectedForReplacement) {
-                                    String userId = doc.getId();
-                                    Map<String, Object> data = doc.getData();
-                                    userIds.add(userId);
-
-                                    if (data != null) {
-                                        // Move to SelectedEntrants
-                                        batch.set(eventRef.collection("SelectedEntrants").document(userId), data);
-                                        // Remove from WaitlistedEntrants
-                                        batch.delete(eventRef.collection("WaitlistedEntrants").document(userId));
-                                        
-                                        // Create invitation for replacement
-                                        Map<String, Object> invitation = new HashMap<>();
-                                        invitation.put("eventId", eventId);
-                                        invitation.put("userId", userId);
-                                        invitation.put("status", "PENDING");
-                                        invitation.put("createdAt", System.currentTimeMillis());
-                                        invitation.put("expiresAt", deadlineToAccept);
-                                        invitation.put("isReplacement", true);
-                                        
-                                        batch.set(db.collection("invitations").document(UUID.randomUUID().toString()), invitation);
-                                    }
-                                }
-
-                                batch.commit()
-                                        .addOnSuccessListener(v -> {
-                                            Toast.makeText(this, 
-                                                    "Successfully replaced " + count + " entrant" + (count == 1 ? "" : "s"),
-                                                    Toast.LENGTH_LONG).show();
+                    // SAFETY CHECK: Filter out anyone who might be in CancelledEntrants or SelectedEntrants
+                    // (This should never happen, but extra safety)
+                    eventRef.collection("CancelledEntrants").get()
+                            .addOnSuccessListener(cancelledSnapshot -> {
+                                eventRef.collection("SelectedEntrants").get()
+                                        .addOnSuccessListener(selectedSnapshot -> {
+                                            // Create sets of IDs to exclude
+                                            Set<String> cancelledIds = new HashSet<>();
+                                            if (cancelledSnapshot != null) {
+                                                for (DocumentSnapshot doc : cancelledSnapshot.getDocuments()) {
+                                                    cancelledIds.add(doc.getId());
+                                                }
+                                            }
+                                            Set<String> alreadySelectedIds = new HashSet<>();
+                                            if (selectedSnapshot != null) {
+                                                for (DocumentSnapshot doc : selectedSnapshot.getDocuments()) {
+                                                    alreadySelectedIds.add(doc.getId());
+                                                }
+                                            }
                                             
-                                            // Send notifications
-                                            String eventTitleStr = eventTitle != null ? eventTitle : "the event";
-                                            sendReplacementNotifications(userIds, eventTitleStr, deadlineToAccept);
+                                            // Filter nonSelectedDocs to ONLY include truly non-selected users
+                                            List<DocumentSnapshot> validNonSelectedDocs = new ArrayList<>();
+                                            for (DocumentSnapshot doc : nonSelectedDocs) {
+                                                String userId = doc.getId();
+                                                if (!cancelledIds.contains(userId) && !alreadySelectedIds.contains(userId)) {
+                                                    validNonSelectedDocs.add(doc);
+                                                } else {
+                                                    Log.w(TAG, "SAFETY: Filtered out user " + userId + " from replacement (in cancelled or selected)");
+                                                }
+                                            }
                                             
-                                            // Reload entrants
-                                            loadEntrantsFromFirestore();
+                                            if (validNonSelectedDocs.size() < count) {
+                                                Toast.makeText(this, "Not enough valid non-selected entrants available", Toast.LENGTH_SHORT).show();
+                                                return;
+                                            }
+
+                                            // Show dialog to let organizer manually select which entrants
+                                            // For now, randomly select (organizer can manually move later if needed)
+                                            List<DocumentSnapshot> selectedForReplacement = randomlySelect(validNonSelectedDocs, count);
+                                            
+                                            List<String> userIds = new ArrayList<>();
+
+                                            // CRITICAL: Double-check sample size before committing batch
+                                            // Re-check selectedCount right before batch commit to ensure we don't exceed sampleSize
+                                            eventRef.collection("SelectedEntrants").get()
+                                                    .addOnSuccessListener(finalSelectedCheck -> {
+                                                        int currentSelectedCount = finalSelectedCheck != null ? finalSelectedCheck.size() : 0;
+                                                        int finalSampleSize = sampleSize; // sampleSize is now in scope from outer lambda
+                                                        
+                                                        // Calculate how many we can actually add
+                                                        int canAdd = finalSampleSize - currentSelectedCount;
+                                                        
+                                                        if (canAdd <= 0) {
+                                                            Toast.makeText(this, 
+                                                                String.format("Cannot replace: Selected entrants (%d) already equals sample size (%d).", 
+                                                                    currentSelectedCount, finalSampleSize), 
+                                                                Toast.LENGTH_LONG).show();
+                                                            return;
+                                                        }
+                                                        
+                                                        // Limit replacement to what we can actually add
+                                                        List<DocumentSnapshot> finalSelectedForReplacement = selectedForReplacement;
+                                                        List<String> finalUserIds = new ArrayList<>();
+                                                        if (selectedForReplacement.size() > canAdd) {
+                                                            Log.w(TAG, "Limiting replacement from " + selectedForReplacement.size() + " to " + canAdd + " to respect sample size");
+                                                            finalSelectedForReplacement = selectedForReplacement.subList(0, canAdd);
+                                                        }
+                                                        
+                                                        // CRITICAL: Final verification before batch commit
+                                                        int finalTotalCount = currentSelectedCount + finalSelectedForReplacement.size();
+                                                        if (finalTotalCount > finalSampleSize) {
+                                                            Log.e(TAG, "CRITICAL: Final count (" + finalTotalCount + ") would exceed sampleSize (" + finalSampleSize + ")! Adjusting.");
+                                                            int maxToAdd = finalSampleSize - currentSelectedCount;
+                                                            if (maxToAdd > 0) {
+                                                                finalSelectedForReplacement = finalSelectedForReplacement.subList(0, maxToAdd);
+                                                                Log.w(TAG, "Adjusted replacement count to " + maxToAdd + " to respect sample size");
+                                                            } else {
+                                                                Toast.makeText(this, 
+                                                                    "Cannot add any more - already at sample size limit",
+                                                                    Toast.LENGTH_LONG).show();
+                                                                return;
+                                                            }
+                                                        }
+                                                        
+                                                        WriteBatch finalBatch = db.batch();
+                                                        
+                                                        // Move selected entrants from NonSelectedEntrants to SelectedEntrants
+                                                        for (DocumentSnapshot doc : finalSelectedForReplacement) {
+                                                            String userId = doc.getId();
+                                                            Map<String, Object> data = doc.getData();
+                                                            finalUserIds.add(userId);
+                                                            
+                                                            if (data != null) {
+                                                                int index = finalUserIds.size();
+                                                                int willBeTotal = currentSelectedCount + index;
+                                                                Log.d(TAG, "Replacement: Moving user " + userId + " from NonSelected to Selected (will make " + willBeTotal + "/" + finalSampleSize + " selected)");
+                                                                
+                                                                // CRITICAL: Final check per user - ensure we don't exceed
+                                                                if (willBeTotal > finalSampleSize) {
+                                                                    Log.e(TAG, "CRITICAL: Stopping replacement - would exceed sample size at user " + userId);
+                                                                    break; // Stop adding more users
+                                                                }
+                                                                
+                                                                // CRITICAL: Ensure mutual exclusivity - user can only exist in ONE collection
+                                                                // Move to SelectedEntrants
+                                                                finalBatch.set(eventRef.collection("SelectedEntrants").document(userId), data);
+                                                                // Remove from ALL other collections
+                                                                finalBatch.delete(eventRef.collection("NonSelectedEntrants").document(userId));
+                                                                finalBatch.delete(eventRef.collection("WaitlistedEntrants").document(userId));
+                                                                finalBatch.delete(eventRef.collection("CancelledEntrants").document(userId));
+                                                                
+                                                                // Create invitation for replacement
+                                                                Map<String, Object> invitation = new HashMap<>();
+                                                                invitation.put("eventId", eventId);
+                                                                invitation.put("uid", userId);
+                                                                invitation.put("entrantId", userId);
+                                                                invitation.put("status", "PENDING");
+                                                                invitation.put("issuedAt", System.currentTimeMillis());
+                                                                invitation.put("expiresAt", deadlineToAccept);
+                                                                invitation.put("isReplacement", true);
+                                                                
+                                                                finalBatch.set(db.collection("invitations").document(UUID.randomUUID().toString()), invitation);
+                                                            }
+                                                        }
+                                                        
+                                                        // CRITICAL: Create final copy of user IDs for lambda (must be final or effectively final)
+                                                        final List<String> finalUserIdsForLambda = new ArrayList<>(finalUserIds);
+                                                        
+                                                        // Commit final batch
+                                                        finalBatch.commit()
+                                                                .addOnSuccessListener(v -> {
+                                                                    Toast.makeText(this, 
+                                                                            "Successfully selected " + finalUserIdsForLambda.size() + " entrant" + (finalUserIdsForLambda.size() == 1 ? "" : "s") + " for replacement",
+                                                                            Toast.LENGTH_LONG).show();
+                                                                    
+                                                                    // Send notifications with deadline
+                                                                    String eventTitleStr = eventTitle != null ? eventTitle : "the event";
+                                                                    sendReplacementNotifications(finalUserIdsForLambda, eventTitleStr, deadlineToAccept);
+                                                                    
+                                                                    // Reload entrants
+                                                                    loadEntrantsFromFirestore();
+                                                                })
+                                                                .addOnFailureListener(e -> {
+                                                                    Log.e(TAG, "Failed to perform replacement swap", e);
+                                                                    Toast.makeText(this, "Failed to perform replacement swap: " + e.getMessage(), 
+                                                                            Toast.LENGTH_LONG).show();
+                                                                });
                                         })
                                         .addOnFailureListener(e -> {
-                                            Log.e(TAG, "Failed to perform replacement swap", e);
-                                            Toast.makeText(this, "Failed to perform replacement swap: " + e.getMessage(), 
-                                                    Toast.LENGTH_LONG).show();
+                                            Log.e(TAG, "Failed to load selected entrants for safety check", e);
+                                            Toast.makeText(this, "Failed to perform safety check", Toast.LENGTH_SHORT).show();
                                         });
                             })
                             .addOnFailureListener(e -> {
-                                Log.e(TAG, "Failed to load waitlisted entrants for replacement", e);
-                                Toast.makeText(this, "Failed to load waitlisted entrants", Toast.LENGTH_SHORT).show();
+                                Log.e(TAG, "Failed to load selected entrants for safety check", e);
+                                Toast.makeText(this, "Failed to perform safety check", Toast.LENGTH_SHORT).show();
                             });
+                    })
+                    .addOnFailureListener(e -> {
+                        Log.e(TAG, "Failed to load cancelled entrants for safety check", e);
+                        Toast.makeText(this, "Failed to perform safety check", Toast.LENGTH_SHORT).show();
+                    });
                 })
                 .addOnFailureListener(e -> {
-                    Log.e(TAG, "Failed to load event for replacement", e);
-                    Toast.makeText(this, "Failed to load event details", Toast.LENGTH_SHORT).show();
+                    Log.e(TAG, "Failed to load non-selected entrants for replacement", e);
+                    Toast.makeText(this, "Failed to load non-selected entrants", Toast.LENGTH_SHORT).show();
                 });
+            })
+            .addOnFailureListener(e -> {
+                Log.e(TAG, "Failed to load event document", e);
+                Toast.makeText(this, "Failed to load event details", Toast.LENGTH_SHORT).show();
+            });
     }
 
     private List<DocumentSnapshot> randomlySelect(List<DocumentSnapshot> allDocs, int count) {
@@ -947,37 +1379,67 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
 
     private void sendReplacementNotifications(List<String> userIds, String eventTitle, long deadlineMs) {
         if (userIds == null || userIds.isEmpty()) {
+            Log.w(TAG, "sendReplacementNotifications: userIds is null or empty");
+            return;
+        }
+        
+        if (eventId == null || eventId.isEmpty()) {
+            Log.e(TAG, "sendReplacementNotifications: eventId is null or empty");
             return;
         }
 
+        Log.d(TAG, "sendReplacementNotifications called for " + userIds.size() + " users, eventId: " + eventId);
+        
         SimpleDateFormat sdf = new SimpleDateFormat("MMM d, yyyy 'at' h:mm a", Locale.getDefault());
         String deadlineStr = sdf.format(new Date(deadlineMs));
-        String message = String.format(
-                "You've been selected as a replacement for \"%s\"! Please accept or decline by %s",
+        String notificationTitle = "You've been selected! 🎉";
+        String notificationMessage = String.format(
+                "Congratulations! You've been selected for \"%s\". Please check your invitations to accept or decline. Deadline to respond: %s",
                 eventTitle, deadlineStr
         );
 
-        // Use NotificationHelper for push notifications (works when app is closed via Cloud Functions)
-        NotificationHelper notificationHelper = new NotificationHelper();
-        notificationHelper.sendNotificationsToUsers(
-                userIds,
-                "Replacement Invitation",
-                message,
-                eventId,
-                eventTitle != null ? eventTitle : "the event",
-                false, // filterDeclined = false (they're new replacements, haven't declined yet)
-                new NotificationHelper.NotificationCallback() {
-                    @Override
-                    public void onComplete(int sentCount) {
-                        Log.d(TAG, "Successfully sent " + sentCount + " replacement push notifications");
+        // Get organizer ID from event
+        db.collection("events").document(eventId).get()
+                .addOnSuccessListener(eventDoc -> {
+                    if (eventDoc == null || !eventDoc.exists()) {
+                        Log.e(TAG, "Event not found when sending replacement notifications");
+                        return;
                     }
                     
-                    @Override
-                    public void onError(String error) {
-                        Log.e(TAG, "Failed to send replacement notifications: " + error);
+                    String organizerId = eventDoc.getString("organizerId");
+                    if (organizerId == null || organizerId.isEmpty()) {
+                        organizerId = "system";
                     }
-                }
-        );
+                    
+                    // Create notification request (same format as initial selection)
+                    Map<String, Object> notificationRequest = new HashMap<>();
+                    notificationRequest.put("eventId", eventId);
+                    notificationRequest.put("eventTitle", eventTitle != null ? eventTitle : "Event");
+                    notificationRequest.put("organizerId", organizerId);
+                    notificationRequest.put("userIds", userIds);
+                    notificationRequest.put("groupType", "selection");
+                    notificationRequest.put("message", notificationMessage);
+                    notificationRequest.put("title", notificationTitle);
+                    notificationRequest.put("status", "PENDING");
+                    notificationRequest.put("createdAt", System.currentTimeMillis());
+                    notificationRequest.put("processed", false);
+                    
+                    // Write to notificationRequests collection - Cloud Functions will handle sending
+                    db.collection("notificationRequests").add(notificationRequest)
+                            .addOnSuccessListener(docRef -> {
+                                Log.d(TAG, "✓ Created replacement selection notification request for " + userIds.size() + " users");
+                                Toast.makeText(OrganizerViewEntrantsActivity.this, 
+                                        "Sent " + userIds.size() + " notification(s)", Toast.LENGTH_SHORT).show();
+                            })
+                            .addOnFailureListener(e -> {
+                                Log.e(TAG, "Failed to create replacement notification request", e);
+                                Toast.makeText(OrganizerViewEntrantsActivity.this, 
+                                        "Failed to send notifications: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                            });
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to load event for replacement notifications", e);
+                });
     }
 
     /**
@@ -1051,76 +1513,209 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
     /**
      * Moves an entrant from one collection to another.
      */
-    private void moveEntrantBetweenCollections(String userId, Map<String, Object> entrantData,
-                                                String fromCollection, String toCollection) {
+    private void moveEntrantBetweenCollections(String userId, @Nullable Map<String, Object> entrantData,
+                                               String fromCollection, String toCollection) {
         if (eventId == null || eventId.isEmpty() || userId == null) {
             Toast.makeText(this, "Invalid data", Toast.LENGTH_SHORT).show();
             return;
         }
 
         DocumentReference eventRef = db.collection("events").document(eventId);
-        DocumentReference fromRef = eventRef.collection(fromCollection).document(userId);
-        DocumentReference toRef = eventRef.collection(toCollection).document(userId);
 
-        WriteBatch batch = db.batch();
-        
-        if (entrantData != null) {
-            batch.set(toRef, entrantData);
-        } else {
-            // If no data, fetch from users collection
+        if (entrantData == null) {
             db.collection("users").document(userId).get()
                     .addOnSuccessListener(userDoc -> {
-                        Map<String, Object> userData = new HashMap<>();
-                        if (userDoc != null && userDoc.exists()) {
-                            String name = userDoc.getString("fullName");
-                            if (name == null || name.trim().isEmpty()) {
-                                name = userDoc.getString("name");
-                            }
-                            if (name == null || name.trim().isEmpty()) {
-                                String first = userDoc.getString("firstName");
-                                String last = userDoc.getString("lastName");
-                                name = ((first != null ? first : "") + " " + (last != null ? last : "")).trim();
-                            }
-                            if (name != null && !name.trim().isEmpty()) {
-                                userData.put("name", name);
-                            }
-                            String email = userDoc.getString("email");
-                            if (email != null && !email.trim().isEmpty()) {
-                                userData.put("email", email);
-                            }
-                            userData.put("userId", userId);
-                        }
-                        
-                        WriteBatch moveBatch = db.batch();
-                        moveBatch.set(toRef, userData);
-                        moveBatch.delete(fromRef);
-                        moveBatch.commit()
-                                .addOnSuccessListener(aVoid -> {
-                                    Toast.makeText(this, "Entrant moved successfully", Toast.LENGTH_SHORT).show();
-                                    loadEntrantsFromFirestore();
-                                })
-                                .addOnFailureListener(e -> {
-                                    Log.e(TAG, "Failed to move entrant", e);
-                                    Toast.makeText(this, "Failed to move entrant: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                                });
+                        Map<String, Object> data = buildUserDataMap(userDoc, userId);
+                        attemptMoveWithCapacity(eventRef, userId, data, fromCollection, toCollection);
                     })
                     .addOnFailureListener(e -> {
                         Log.e(TAG, "Failed to fetch user data", e);
                         Toast.makeText(this, "Failed to fetch user data", Toast.LENGTH_SHORT).show();
                     });
-            return;
+        } else {
+            attemptMoveWithCapacity(eventRef, userId, entrantData, fromCollection, toCollection);
         }
+    }
+
+    private void attemptMoveWithCapacity(DocumentReference eventRef, String userId, Map<String, Object> data,
+                                         String fromCollection, String toCollection) {
+        // CRITICAL: Only check sample size when moving TO SelectedEntrants from another collection
+        // Moving TO CancelledEntrants or NonSelectedEntrants is always allowed (even if sample size is met)
+        // Moving FROM SelectedEntrants to another collection is always allowed (frees up a spot)
+        if ("SelectedEntrants".equals(toCollection) && !"SelectedEntrants".equals(fromCollection)) {
+            // Moving TO SelectedEntrants from NonSelected/Cancelled - check sample size limit
+            eventRef.get()
+                    .addOnSuccessListener(eventDoc -> {
+                        int sampleSize;
+                        if (eventDoc != null && eventDoc.exists()) {
+                            Long sampleSizeObj = eventDoc.getLong("sampleSize");
+                            if (sampleSizeObj != null) {
+                                sampleSize = sampleSizeObj.intValue();
+                            } else {
+                                sampleSize = 0;
+                            }
+                        } else {
+                            sampleSize = 0;
+                        }
+
+                        final int sampleLimit = sampleSize;
+                        if (sampleLimit <= 0) {
+                            // No sample size limit, allow the move
+                            performMoveBatch(eventRef, userId, data, fromCollection, toCollection);
+                            return;
+                        }
+
+                        // Check current selected count
+                        eventRef.collection("SelectedEntrants").get()
+                                .addOnSuccessListener(selectedSnap -> {
+                                    int currentSelected = selectedSnap != null ? selectedSnap.size() : 0;
+                                    
+                                    // CRITICAL: Check if user is already in SelectedEntrants (shouldn't happen, but safety check)
+                                    boolean isAlreadySelected = false;
+                                    if (selectedSnap != null) {
+                                        for (DocumentSnapshot doc : selectedSnap.getDocuments()) {
+                                            if (doc.getId().equals(userId)) {
+                                                isAlreadySelected = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    
+                                    // If user is already selected, allow the move (it's just updating data)
+                                    if (isAlreadySelected) {
+                                        Log.d(TAG, "User already in SelectedEntrants, allowing move (data update)");
+                                        performMoveBatch(eventRef, userId, data, fromCollection, toCollection);
+                                        return;
+                                    }
+                                    
+                                    // CRITICAL: Check if adding this user would exceed sample size
+                                    if (currentSelected >= sampleLimit) {
+                                        Toast.makeText(this,
+                                                String.format("Sample size limit reached (%d/%d). Cannot add more selected entrants. You can move existing selected entrants to Cancelled or Not Selected.",
+                                                    currentSelected, sampleLimit),
+                                                Toast.LENGTH_LONG).show();
+                                        return;
+                                    }
+                                    
+                                    // CRITICAL: Final check - ensure we won't exceed after adding
+                                    int finalCount = currentSelected + 1;
+                                    if (finalCount > sampleLimit) {
+                                        Toast.makeText(this,
+                                                String.format("Cannot add: Would exceed sample size (%d > %d).",
+                                                    finalCount, sampleLimit),
+                                                Toast.LENGTH_LONG).show();
+                                        return;
+                                    }
+                                    
+                                    // Sample size check passed, allow the move
+                                    performMoveBatch(eventRef, userId, data, fromCollection, toCollection);
+                                })
+                                .addOnFailureListener(e -> {
+                                    Log.e(TAG, "Failed to check selected entrants", e);
+                                    Toast.makeText(this, "Failed to verify selected entrants", Toast.LENGTH_SHORT).show();
+                                });
+                    })
+                    .addOnFailureListener(e -> {
+                        Log.e(TAG, "Failed to load event for capacity check", e);
+                        Toast.makeText(this, "Failed to load event details", Toast.LENGTH_SHORT).show();
+                    });
+        } else {
+            // Moving TO CancelledEntrants or NonSelectedEntrants - always allowed
+            // OR moving FROM SelectedEntrants - always allowed (frees up a spot)
+            performMoveBatch(eventRef, userId, data, fromCollection, toCollection);
+        }
+    }
+
+    private void performMoveBatch(DocumentReference eventRef, String userId, Map<String, Object> entrantData,
+                                  String fromCollection, String toCollection) {
+        DocumentReference fromRef = eventRef.collection(fromCollection).document(userId);
+        DocumentReference toRef = eventRef.collection(toCollection).document(userId);
+
+        // CRITICAL: Get references to ALL collections to ensure mutual exclusivity
+        DocumentReference waitlistRef = eventRef.collection("WaitlistedEntrants").document(userId);
+        DocumentReference selectedRef = eventRef.collection("SelectedEntrants").document(userId);
+        DocumentReference nonSelectedRef = eventRef.collection("NonSelectedEntrants").document(userId);
+        DocumentReference cancelledRef = eventRef.collection("CancelledEntrants").document(userId);
+
+        WriteBatch batch = db.batch();
         
-        batch.delete(fromRef);
-        
+        // Add to target collection
+        batch.set(toRef, entrantData);
+
+        // CRITICAL: Ensure mutual exclusivity - delete from ALL other collections
+        // This ensures user exists in only ONE collection (Selected, NonSelected, or Cancelled)
+        if (!"WaitlistedEntrants".equals(toCollection)) {
+            batch.delete(waitlistRef);
+        }
+        if (!"SelectedEntrants".equals(toCollection)) {
+            batch.delete(selectedRef);
+        }
+        if (!"NonSelectedEntrants".equals(toCollection)) {
+            batch.delete(nonSelectedRef);
+        }
+        if (!"CancelledEntrants".equals(toCollection)) {
+            batch.delete(cancelledRef);
+        }
+
+        // Also delete from source collection if different from target
+        if (!fromCollection.equals(toCollection)) {
+            batch.delete(fromRef);
+        }
+
+        // Try to resolve a human-readable name
+        String displayName = null;
+        if (entrantData != null) {
+            Object nameObj = entrantData.get("name");
+            if (nameObj instanceof String && !((String) nameObj).trim().isEmpty()) {
+                displayName = ((String) nameObj).trim();
+            }
+        }
+        if (displayName == null) {
+            displayName = "(unknown)";
+        }
+
+        Log.d(TAG, "ENTRANT_MOVE: eventId=" + eventId +
+                ", userId=" + userId +
+                ", name=" + displayName +
+                ", from=" + fromCollection +
+                ", to=" + toCollection +
+                ", reason=organizer_manual_move_or_system_call");
+
         batch.commit()
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(this, "Entrant moved successfully", Toast.LENGTH_SHORT).show();
+                    Log.d(TAG, "Successfully moved entrant " + userId + " from " + fromCollection + " to " + toCollection);
                     loadEntrantsFromFirestore();
                 })
                 .addOnFailureListener(e -> {
-                    Log.e(TAG, "Failed to move entrant", e);
+                    Log.e(TAG, "Failed to move entrant from " + fromCollection + " to " + toCollection, e);
                     Toast.makeText(this, "Failed to move entrant: " + e.getMessage(), Toast.LENGTH_SHORT).show();
                 });
+    }
+
+    private Map<String, Object> buildUserDataMap(@Nullable DocumentSnapshot userDoc, String userId) {
+        Map<String, Object> userData = new HashMap<>();
+        if (userDoc != null && userDoc.exists()) {
+            String name = userDoc.getString("fullName");
+            if (name == null || name.trim().isEmpty()) {
+                name = userDoc.getString("name");
+            }
+            if (name == null || name.trim().isEmpty()) {
+                String first = userDoc.getString("firstName");
+                String last = userDoc.getString("lastName");
+                name = ((first != null ? first : "") + " " + (last != null ? last : "")).trim();
+            }
+            if (name != null && !name.trim().isEmpty()) {
+                userData.put("name", name);
+            }
+            String email = userDoc.getString("email");
+            if (email != null && !email.trim().isEmpty()) {
+                userData.put("email", email);
+            }
+            userData.put("userId", userId);
+        } else {
+            userData.put("userId", userId);
+        }
+        return userData;
     }
 }

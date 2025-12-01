@@ -10,9 +10,10 @@
         android:id="@+id/tvHeader"
         android:text="EventEase"
         android:textStyle="bold"
-        android:textSize="24sp"
-        android:textColor="#223C65"
-        android:background="@color/ee_mint_aqua"
+        android:textSize="32sp"
+        android:gravity="center"
+        android:textColor="@color/ee_topbar_text"
+        android:background="@color/ee_topbar_bg"
         android:padding="16dp"
         android:layout_width="match_parent"
         android:layout_height="wrap_content" />
@@ -36,7 +37,7 @@
             android:layout_height="match_parent">
 
             <TextView
-                android:text="You haven’t posted any events yet"
+                android:text="You haven't posted any events yet"
                 android:textColor="#FFFFFFFF"
                 android:textSize="18sp"
                 android:layout_width="wrap_content"
@@ -99,10 +100,10 @@
             android:foreground="?attr/selectableItemBackgroundBorderless">
 
             <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:tint="@color/ee_navy_dark"
-                android:src="@android:drawable/ic_menu_agenda" />
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:src="@drawable/entrant_ic_my_events_circle_dark"
+                android:scaleType="fitCenter" />
 
             <TextView
                 android:text="My Events"
@@ -131,10 +132,10 @@
             android:foreground="?attr/selectableItemBackgroundBorderless">
 
             <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:tint="@color/ee_navy_dark"
-                android:src="@android:drawable/ic_menu_myplaces" />
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:src="@drawable/entrant_ic_account_circle_dark"
+                android:scaleType="fitCenter" />
 
             <TextView
                 android:text="Account"

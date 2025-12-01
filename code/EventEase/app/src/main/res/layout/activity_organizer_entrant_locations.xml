@@ -11,7 +11,7 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@color/ee_mint_aqua"
+        android:background="@color/ee_topbar_bg"
         android:elevation="4dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
@@ -30,7 +30,6 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="12dp"
             android:layout_weight="1"
-            android:fontFamily="@font/fredoka_bold"
             android:gravity="start"
             android:text="Entrants Locations"
             android:textColor="@color/header_text_green"

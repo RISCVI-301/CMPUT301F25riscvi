@@ -79,26 +79,27 @@ public class FirebaseWaitlistRepository implements WaitlistRepository {
             Long capacityLong = eventDoc.getLong("capacity");
             int capacity = capacityLong != null ? capacityLong.intValue() : 0;
             if (capacity > 0) {
-                Long waitlistCountLong = eventDoc.getLong("waitlistCount");
-                int currentWaitlistCount = waitlistCountLong != null ? waitlistCountLong.intValue() : 0;
-                
-                // Also check actual count in subcollection as fallback
-                if (currentWaitlistCount == 0) {
-                    return eventRef.collection("WaitlistedEntrants").get().continueWithTask(countTask -> {
-                        int actualCount = countTask.isSuccessful() && countTask.getResult() != null ? 
-                            countTask.getResult().size() : 0;
-                        
-                        if (actualCount >= capacity) {
-                            Log.d(TAG, "Waitlist capacity reached for event " + eventId + " (capacity: " + capacity + ", current: " + actualCount + ")");
-                            return Tasks.forException(new Exception("Waitlist is full. Capacity reached."));
-                        }
-                        
-                        return proceedWithJoin(eventRef, eventId, uid);
-                    });
-                } else if (currentWaitlistCount >= capacity) {
-                    Log.d(TAG, "Waitlist capacity reached for event " + eventId + " (capacity: " + capacity + ", current: " + currentWaitlistCount + ")");
-                    return Tasks.forException(new Exception("Waitlist is full. Capacity reached."));
-                }
+                // FIX: Always check the actual subcollection count to ensure accuracy
+                // The stored waitlistCount field can be stale, especially after deadline changes
+                return eventRef.collection("WaitlistedEntrants").get().continueWithTask(countTask -> {
+                    int actualCount = countTask.isSuccessful() && countTask.getResult() != null ? 
+                        countTask.getResult().size() : 0;
+                    
+                    Log.d(TAG, "Capacity check for event " + eventId + ": capacity=" + capacity + ", actualWaitlistCount=" + actualCount);
+                    
+                    if (actualCount >= capacity) {
+                        Log.d(TAG, "Waitlist capacity reached for event " + eventId + " (capacity: " + capacity + ", actual: " + actualCount + ")");
+                        return Tasks.forException(new Exception("Waitlist is full. Capacity reached."));
+                    }
+                    
+                    // Also update the waitlistCount field to keep it in sync
+                    if (actualCount >= 0) {
+                        eventRef.update("waitlistCount", actualCount)
+                                .addOnFailureListener(e -> Log.w(TAG, "Failed to sync waitlistCount field", e));
+                    }
+                    
+                    return proceedWithJoin(eventRef, eventId, uid);
+                });
             }
 
             return proceedWithJoin(eventRef, eventId, uid);
@@ -136,21 +137,25 @@ public class FirebaseWaitlistRepository implements WaitlistRepository {
 
     @Override
     public Task<Boolean> isJoined(String eventId, String uid) {
-        // Check in-memory cache first
-        if (membership.contains(key(eventId, uid))) {
-            return Tasks.forResult(true);
-        }
-        
-        // Query Firestore - check waitlist subcollection document
+        // Always verify against Firestore to avoid stale membership cache,
+        // then keep the in-memory set in sync with the latest value.
         return db.collection("events")
                 .document(eventId)
                 .collection("WaitlistedEntrants")
                 .document(uid)
                 .get()
                 .continueWith(task -> {
-                    boolean exists = task.isSuccessful() && task.getResult() != null && task.getResult().exists();
+                    boolean exists = task.isSuccessful()
+                            && task.getResult() != null
+                            && task.getResult().exists();
+
+                    String k = key(eventId, uid);
                     if (exists) {
-                        membership.add(key(eventId, uid));
+                        // Keep cache in sync when user is still on the waitlist
+                        membership.add(k);
+                    } else {
+                        // Ensure we do NOT treat user as joined after they leave/are removed
+                        membership.remove(k);
                     }
                     return exists;
                 });

@@ -45,7 +45,12 @@ public class EventNotificationService extends FirebaseMessagingService {
         android.app.ActivityManager.RunningAppProcessInfo appProcessInfo = new android.app.ActivityManager.RunningAppProcessInfo();
         android.app.ActivityManager.getMyMemoryState(appProcessInfo);
         Log.d(TAG, "App importance: " + appProcessInfo.importance);
-        Log.d(TAG, "App in foreground: " + (appProcessInfo.importance == android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND));
+        boolean isForeground = (appProcessInfo.importance == android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND);
+        Log.d(TAG, "App in foreground: " + isForeground);
+        
+        // CRITICAL: Always show notification manually, even if Android would handle it automatically
+        // This ensures notifications are shown even when app is in background and channel might be blocked
+        // Android's automatic handling sometimes fails, especially on emulators
 
         if (remoteMessage.getNotification() != null) {
             String title = remoteMessage.getNotification().getTitle();
@@ -53,6 +58,8 @@ public class EventNotificationService extends FirebaseMessagingService {
             Log.d(TAG, "Notification payload - Title: " + title);
             Log.d(TAG, "Notification payload - Body: " + body);
             
+            // ALWAYS show notification manually, even in background
+            // This ensures it's displayed regardless of Android's automatic handling
             showNotification(title, body, remoteMessage.getData());
         } else if (remoteMessage.getData().size() > 0) {
             Log.d(TAG, "Data-only payload received");
@@ -63,7 +70,7 @@ public class EventNotificationService extends FirebaseMessagingService {
             String eventTitle = remoteMessage.getData().get("eventTitle");
             
             if ("invitation".equals(type)) {
-                String title = "Yay! You are chosen for the " + (eventTitle != null ? eventTitle : "event") + " event 🎉";
+                String title = "You are chosen for the " + (eventTitle != null ? eventTitle : "event") + " event";
                 String body = "You've been selected! Tap to view details and accept your invitation.";
                 showNotification(title, body, remoteMessage.getData());
             } else if ("waitlist".equals(type) || "selected".equals(type) || "cancelled".equals(type) || 
@@ -110,39 +117,61 @@ public class EventNotificationService extends FirebaseMessagingService {
         Log.d(TAG, "=== Attempting to show notification ===");
         Log.d(TAG, "Title: " + title);
         Log.d(TAG, "Body: " + body);
+        Log.d(TAG, "Data payload: " + (data != null ? data.toString() : "null"));
         
         // Check if notifications are enabled for this app
         NotificationManager notificationManager =
                 (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         
         if (notificationManager == null) {
-            Log.e(TAG, "✗ NotificationManager is null - cannot show notification");
+            Log.e(TAG, "❌ NotificationManager is null - cannot show notification");
+            Log.e(TAG, "  This is a critical error - notification system is not available");
             return;
         }
         
         // Check if notifications are enabled (Android 13+)
+        boolean appNotificationsEnabled = true;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            boolean notificationsEnabled = notificationManager.areNotificationsEnabled();
-            Log.d(TAG, "Notifications enabled for app: " + notificationsEnabled);
-            if (!notificationsEnabled) {
-                Log.w(TAG, "✗ Notifications are disabled for this app - notification will not be shown");
-                Log.w(TAG, "  User needs to enable notifications in device settings");
-                return;
+            appNotificationsEnabled = notificationManager.areNotificationsEnabled();
+            Log.d(TAG, "App notifications enabled: " + appNotificationsEnabled);
+            if (!appNotificationsEnabled) {
+                Log.w(TAG, "⚠ WARNING: Notifications are disabled for this app");
+                Log.w(TAG, "  User needs to enable in: Settings → Apps → EventEase → Notifications");
+                Log.w(TAG, "  Attempting to show notification anyway (may be blocked by system)");
             }
         }
         
         // Additional check for Android 13+ (API 33+)
+        boolean hasPostNotificationPermission = true;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             android.content.pm.PackageManager pm = getPackageManager();
-            boolean hasPermission = pm.checkPermission(
+            hasPostNotificationPermission = pm.checkPermission(
                 android.Manifest.permission.POST_NOTIFICATIONS,
                 getPackageName()
             ) == android.content.pm.PackageManager.PERMISSION_GRANTED;
-            Log.d(TAG, "POST_NOTIFICATIONS permission granted: " + hasPermission);
-            if (!hasPermission) {
-                Log.w(TAG, "✗ POST_NOTIFICATIONS permission not granted - notification will not be shown");
-                return;
+            Log.d(TAG, "POST_NOTIFICATIONS permission granted: " + hasPostNotificationPermission);
+            if (!hasPostNotificationPermission) {
+                Log.w(TAG, "⚠ WARNING: POST_NOTIFICATIONS permission not granted");
+                Log.w(TAG, "  Attempting to show notification anyway (may be blocked by system)");
             }
+        }
+        
+        // Log device info for debugging (especially emulator issues)
+        Log.d(TAG, "Device info:");
+        Log.d(TAG, "  - Android version: " + Build.VERSION.SDK_INT);
+        Log.d(TAG, "  - Device model: " + Build.MODEL);
+        Log.d(TAG, "  - Device manufacturer: " + Build.MANUFACTURER);
+        boolean isEmulator = Build.FINGERPRINT.contains("generic") 
+                || Build.FINGERPRINT.contains("unknown")
+                || Build.MODEL.contains("google_sdk")
+                || Build.MODEL.contains("Emulator")
+                || Build.MODEL.contains("Android SDK built for x86")
+                || Build.MANUFACTURER.contains("Genymotion")
+                || (Build.BRAND.startsWith("generic") && Build.DEVICE.startsWith("generic"))
+                || "google_sdk".equals(Build.PRODUCT);
+        Log.d(TAG, "  - Is emulator: " + isEmulator);
+        if (isEmulator) {
+            Log.w(TAG, "⚠ Running on emulator - FCM notifications may not work if Google Play Services is not available");
         }
         
         // Check channel (Android O+)
@@ -151,7 +180,7 @@ public class EventNotificationService extends FirebaseMessagingService {
             Log.d(TAG, "Channel importance: " + importance + " (0=NONE, 1=MIN, 2=LOW, 3=DEFAULT, 4=HIGH)");
             
             if (importance == NotificationManager.IMPORTANCE_NONE) {
-                Log.e(TAG, "✗ Channel importance is NONE - channel is BLOCKED!");
+                Log.e(TAG, "Channel importance is NONE - channel is BLOCKED!");
                 Log.e(TAG, "  Attempting to fix channel...");
                 
                 // Try to fix the channel by deleting and recreating
@@ -167,34 +196,40 @@ public class EventNotificationService extends FirebaseMessagingService {
                 // Re-check after fix attempt
                 importance = NotificationChannelManager.getChannelImportance(this);
                 if (importance == NotificationManager.IMPORTANCE_NONE) {
-                    Log.e(TAG, "✗ Channel still blocked after recreation attempt");
+                    Log.e(TAG, "Channel still blocked after recreation attempt");
                     Log.e(TAG, "  IMPORTANT: Even though channel is blocked, we'll still try to show notification");
                     Log.e(TAG, "  Android might still display it, or user needs to enable channel in settings");
                     Log.e(TAG, "  Solution: Settings → Apps → EventEase → Notifications → Event Invitations");
                     // DON'T return - continue and try to show notification anyway
                     // Sometimes Android will still show it even if channel appears blocked
                 } else {
-                    Log.d(TAG, "✓ Channel fixed! Importance is now: " + importance);
+                    Log.d(TAG, "Channel fixed! Importance is now: " + importance);
                 }
             } else if (importance < 0) {
-                Log.w(TAG, "⚠ Channel not found, creating it now");
+                Log.w(TAG, "Channel not found, creating it now");
                 createNotificationChannel();
             } else {
-                // Channel is enabled (any importance > NONE is fine)
-                Log.d(TAG, "✓ Channel is enabled (importance: " + importance + "), notification will be shown");
+                Log.d(TAG, "Channel is enabled (importance: " + importance + "), notification will be shown");
             }
         }
         
         Intent intent = new Intent(this, MainActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
         
+        String eventId = null;
         if (data != null && data.containsKey("eventId")) {
-            intent.putExtra("eventId", data.get("eventId"));
+            eventId = data.get("eventId");
+            intent.putExtra("eventId", eventId);
+            Log.d(TAG, "Added eventId to intent: " + eventId);
         }
+        
+        // CRITICAL: Use unique request code for each notification (based on eventId hash)
+        // If we use 0 for all, Android will reuse the same PendingIntent and lose eventId!
+        int requestCode = eventId != null ? eventId.hashCode() : (int) System.currentTimeMillis();
         
         PendingIntent pendingIntent = PendingIntent.getActivity(
                 this,
-                0,
+                requestCode, // UNIQUE request code to prevent intent extras from being overwritten
                 intent,
                 PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT
         );
@@ -207,8 +242,8 @@ public class EventNotificationService extends FirebaseMessagingService {
             android.graphics.drawable.Drawable icon = res.getDrawable(iconResId, null);
             Log.d(TAG, "  Notification icon exists: " + (icon != null));
         } catch (Exception e) {
-            Log.e(TAG, "  ⚠ Notification icon not found, using default");
-            iconResId = android.R.drawable.ic_dialog_info; // Fallback icon
+            Log.e(TAG, "  Notification icon not found, using default");
+            iconResId = android.R.drawable.ic_dialog_info;
         }
         
         NotificationCompat.Builder notificationBuilder = new NotificationCompat.Builder(this, CHANNEL_ID)
@@ -226,7 +261,7 @@ public class EventNotificationService extends FirebaseMessagingService {
         try {
             android.app.Notification notification = notificationBuilder.build();
             notificationManager.notify(notificationId, notification);
-            Log.d(TAG, "✓ Notification displayed successfully!");
+            Log.d(TAG, "Notification displayed successfully!");
             Log.d(TAG, "  Notification ID: " + notificationId);
             Log.d(TAG, "  Title: " + title);
             Log.d(TAG, "  Body: " + body);
@@ -241,20 +276,31 @@ public class EventNotificationService extends FirebaseMessagingService {
             for (android.service.notification.StatusBarNotification active : activeNotifications) {
                 if (active.getId() == notificationId) {
                     found = true;
-                    Log.d(TAG, "  ✓ Notification confirmed in active notifications list");
+                    Log.d(TAG, "  Notification confirmed in active notifications list");
                     break;
                 }
             }
             if (!found) {
                 Log.w(TAG, "  ⚠ Notification was posted but not found in active notifications list");
-                Log.w(TAG, "  This may indicate the notification was blocked or dismissed");
+                Log.w(TAG, "  This may indicate:");
+                Log.w(TAG, "    1. The notification was immediately blocked by the system");
+                Log.w(TAG, "    2. The notification channel is blocked (check Settings → Apps → EventEase → Notifications)");
+                Log.w(TAG, "    3. The device is in Do Not Disturb mode");
+                Log.w(TAG, "    4. The app is in battery optimization mode (restricting background activity)");
+            } else {
+                Log.d(TAG, "  ✓ Notification confirmed visible in system");
             }
         } catch (Exception e) {
-            Log.e(TAG, "✗ Failed to display notification", e);
+            Log.e(TAG, "❌ Failed to display notification", e);
             Log.e(TAG, "  Exception type: " + e.getClass().getName());
             Log.e(TAG, "  Exception message: " + e.getMessage());
             if (e.getCause() != null) {
                 Log.e(TAG, "  Cause: " + e.getCause().getMessage());
+            }
+            Log.e(TAG, "  Stack trace:");
+            StackTraceElement[] stackTrace = e.getStackTrace();
+            for (int i = 0; i < Math.min(5, stackTrace.length); i++) {
+                Log.e(TAG, "    " + stackTrace[i].toString());
             }
         }
         Log.d(TAG, "=== End showNotification ===");

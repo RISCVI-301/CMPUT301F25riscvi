@@ -9,30 +9,14 @@
 
     <!-- Header -->
     <LinearLayout
+        android:id="@+id/linearLayout"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@color/ee_mint_aqua"
-        android:padding="16dp"
+        android:layout_height="56dp"
+        android:background="@color/ee_topbar_bg"
+        android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:gravity="center_vertical">
+        android:padding="16dp">
 
-        <ImageButton
-            android:id="@+id/btnBack"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:background="@android:color/transparent"
-            android:contentDescription="Back"
-            android:src="@android:drawable/ic_media_previous"
-            android:tint="@color/ee_navy_dark"/>
-
-        <TextView
-            android:layout_marginStart="12dp"
-            android:text="EventEase"
-            android:textStyle="bold"
-            android:textSize="28sp"
-            android:textColor="@color/ee_navy_dark"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"/>
     </LinearLayout>
 
     <ScrollView
@@ -48,22 +32,45 @@
             android:orientation="vertical"
             android:padding="20dp">
 
-            <!-- Title bar -->
-            <TextView
-                android:text="Create New Event"
-                android:textStyle="bold"
-                android:textSize="24sp"
-                android:textColor="@color/ee_text_light"
-                android:background="@drawable/ee_card_bg"
-                android:padding="12dp"
-                android:gravity="center"
-                android:textAlignment="center"
+            <!-- Back button and Create New Event title -->
+            <androidx.constraintlayout.widget.ConstraintLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"/>
+                android:layout_height="48dp"
+                android:layout_marginBottom="8dp">
+
+                <ImageButton
+                    android:id="@+id/btnBack"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="Back"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintStart_toStartOf="parent"
+                    app:layout_constraintTop_toTopOf="parent"
+                    app:srcCompat="@drawable/ic_arrow_back_24"
+                    app:tint="#FFFFFF" />
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:ellipsize="end"
+                    android:singleLine="true"
+                    android:text="Create New Event"
+                    android:textColor="@color/ee_text_light"
+                    android:textSize="20sp"
+                    android:textStyle="bold"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintEnd_toEndOf="parent"
+                    app:layout_constraintStart_toEndOf="@id/btnBack"
+                    app:layout_constraintTop_toTopOf="parent" />
+
+            </androidx.constraintlayout.widget.ConstraintLayout>
 
             <!-- Event Name + poster camera -->
+
             <TextView
-                android:layout_marginTop="16dp"
+                android:layout_marginTop="8dp"
                 android:layout_marginBottom="8dp"
                 android:text="Event Name"
                 android:textStyle="bold"
@@ -124,7 +131,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Adjust Crop"
-                    android:textColor="@color/ee_mint_aqua"
+                    android:textColor="@color/ee_topbar_bg"
                     android:textSize="14sp"
                     android:visibility="gone"
                     app:cornerRadius="8dp"/>
@@ -139,20 +146,22 @@
                 android:visibility="gone"
                 app:cardCornerRadius="12dp"
                 app:cardElevation="4dp"
-                app:cardBackgroundColor="@color/ee_card">
+                app:cardBackgroundColor="@color/ee_card"
+                app:cardUseCompatPadding="false"
+                app:cardPreventCornerOverlap="false">
 
                 <FrameLayout
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:clipChildren="true">
+                    android:clipChildren="true"
+                    android:clipToPadding="false">
 
                     <ImageView
                         android:id="@+id/posterPreview"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         android:scaleType="matrix"
-                        android:contentDescription="Poster preview"
-                        android:background="@drawable/ee_card_bg"/>
+                        android:contentDescription="Poster preview"/>
 
                 </FrameLayout>
 
@@ -169,34 +178,17 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"/>
 
-            <LinearLayout
+            <EditText
+                android:id="@+id/etDescription"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginBottom="16dp">
-
-                <EditText
-                    android:id="@+id/etDescription"
-                    android:layout_width="0dp"
-                    android:layout_height="56dp"
-                    android:layout_weight="1"
-                    android:minLines="3"
-                    android:background="@drawable/ee_card_bg"
-                    android:padding="18dp"
-                    android:hint="Add details"
-                    android:textColor="@color/ee_text_light"
-                    android:textColorHint="#B3FFFFFF"/>
-
-                <ImageButton
-                    android:id="@+id/btnEditDesc"
-                    android:layout_marginStart="8dp"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:background="@drawable/ee_card_bg"
-                    android:contentDescription="Edit"
-                    android:tint="@color/ee_text_light"
-                    android:src="@android:drawable/ic_menu_edit"/>
-            </LinearLayout>
+                android:layout_height="56dp"
+                android:layout_marginBottom="16dp"
+                android:minLines="3"
+                android:background="@drawable/ee_card_bg"
+                android:padding="18dp"
+                android:hint="Add details"
+                android:textColor="@color/ee_text_light"
+                android:textColorHint="#B3FFFFFF"/>
 
             <!-- Guidelines -->
             <TextView
@@ -301,9 +293,9 @@
                         android:textColor="@color/ee_text_light"
                         android:textSize="16sp"
                         app:backgroundTint="@color/ee_navy_dark"
-                        app:strokeColor="@color/ee_mint_aqua"
+                        app:strokeColor="@color/ee_topbar_bg"
                         app:strokeWidth="2dp"
-                        app:rippleColor="@color/ee_mint_aqua"
+                        app:rippleColor="@color/ee_topbar_bg"
                         app:cornerRadius="12dp"/>
                 </LinearLayout>
 
@@ -331,9 +323,9 @@
                         android:textColor="@color/ee_text_light"
                         android:textSize="16sp"
                         app:backgroundTint="@color/ee_navy_dark"
-                        app:strokeColor="@color/ee_mint_aqua"
+                        app:strokeColor="@color/ee_topbar_bg"
                         app:strokeWidth="2dp"
-                        app:rippleColor="@color/ee_mint_aqua"
+                        app:rippleColor="@color/ee_topbar_bg"
                         app:cornerRadius="12dp"/>
                 </LinearLayout>
             </LinearLayout>
@@ -359,9 +351,9 @@
                 android:textSize="16sp"
                 android:layout_marginBottom="16dp"
                 app:backgroundTint="@color/ee_navy_dark"
-                app:strokeColor="@color/ee_mint_aqua"
+                app:strokeColor="@color/ee_topbar_bg"
                 app:strokeWidth="2dp"
-                app:rippleColor="@color/ee_mint_aqua"
+                app:rippleColor="@color/ee_topbar_bg"
                 app:cornerRadius="12dp"/>
 
             <!-- Event Start Date -->
@@ -385,9 +377,9 @@
                 android:textSize="16sp"
                 android:layout_marginBottom="16dp"
                 app:backgroundTint="@color/ee_navy_dark"
-                app:strokeColor="@color/ee_mint_aqua"
+                app:strokeColor="@color/ee_topbar_bg"
                 app:strokeWidth="2dp"
-                app:rippleColor="@color/ee_mint_aqua"
+                app:rippleColor="@color/ee_topbar_bg"
                 app:cornerRadius="12dp"/>
 
             <!-- Toggles -->
@@ -413,6 +405,48 @@
                     android:layout_height="wrap_content"
                     android:textSize="16sp"/>
             </LinearLayout>
+
+            <TextView
+                android:id="@+id/tvTagsLabel"
+                android:layout_marginBottom="8dp"
+                android:text="Tags / Interests"
+                android:textStyle="bold"
+                android:textSize="20sp"
+                android:textColor="@color/ee_text_light"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"/>
+
+            <TextView
+                android:id="@+id/tvTagsLimit"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="4dp"
+                android:text="Add up to 5 tags"
+                android:textColor="#80FFFFFF"
+                android:textSize="12sp"/>
+
+            <EditText
+                android:id="@+id/etTags"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:background="@drawable/ee_card_bg"
+                android:hint="Type a tag and press enter"
+                android:imeOptions="actionDone"
+                android:inputType="text"
+                android:maxLines="1"
+                android:padding="18dp"
+                android:textColor="@color/ee_text_light"
+                android:textColorHint="#80FFFFFF"/>
+
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/chipGroupTags"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                app:chipSpacingHorizontal="8dp"
+                app:chipSpacingVertical="8dp"
+                app:singleLine="false"/>
 
             <LinearLayout
                 android:layout_marginTop="16dp"
@@ -515,7 +549,7 @@
         </LinearLayout>
     </ScrollView>
 
-    <!-- Fixed bottom footer with Save button -->
+    <!-- Fixed bottom footer with Save button (matching entrant style) -->
     <LinearLayout
         android:id="@+id/footerBar"
         android:layout_width="match_parent"
@@ -535,8 +569,20 @@
             android:textSize="18sp"
             android:textColor="@color/ee_navy_dark"
             android:elevation="8dp"
-            app:backgroundTint="@color/ee_mint_aqua"
+            app:backgroundTint="@color/ee_topbar_bg"
             app:rippleColor="@color/ee_card"
             app:cornerRadius="12dp"/>
     </LinearLayout>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:gravity="center"
+        android:text="EventEase"
+        android:textColor="@color/ee_topbar_text"
+        android:textSize="32sp"
+        android:textStyle="bold"
+        app:layout_anchor="@+id/linearLayout"
+        app:layout_anchorGravity="center" />
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

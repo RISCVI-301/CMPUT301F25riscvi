@@ -43,5 +43,57 @@
         <item name="android:windowTranslucentNavigation">true</item>
     </style>
 
+    <!-- Date and Time Picker Dialog Theme -->
+    <style name="EventEasePickerDialogTheme" parent="ThemeOverlay.MaterialComponents.Dialog.Alert">
+        <item name="android:windowBackground">@drawable/ee_dialog_background</item>
+        <item name="colorAccent">@color/ee_topbar_bg</item>
+        <item name="colorSurface">@android:color/white</item>
+        <item name="colorSurfaceVariant">@android:color/white</item>
+        <item name="colorOnSurface">@color/ee_navy_dark</item>
+        <item name="android:textColorPrimary">@color/ee_navy_dark</item>
+        <item name="android:textColorSecondary">#757575</item>
+        <item name="dialogCornerRadius">20dp</item>
+        <item name="android:datePickerStyle">@style/EventEaseDatePickerStyle</item>
+        <item name="android:timePickerStyle">@style/EventEaseTimePickerStyle</item>
+<!--        <item name="clockFaceBackgroundColor"></item>-->
+        <item name="clockNumberTextColor">@color/ee_navy_dark</item>
+    </style>
+
+    <!-- DatePicker widget styling -->
+    <style name="EventEaseDatePickerStyle" parent="@android:style/Widget.Material.DatePicker">
+        <!-- Keep header background aligned with EventEase top bar -->
+        <item name="android:headerBackground">@color/ee_topbar_bg</item>
+
+        <!-- Use calendar view (grid) only -->
+        <item name="android:calendarViewShown">true</item>
+        <item name="android:spinnersShown">false</item>
+
+        <!-- Control text colors directly -->
+        <item name="android:textColorPrimary">@color/ee_navy_dark</item>
+        <item name="android:textColorSecondary">@color/ee_navy_dark</item>
+    </style>
+
+    <!-- TimePicker widget styling -->
+    <style name="EventEaseTimePickerStyle" parent="@android:style/Widget.Material.TimePicker">
+        <!-- Teal header to match the DatePicker -->
+        <item name="android:headerBackground">@color/ee_topbar_bg</item>
+
+        <!-- White background so teal header stands out -->
+        <item name="android:colorBackground">@android:color/white</item>
+
+        <!-- Force the spinner (wheel) presentation -->
+        <item name="android:timePickerMode">spinner</item>
+
+        <!-- Clock numbers / ticks (unselected) -->
+        <item name="android:colorControlNormal">@color/ee_navy_dark</item>
+
+        <!-- Selected hour/minute & clock hand -->
+        <item name="android:colorControlActivated">@color/ee_topbar_bg</item>
+
+        <!-- Text colors -->
+        <item name="android:textColorPrimary">@color/ee_navy_dark</item>
+        <item name="android:textColor">@color/ee_navy_dark</item>
+    </style>
+
 </resources>
 

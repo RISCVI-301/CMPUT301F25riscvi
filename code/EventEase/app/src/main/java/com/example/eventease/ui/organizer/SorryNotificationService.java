@@ -13,21 +13,21 @@ import java.util.Locale;
 
 /**
  * Service that automatically sends "sorry" notifications to non-selected entrants
- * 48 hours before the event start date.
+ * when the event is about to start.
  * 
  * <p>This service monitors events and automatically sends notifications to entrants
- * in the NonSelectedEntrants subcollection 48 hours before the event starts.
+ * in the NonSelectedEntrants subcollection right before the event starts.
  */
 public class SorryNotificationService {
     private static final String TAG = "SorryNotificationService";
-    // 48 hours before event start (in milliseconds)
-    private static final long FORTY_EIGHT_HOURS_MS = 48L * 60 * 60 * 1000;
+    // Send notification 1 minute before event start (in milliseconds)
+    private static final long NOTIFICATION_BEFORE_START_MS = 1L * 60 * 1000;
     private static ListenerRegistration listenerRegistration;
     private static final FirebaseFirestore db = FirebaseFirestore.getInstance();
     
     /**
      * Sets up a Firestore listener to automatically send "sorry" notifications
-     * 48 hours before event start dates.
+     * shortly before event start dates.
      */
     public static void setupSorryNotificationListener() {
         if (listenerRegistration != null) {
@@ -78,7 +78,7 @@ public class SorryNotificationService {
     }
     
     /**
-     * Checks if an event is 48 hours before start and sends sorry notifications if needed.
+     * Checks if an event is about to start and sends sorry notifications if needed.
      */
     private static void checkAndSendSorryNotifications(DocumentSnapshot eventDoc, long currentTime) {
         Long startsAtEpochMs = eventDoc.getLong("startsAtEpochMs");
@@ -102,14 +102,13 @@ public class SorryNotificationService {
             return;
         }
         
-        // Calculate 48 hours before event start
-        long notificationTime = startsAtEpochMs - FORTY_EIGHT_HOURS_MS;
+        // Calculate notification time (1 minute before event start)
+        long notificationTime = startsAtEpochMs - NOTIFICATION_BEFORE_START_MS;
         
-        // Check if we're within the notification window (48 hours before, with 1 hour tolerance)
-        // This allows the notification to be sent if we're between 47 to 49 hours before
-        long toleranceMs = 60 * 60 * 1000; // 1 hour
+        // Check if we're within the notification window (1 minute before, with 30 second tolerance)
+        long toleranceMs = 30 * 1000; // 30 seconds
         if (currentTime >= notificationTime - toleranceMs && currentTime <= notificationTime + toleranceMs) {
-            Log.d(TAG, "Event " + eventId + " is 48 hours before start, sending sorry notifications");
+            Log.d(TAG, "Event " + eventId + " is 1 minute before start, sending sorry notifications");
             sendSorryNotifications(eventId, eventTitle != null ? eventTitle : "this event");
         }
     }

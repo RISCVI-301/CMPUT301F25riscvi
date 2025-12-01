@@ -2,7 +2,20 @@ package com.example.eventease.model;
 
 /**
  * Represents a user profile in the EventEase system.
- * Contains user information including display name, email, phone number, and photo URL.
+ *
+ * <p>This class serves as a data model (Data Transfer Object pattern) for user profile information
+ * in the EventEase application. It encapsulates user identity and contact information that is used
+ * throughout the application for user identification, display, and communication purposes.</p>
+ *
+ * <p>This class follows the JavaBean pattern with private fields and public getter/setter methods,
+ * providing encapsulation while maintaining compatibility with Firestore serialization through
+ * the default constructor.</p>
+ *
+ * <p><b>Role in Application:</b> Used to store and retrieve user profile information for both
+ * entrants and organizers. The profile data is displayed in various UI components, used for
+ * notifications, and stored in the Firebase backend for user management.</p>
+ *
+ * <p><b>Outstanding Issues:</b> None currently.</p>
  */
 public class Profile {
     private String uid;

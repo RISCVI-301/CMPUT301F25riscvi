@@ -15,6 +15,9 @@ import java.util.Date;
 import java.util.List;
 import java.util.NoSuchElementException;
 
+/**
+ * Legacy Firestore repository. Prefer {@link FirebaseEventRepository}.
+ */
 public class FirestoreEventRepository implements EventRepository {
 
     private static final String TAG = "FirestoreEventRepo";
@@ -27,33 +30,9 @@ public class FirestoreEventRepository implements EventRepository {
 
     @Override
     public Task<List<Event>> getOpenEvents(Date now) {
-        return db.collection("events")
-                .get()
-                .continueWith(task -> {
-                    if (!task.isSuccessful()) {
-                        throw task.getException() != null ? task.getException() :
-                                new IllegalStateException("Failed to load events");
-                    }
-
-                    QuerySnapshot snapshot = task.getResult();
-                    List<Event> events = new ArrayList<>();
-                    if (snapshot != null) {
-                        for (DocumentSnapshot doc : snapshot.getDocuments()) {
-                            Event event = Event.fromMap(doc.getData());
-                            if (event == null) continue;
-                            if (event.id == null) {
-                                event.id = doc.getId();
-                            }
-                            if (now == null || event.getStartAt() == null || event.getStartAt().after(now)) {
-                                events.add(event);
-                            }
-                        }
-                    }
-
-                    events.sort(Comparator.comparing(Event::getStartAt,
-                            Comparator.nullsLast(Comparator.naturalOrder())));
-                    return Collections.unmodifiableList(events);
-                });
+        // Deprecated: use FirebaseEventRepository#getOpenEvents instead.
+        Log.w(TAG, "Deprecated getOpenEvents called. Returning empty list.");
+        return com.google.android.gms.tasks.Tasks.forResult(Collections.emptyList());
     }
 
     @Override
@@ -72,7 +51,12 @@ public class FirestoreEventRepository implements EventRepository {
                         throw new NoSuchElementException("Event not found: " + eventId);
                     }
 
-                    Event event = Event.fromMap(doc.getData());
+                    java.util.Map<String, Object> data = doc.getData();
+                    if (data == null) {
+                        throw new IllegalStateException("Event document has null data: " + eventId);
+                    }
+
+                    Event event = Event.fromMap(data);
                     if (event == null) {
                         throw new IllegalStateException("Failed to parse event: " + eventId);
                     }

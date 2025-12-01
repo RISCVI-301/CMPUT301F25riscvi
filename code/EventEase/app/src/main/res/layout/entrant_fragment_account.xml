@@ -17,7 +17,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
-            android:fontFamily="@font/entrant_fredoka_one"
+            android:textStyle="bold"
             android:text="@string/app_name"
             android:textColor="@color/ee_topbar_text"
             android:textSize="36sp"
@@ -56,9 +56,33 @@
                 android:text="Full Name"
                 android:textSize="28sp"
                 android:textColor="#FFFFFF"
-                android:fontFamily="@font/entrant_fredoka_one"
+                android:textStyle="bold"
                 android:layout_gravity="center_vertical"
                 android:layout_marginStart="16dp"/>
+
+            <FrameLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:layout_marginEnd="12dp">
+
+                <ImageView
+                    android:id="@+id/notificationBellButton"
+                    android:layout_width="32dp"
+                    android:layout_height="32dp"
+                    android:src="@drawable/entrant_ic_notification_bell"
+                    app:tint="#FFFFFF"/>
+
+                <View
+                    android:id="@+id/notificationBadge"
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:layout_gravity="top|end"
+                    android:layout_marginTop="2dp"
+                    android:layout_marginEnd="2dp"
+                    android:background="@drawable/entrant_notification_badge"
+                    android:visibility="gone"/>
+            </FrameLayout>
 
             <ImageView
                 android:id="@+id/settingsButton"
@@ -76,7 +100,7 @@
         android:layout_weight="1"/>
 
     <androidx.cardview.widget.CardView
-        android:id="@+id/notificationsCard"
+        android:id="@+id/notificationPreferencesCard"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginHorizontal="16dp"
@@ -85,29 +109,15 @@
         app:cardBackgroundColor="#536C8C"
         android:elevation="8dp">
 
-        <LinearLayout
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:padding="16dp"
-            android:gravity="center_vertical">
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Notifications"
-                android:textSize="24sp"
-                android:textColor="#FFFFFF"
-                android:fontFamily="@font/entrant_fredoka_one"/>
-
-            <com.google.android.material.switchmaterial.SwitchMaterial
-                android:id="@+id/notificationToggle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="16dp"
-                android:checked="true"/>
-        </LinearLayout>
+            android:text="Notification Preferences"
+            android:textSize="24sp"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:padding="16dp"/>
     </androidx.cardview.widget.CardView>
 
     <androidx.cardview.widget.CardView
@@ -122,34 +132,38 @@
         android:visibility="gone">
 
         <TextView
+            android:id="@+id/applyOrganizerText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="Switch to organizer view"
             android:textSize="24sp"
             android:textColor="#223C65"
-            android:fontFamily="@font/entrant_fredoka_one"
+            android:textStyle="bold"
             android:gravity="center"
             android:padding="16dp"/>
     </androidx.cardview.widget.CardView>
 
+
     <androidx.cardview.widget.CardView
-        android:id="@+id/logoutButton"
+        android:id="@+id/switchAdminCard"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_margin="16dp"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginVertical="8dp"
         app:cardCornerRadius="16dp"
-        app:cardBackgroundColor="#EF9A9A"
-        android:elevation="8dp">
+        app:cardBackgroundColor="#F4B5AE"
+        android:elevation="8dp"
+        android:visibility="gone">
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Log Out"
+            android:text="Switch to Admin View"
             android:textSize="24sp"
-            android:textColor="#FFFFFF"
-            android:fontFamily="@font/entrant_fredoka_one"
+            android:textColor="#223C65"
+            android:textStyle="bold"
             android:gravity="center"
-            android:padding="16dp"/>
+            android:padding="16dp" />
     </androidx.cardview.widget.CardView>
 
     <androidx.cardview.widget.CardView
@@ -167,7 +181,7 @@
             android:text="Delete Profile"
             android:textSize="24sp"
             android:textColor="#FFFFFF"
-            android:fontFamily="@font/entrant_fredoka_one"
+            android:textStyle="bold"
             android:gravity="center"
             android:padding="16dp"/>
     </androidx.cardview.widget.CardView>

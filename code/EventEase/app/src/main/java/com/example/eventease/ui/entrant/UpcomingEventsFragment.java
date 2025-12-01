@@ -23,7 +23,6 @@ import androidx.navigation.Navigation;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.example.eventease.auth.AuthManager;
 import com.example.eventease.data.AdmittedRepository;
 import com.example.eventease.model.Event;
 import com.example.eventease.ui.entrant.eventdetail.EventDetailActivity;
@@ -48,7 +47,6 @@ public class UpcomingEventsFragment extends Fragment {
     private TextView emptyView;
     private UpcomingEventsAdapter adapter;
     private AdmittedRepository admittedRepo;
-    private AuthManager authManager;
 
     @Nullable
     @Override
@@ -63,7 +61,6 @@ public class UpcomingEventsFragment extends Fragment {
 
         // Initialize repositories
         admittedRepo = App.graph().admitted;
-        authManager = App.graph().auth;
 
         // Set up back button
         View btnBack = root.findViewById(R.id.btnBackUpcoming);
@@ -98,9 +95,6 @@ public class UpcomingEventsFragment extends Fragment {
         if (admittedRepo == null) {
             admittedRepo = App.graph().admitted;
         }
-        if (authManager == null) {
-            authManager = App.graph().auth;
-        }
         loadUpcomingEvents();
     }
 
@@ -109,25 +103,39 @@ public class UpcomingEventsFragment extends Fragment {
         super.onResume();
         // Refresh events when fragment becomes visible (e.g., after accepting invitation)
         // Only refresh if repositories are already initialized (to avoid double-loading on first start)
-        if (admittedRepo != null && authManager != null) {
+        if (admittedRepo != null) {
             loadUpcomingEvents();
         }
     }
 
     private void loadUpcomingEvents() {
-        if (admittedRepo == null || authManager == null) {
-            android.util.Log.w("UpcomingEventsFragment", "Repositories not initialized");
+        if (admittedRepo == null) {
+            android.util.Log.w("UpcomingEventsFragment", "Repositories not initialized - admittedRepo is null");
             return;
         }
         
         setLoading(true);
-        String uid = authManager.getUid();
+        String uid = com.example.eventease.auth.AuthHelper.getUid(requireContext());
+        if (uid == null || uid.isEmpty()) {
+            android.util.Log.e("UpcomingEventsFragment", "User UID is null or empty");
+            setLoading(false);
+            adapter.submitEvents(new ArrayList<>());
+            updateEmptyState(true);
+            return;
+        }
+        
         android.util.Log.d("UpcomingEventsFragment", "Loading upcoming events for uid: " + uid);
+        android.util.Log.d("UpcomingEventsFragment", "admittedRepo: " + admittedRepo);
         
         admittedRepo.getUpcomingEvents(uid)
                 .addOnSuccessListener(events -> {
                     if (!isAdded()) return;
                     android.util.Log.d("UpcomingEventsFragment", "Loaded " + (events != null ? events.size() : 0) + " upcoming events");
+                    if (events != null && !events.isEmpty()) {
+                        for (Event event : events) {
+                            android.util.Log.d("UpcomingEventsFragment", "  - Event: " + event.getTitle() + " (id: " + event.getId() + ")");
+                        }
+                    }
                     setLoading(false);
                     adapter.submitEvents(events != null ? events : new ArrayList<>());
                     updateEmptyState(events == null || events.isEmpty());
@@ -135,6 +143,9 @@ public class UpcomingEventsFragment extends Fragment {
                 .addOnFailureListener(e -> {
                     if (!isAdded()) return;
                     android.util.Log.e("UpcomingEventsFragment", "Failed to load upcoming events", e);
+                    if (e != null && e.getMessage() != null) {
+                        android.util.Log.e("UpcomingEventsFragment", "Error message: " + e.getMessage());
+                    }
                     setLoading(false);
                     updateEmptyState(true);
                     adapter.submitEvents(new ArrayList<>());
@@ -213,7 +224,7 @@ public class UpcomingEventsFragment extends Fragment {
                     int pos = getAdapterPosition();
                     if (pos != RecyclerView.NO_POSITION) {
                         Event event = events.get(pos);
-                        Intent intent = new Intent(requireContext(), EventDetailActivity.class);
+                        Intent intent = new Intent(itemView.getContext(), EventDetailActivity.class);
                         intent.putExtra("eventId", event.getId());
                         intent.putExtra("eventTitle", event.getTitle());
                         intent.putExtra("eventLocation", event.getLocation());
@@ -225,7 +236,7 @@ public class UpcomingEventsFragment extends Fragment {
                         intent.putExtra("eventPosterUrl", event.getPosterUrl());
                         intent.putExtra("eventWaitlistCount", event.getWaitlistCount());
                         intent.putExtra("hasInvitation", false); // Already accepted
-                        startActivity(intent);
+                        itemView.getContext().startActivity(intent);
                     }
                 });
             }

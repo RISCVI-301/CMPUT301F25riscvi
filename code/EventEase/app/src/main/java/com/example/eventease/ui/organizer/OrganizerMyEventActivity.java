@@ -1,11 +1,31 @@
 package com.example.eventease.ui.organizer;
 
+import android.app.DatePickerDialog;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.Color;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextUtils;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.View;
+import android.view.WindowManager;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.RadioButton;
+import android.widget.TextView;
 import android.widget.Toast;
+import android.renderscript.Allocation;
+import android.renderscript.Element;
+import android.renderscript.RenderScript;
+import android.renderscript.ScriptIntrinsicBlur;
+import android.app.Dialog;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
@@ -13,8 +33,6 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.eventease.R;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentChange;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
@@ -31,12 +49,16 @@ import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
 import com.google.firebase.firestore.WriteBatch;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 public class OrganizerMyEventActivity extends AppCompatActivity {
@@ -49,13 +71,34 @@ public class OrganizerMyEventActivity extends AppCompatActivity {
     private View fabAdd;
     private String organizerId;
     private boolean isResolvingOrganizerId;
+    
+    // Bottom nav icon and label views
+    private ImageView navIconMyEvents, navIconCreate, navIconAccount;
+    private TextView navLabelMyEvents, navLabelCreate, navLabelAccount;
 
     private OrganizerMyEventAdapter adapter;
     private final List<Map<String, Object>> items = new ArrayList<>();
+    private final List<Map<String, Object>> allItems = new ArrayList<>(); // Store all items for filtering
 
     private FirebaseFirestore db;
     private ListenerRegistration registration;
     private ListenerRegistration legacyRegistration;
+
+    // Search and filter fields
+    private EditText searchInput;
+    private String searchQuery = "";
+    private String locationFilter = "";
+
+    private enum DateFilterOption {
+        ANY_DATE,
+        TODAY,
+        THIS_MONTH,
+        CUSTOM
+    }
+
+    private DateFilterOption activeDateFilter = DateFilterOption.ANY_DATE;
+    private long customDateFilterStartMs = 0L;
+    private final SimpleDateFormat filterDateFormat = new SimpleDateFormat("MMM d, yyyy", Locale.getDefault());
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -69,6 +112,14 @@ public class OrganizerMyEventActivity extends AppCompatActivity {
         btnMyEvents = findViewById(R.id.btnMyEvents);
         btnAccount  = findViewById(R.id.btnAccount);
         fabAdd      = findViewById(R.id.fabAdd);
+        
+        // Get bottom nav icon and label views
+        navIconMyEvents = findViewById(R.id.nav_icon_my_events);
+        navIconCreate = findViewById(R.id.nav_icon_create);
+        navIconAccount = findViewById(R.id.nav_icon_account);
+        navLabelMyEvents = findViewById(R.id.nav_label_my_events);
+        navLabelCreate = findViewById(R.id.nav_label_create);
+        navLabelAccount = findViewById(R.id.nav_label_account);
 
         rvMyEvents.setLayoutManager(new LinearLayoutManager(this));
 
@@ -101,15 +152,37 @@ public class OrganizerMyEventActivity extends AppCompatActivity {
             Intent intent = new Intent(this, OrganizerCreateEventActivity.class);
             intent.putExtra(EXTRA_ORGANIZER_ID, organizerId);
             startActivity(intent);
+            overridePendingTransition(0, 0); // Remove slide animation
         });
         btnMyEvents.setOnClickListener(v -> refreshFromServer());
         btnAccount.setOnClickListener(v -> {
             Intent intent = new Intent(this, OrganizerAccountActivity.class);
             intent.putExtra(EXTRA_ORGANIZER_ID, organizerId);
             startActivity(intent);
+            overridePendingTransition(0, 0); // Remove slide animation
+            finish(); // Close this activity to show new one instantly
         });
         
-        seedSampleParticipants();
+        // Set icon states - My Events is selected (light), others are dark
+        updateNavigationSelection("myEvents");
+
+        // Setup search input
+        searchInput = findViewById(R.id.etMyEventsSearch);
+        if (searchInput != null) {
+            searchInput.addTextChangedListener(new TextWatcher() {
+                @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
+                @Override public void afterTextChanged(Editable s) {
+                    updateSearchQuery(s != null ? s.toString() : "");
+                }
+            });
+        }
+
+        // Setup filter button
+        View filterButton = findViewById(R.id.myEvents_filter);
+        if (filterButton != null) {
+            filterButton.setOnClickListener(v -> showFilterDialog());
+        }
     }
 
     private void ensureOrganizerId(Runnable onReady) {
@@ -122,20 +195,23 @@ public class OrganizerMyEventActivity extends AppCompatActivity {
         if (isResolvingOrganizerId) {
             return;
         }
-        FirebaseUser current = FirebaseAuth.getInstance().getCurrentUser();
-        if (current == null) {
+        // Get device ID as organizer ID
+        com.example.eventease.auth.DeviceAuthManager authManager = 
+            new com.example.eventease.auth.DeviceAuthManager(this);
+        String deviceId = authManager.getUid();
+        
+        if (deviceId == null || deviceId.isEmpty()) {
             return;
         }
+        
         isResolvingOrganizerId = true;
+        organizerId = deviceId; // Use device ID directly
+        
         FirebaseFirestore.getInstance()
                 .collection("users")
-                .document(current.getUid())
+                .document(deviceId)
                 .get()
                 .addOnSuccessListener(doc -> {
-                    organizerId = doc != null ? doc.getString("organizerId") : null;
-                    if (organizerId == null || organizerId.trim().isEmpty()) {
-                        organizerId = current.getUid();
-                    }
                     isResolvingOrganizerId = false;
                     if (organizerId == null || organizerId.trim().isEmpty()) {
                         Toast.makeText(this, "Organizer ID not set for this account", Toast.LENGTH_LONG).show();
@@ -152,8 +228,11 @@ public class OrganizerMyEventActivity extends AppCompatActivity {
     @Override
     protected void onStart() {
         super.onStart();
-        if (FirebaseAuth.getInstance().getCurrentUser() == null) {
-            Toast.makeText(this, "Please sign in to view your events", Toast.LENGTH_LONG).show();
+        // Device auth - always have profile by this point
+        com.example.eventease.auth.DeviceAuthManager authManager = 
+            new com.example.eventease.auth.DeviceAuthManager(this);
+        if (!authManager.hasCachedProfile()) {
+            Toast.makeText(this, "Please complete your profile setup", Toast.LENGTH_LONG).show();
             finish();
             return;
         }
@@ -378,8 +457,9 @@ public class OrganizerMyEventActivity extends AppCompatActivity {
         // Update the UI with the merged results
         items.clear();
         items.addAll(merged.values());
-        adapter.setData(items);
-        toggleEmpty(!items.isEmpty());
+        allItems.clear();
+        allItems.addAll(items); // Store all items for filtering
+        applyFiltersAndUpdateUI();
     }
 
     private void mergeSnapshotsAndDisplay(@Nullable Iterable<? extends DocumentSnapshot> primary,
@@ -410,8 +490,9 @@ public class OrganizerMyEventActivity extends AppCompatActivity {
         Log.d("OrganizerMyEventActivity", "Merging events: primary=" + primaryCount + " legacy=" + legacyCount);
         items.clear();
         items.addAll(merged.values());
-        adapter.setData(items);
-        toggleEmpty(!items.isEmpty());
+        allItems.clear();
+        allItems.addAll(items); // Store all items for filtering
+        applyFiltersAndUpdateUI();
     }
 
     private void backfillLegacy(@Nullable QuerySnapshot legacySnap) {
@@ -435,8 +516,387 @@ public class OrganizerMyEventActivity extends AppCompatActivity {
             Map<String, Object> m = toAdapterMap(d);
             if (m != null) items.add(m);
         }
-        adapter.setData(items);
+        allItems.clear();
+        allItems.addAll(items); // Store all items for filtering
+        applyFiltersAndUpdateUI();
+    }
+
+    private void applyFiltersAndUpdateUI() {
+        if (adapter == null) return;
+
+        List<Map<String, Object>> filtered = new ArrayList<>();
+        for (Map<String, Object> event : allItems) {
+            if (passesDateFilter(event) && passesLocationFilter(event) && passesSearchFilter(event)) {
+                filtered.add(event);
+            }
+        }
+
+        items.clear();
+        items.addAll(filtered);
+        List<OrganizerMyEventAdapter.EventListItem> sectionedList = createSectionedList(items);
+        adapter.setSectionedData(sectionedList);
         toggleEmpty(!items.isEmpty());
+    }
+
+    private boolean passesLocationFilter(Map<String, Object> event) {
+        if (TextUtils.isEmpty(locationFilter)) {
+            return true;
+        }
+        String eventLocation = asString(event.get("location"));
+        if (TextUtils.isEmpty(eventLocation)) {
+            return false;
+        }
+        return eventLocation.toLowerCase(Locale.getDefault())
+                .contains(locationFilter.toLowerCase(Locale.getDefault()));
+    }
+
+    private boolean passesSearchFilter(Map<String, Object> event) {
+        if (TextUtils.isEmpty(searchQuery)) {
+            return true;
+        }
+        String queryLower = searchQuery.toLowerCase(Locale.getDefault());
+        String title = asString(event.get("title"));
+        if (!TextUtils.isEmpty(title) && title.toLowerCase(Locale.getDefault()).contains(queryLower)) {
+            return true;
+        }
+        @SuppressWarnings("unchecked")
+        List<String> interests = (List<String>) event.get("interests");
+        if (interests == null || interests.isEmpty()) {
+            return false;
+        }
+        for (String interest : interests) {
+            if (interest != null && interest.toLowerCase(Locale.getDefault()).contains(queryLower)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean passesDateFilter(Map<String, Object> event) {
+        if (activeDateFilter == DateFilterOption.ANY_DATE) {
+            return true;
+        }
+
+        long eventDate = getEventDateForFilter(event);
+        if (eventDate <= 0) {
+            return false;
+        }
+
+        switch (activeDateFilter) {
+            case TODAY:
+                return isSameDay(eventDate, startOfDay(System.currentTimeMillis()));
+            case THIS_MONTH:
+                return isSameMonth(eventDate, System.currentTimeMillis());
+            case CUSTOM:
+                if (customDateFilterStartMs <= 0) return true;
+                return isSameDay(eventDate, customDateFilterStartMs);
+            default:
+                return true;
+        }
+    }
+
+    private long getEventDateForFilter(Map<String, Object> event) {
+        long startsAt = coerceLong(event.get("startsAtEpochMs"));
+        if (startsAt > 0) {
+            return startsAt;
+        }
+        long regStart = coerceLong(event.get("registrationStart"));
+        return regStart > 0 ? regStart : 0;
+    }
+
+    private boolean isSameDay(long timestampMs, long dayStartMs) {
+        Calendar day = Calendar.getInstance();
+        day.setTimeInMillis(dayStartMs);
+
+        Calendar target = Calendar.getInstance();
+        target.setTimeInMillis(timestampMs);
+
+        return day.get(Calendar.YEAR) == target.get(Calendar.YEAR)
+                && day.get(Calendar.DAY_OF_YEAR) == target.get(Calendar.DAY_OF_YEAR);
+    }
+
+    private boolean isSameMonth(long timestampMs, long referenceMs) {
+        Calendar ref = Calendar.getInstance();
+        ref.setTimeInMillis(referenceMs);
+        Calendar target = Calendar.getInstance();
+        target.setTimeInMillis(timestampMs);
+        return ref.get(Calendar.YEAR) == target.get(Calendar.YEAR)
+                && ref.get(Calendar.MONTH) == target.get(Calendar.MONTH);
+    }
+
+    private long startOfDay(long timeMs) {
+        Calendar cal = Calendar.getInstance();
+        cal.setTimeInMillis(timeMs);
+        cal.set(Calendar.HOUR_OF_DAY, 0);
+        cal.set(Calendar.MINUTE, 0);
+        cal.set(Calendar.SECOND, 0);
+        cal.set(Calendar.MILLISECOND, 0);
+        return cal.getTimeInMillis();
+    }
+
+    private void updateSearchQuery(String query) {
+        String cleaned = query != null ? query.trim() : "";
+        if (cleaned.equals(searchQuery)) {
+            return;
+        }
+        searchQuery = cleaned;
+        applyFiltersAndUpdateUI();
+    }
+
+    private void showFilterDialog() {
+        Dialog dialog = new Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
+        dialog.setContentView(R.layout.entrant_dialog_discover_filter);
+        dialog.setCanceledOnTouchOutside(false);
+
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            WindowManager.LayoutParams layoutParams = dialog.getWindow().getAttributes();
+            layoutParams.dimAmount = 0f;
+            dialog.getWindow().setAttributes(layoutParams);
+            dialog.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+        }
+
+        Bitmap screenshot = captureScreenshot();
+        if (screenshot != null) {
+            Bitmap blurredBitmap = blurBitmap(screenshot, 25f);
+            if (blurredBitmap != null) {
+                View blurBackground = dialog.findViewById(R.id.dialogBlurBackground);
+                if (blurBackground != null) {
+                    blurBackground.setBackground(new BitmapDrawable(getResources(), blurredBitmap));
+                }
+            }
+        }
+
+        View blurBackground = dialog.findViewById(R.id.dialogBlurBackground);
+        ImageButton closeButton = dialog.findViewById(R.id.btnFilterClose);
+        if (closeButton != null) {
+            closeButton.setOnClickListener(v -> dialog.dismiss());
+        }
+
+        RadioButton radioAnyDate = dialog.findViewById(R.id.radioAnyDate);
+        RadioButton radioToday = dialog.findViewById(R.id.radioToday);
+        RadioButton radioThisMonth = dialog.findViewById(R.id.radioTomorrow);
+        RadioButton radioCustom = dialog.findViewById(R.id.radioCustomDate);
+        TextView chooseDateValue = dialog.findViewById(R.id.textChooseDateValue);
+        View chooseDateRow = dialog.findViewById(R.id.chooseDateRow);
+        EditText etFilterLocation = dialog.findViewById(R.id.etFilterLocation);
+        if (etFilterLocation != null) {
+            etFilterLocation.setText(locationFilter);
+        }
+
+        restoreDateSelection(radioAnyDate, radioToday, radioThisMonth, radioCustom, chooseDateValue);
+        setDateSelectionHandlers(radioAnyDate, radioToday, radioThisMonth, radioCustom, chooseDateRow, chooseDateValue);
+
+        Button applyButton = dialog.findViewById(R.id.btnApplyFilters);
+        if (applyButton != null) {
+            applyButton.setOnClickListener(v -> {
+                if (etFilterLocation != null) {
+                    locationFilter = etFilterLocation.getText() != null
+                            ? etFilterLocation.getText().toString().trim()
+                            : "";
+                }
+                applyFiltersAndUpdateUI();
+                dialog.dismiss();
+            });
+        }
+
+        dialog.show();
+
+        View card = dialog.findViewById(R.id.dialogCardView);
+        if (blurBackground != null && card != null) {
+            android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_fade_in);
+            android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_zoom_in);
+
+            blurBackground.startAnimation(fadeIn);
+            card.startAnimation(zoomIn);
+        }
+    }
+
+    private void restoreDateSelection(RadioButton any, RadioButton today,
+                                      RadioButton thisMonth, RadioButton custom,
+                                      TextView chooseDateValue) {
+        clearDateChecks(any, today, thisMonth, custom);
+        if (any == null || today == null || thisMonth == null || custom == null) return;
+
+        switch (activeDateFilter) {
+            case ANY_DATE:
+                any.setChecked(true);
+                break;
+            case TODAY:
+                today.setChecked(true);
+                break;
+            case THIS_MONTH:
+                thisMonth.setChecked(true);
+                break;
+            case CUSTOM:
+                custom.setChecked(true);
+                break;
+        }
+
+        updateChooseDateLabel(chooseDateValue);
+    }
+
+    private void updateChooseDateLabel(TextView chooseDateValue) {
+        if (chooseDateValue == null) return;
+        if (customDateFilterStartMs > 0) {
+            chooseDateValue.setText(filterDateFormat.format(new Date(customDateFilterStartMs)));
+        } else {
+            chooseDateValue.setText("No date selected");
+        }
+    }
+
+    private void setDateSelectionHandlers(RadioButton any, RadioButton today,
+                                          RadioButton thisMonth, RadioButton custom,
+                                          View chooseDateRow, TextView chooseDateValue) {
+        View.OnClickListener anyHandler = v -> setDateChoice(DateFilterOption.ANY_DATE, any, today, thisMonth, custom, chooseDateValue, false);
+        View.OnClickListener todayHandler = v -> setDateChoice(DateFilterOption.TODAY, today, any, thisMonth, custom, chooseDateValue, false);
+        View.OnClickListener thisMonthHandler = v -> setDateChoice(DateFilterOption.THIS_MONTH, thisMonth, any, today, custom, chooseDateValue, false);
+        View.OnClickListener customHandler = v -> setDateChoice(DateFilterOption.CUSTOM, custom, any, today, thisMonth, chooseDateValue, true);
+
+        if (any != null) any.setOnClickListener(anyHandler);
+        if (today != null) today.setOnClickListener(todayHandler);
+        if (thisMonth != null) thisMonth.setOnClickListener(thisMonthHandler);
+        if (custom != null) custom.setOnClickListener(customHandler);
+        if (chooseDateRow != null) chooseDateRow.setOnClickListener(customHandler);
+    }
+
+    private void setDateChoice(DateFilterOption option, RadioButton target,
+                               RadioButton other1, RadioButton other2, RadioButton other3,
+                               TextView chooseDateValue, boolean launchPickerIfNeeded) {
+        clearDateChecks(target, other1, other2, other3);
+        if (target != null) {
+            target.setChecked(true);
+        }
+        activeDateFilter = option;
+        if (option == DateFilterOption.CUSTOM) {
+            if (customDateFilterStartMs <= 0 || launchPickerIfNeeded) {
+                openDatePicker(chooseDateValue, target);
+            } else {
+                updateChooseDateLabel(chooseDateValue);
+            }
+        } else {
+            updateChooseDateLabel(chooseDateValue);
+        }
+    }
+
+    private void clearDateChecks(RadioButton... radios) {
+        if (radios == null) return;
+        for (RadioButton rb : radios) {
+            if (rb != null) {
+                rb.setChecked(false);
+            }
+        }
+    }
+
+    private void openDatePicker(TextView chooseDateValue, RadioButton customRadio) {
+        Calendar cal = Calendar.getInstance();
+        if (customDateFilterStartMs > 0) {
+            cal.setTimeInMillis(customDateFilterStartMs);
+        }
+        DatePickerDialog picker = new DatePickerDialog(this,
+                (view, year, month, dayOfMonth) -> {
+                    Calendar selected = Calendar.getInstance();
+                    selected.set(year, month, dayOfMonth);
+                    customDateFilterStartMs = selected.getTimeInMillis();
+                    if (customRadio != null) customRadio.setChecked(true);
+                    updateChooseDateLabel(chooseDateValue);
+                },
+                cal.get(Calendar.YEAR),
+                cal.get(Calendar.MONTH),
+                cal.get(Calendar.DAY_OF_MONTH));
+        picker.show();
+    }
+
+    private Bitmap captureScreenshot() {
+        try {
+            if (getWindow() == null) return null;
+            View rootView = getWindow().getDecorView().getRootView();
+            rootView.setDrawingCacheEnabled(true);
+            Bitmap bitmap = Bitmap.createBitmap(rootView.getDrawingCache());
+            rootView.setDrawingCacheEnabled(false);
+            return bitmap;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    private Bitmap blurBitmap(Bitmap bitmap, float radius) {
+        if (bitmap == null) return null;
+
+        try {
+            int width = Math.round(bitmap.getWidth() * 0.4f);
+            int height = Math.round(bitmap.getHeight() * 0.4f);
+            Bitmap inputBitmap = Bitmap.createScaledBitmap(bitmap, width, height, false);
+            Bitmap outputBitmap = Bitmap.createBitmap(inputBitmap);
+
+            RenderScript rs = RenderScript.create(this);
+            ScriptIntrinsicBlur blurScript = ScriptIntrinsicBlur.create(rs, Element.U8_4(rs));
+            Allocation tmpIn = Allocation.createFromBitmap(rs, inputBitmap);
+            Allocation tmpOut = Allocation.createFromBitmap(rs, outputBitmap);
+
+            blurScript.setRadius(radius);
+            blurScript.setInput(tmpIn);
+            blurScript.forEach(tmpOut);
+            tmpOut.copyTo(outputBitmap);
+
+            rs.destroy();
+
+            return Bitmap.createScaledBitmap(outputBitmap, bitmap.getWidth(), bitmap.getHeight(), true);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return bitmap;
+        }
+    }
+
+    private static String asString(Object o) {
+        return o instanceof String ? (String) o : null;
+    }
+
+    /**
+     * Creates a sectioned list with "Upcoming Events" and "Old Events" headers.
+     * Events are split based on their start time (startsAtEpochMs) or registration end time.
+     */
+    private List<OrganizerMyEventAdapter.EventListItem> createSectionedList(List<Map<String, Object>> events) {
+        List<OrganizerMyEventAdapter.EventListItem> sectionedList = new ArrayList<>();
+        
+        long currentTime = System.currentTimeMillis();
+        List<Map<String, Object>> upcomingEvents = new ArrayList<>();
+        List<Map<String, Object>> oldEvents = new ArrayList<>();
+        
+        for (Map<String, Object> event : events) {
+            // Check startsAtEpochMs first, then fall back to registrationEnd
+            long startTime = coerceLong(event.get("startsAtEpochMs"));
+            if (startTime == 0) {
+                startTime = coerceLong(event.get("registrationEnd"));
+            }
+            
+            if (startTime > currentTime) {
+                upcomingEvents.add(event);
+            } else {
+                oldEvents.add(event);
+            }
+        }
+        
+        // Add upcoming events section
+        if (!upcomingEvents.isEmpty()) {
+            sectionedList.add(OrganizerMyEventAdapter.EventListItem.createHeader("Upcoming Events"));
+            for (Map<String, Object> event : upcomingEvents) {
+                sectionedList.add(OrganizerMyEventAdapter.EventListItem.createEvent(event));
+            }
+        }
+        
+        // Add old events section
+        if (!oldEvents.isEmpty()) {
+            sectionedList.add(OrganizerMyEventAdapter.EventListItem.createHeader("Old Events"));
+            for (Map<String, Object> event : oldEvents) {
+                sectionedList.add(OrganizerMyEventAdapter.EventListItem.createEvent(event));
+            }
+        }
+        
+        return sectionedList;
     }
 
     private void toggleEmpty(boolean hasItems) {
@@ -451,19 +911,24 @@ public class OrganizerMyEventActivity extends AppCompatActivity {
         String title = getStringOr(d.getString("title"), "Untitled");
         String posterUrl = d.getString("posterUrl");
         String location = d.getString("location");
+        @SuppressWarnings("unchecked")
+        List<String> interests = (List<String>) d.get("interests");
 
         long regStart = coerceLong(d.get("registrationStart"));
         long regEnd   = coerceLong(d.get("registrationEnd"));
         long deadline = coerceLong(d.get("deadlineEpochMs"));
+        long startsAt = coerceLong(d.get("startsAtEpochMs"));
         int capacity  = coerceInt(d.get("capacity"), -1);
 
         m.put("id", id);
         m.put("title", title);
         m.put("posterUrl", posterUrl);
         m.put("location", location);
+        m.put("interests", interests != null ? interests : new ArrayList<String>());
         m.put("registrationStart", regStart);
         m.put("registrationEnd", regEnd);
         m.put("deadlineEpochMs", deadline);
+        m.put("startsAtEpochMs", startsAt);
         m.put("capacity", capacity);
 
         return m;
@@ -490,83 +955,58 @@ public class OrganizerMyEventActivity extends AppCompatActivity {
     }
 
     /**
-     * Convenience helper you can call while developing to populate the event buckets
-     * for the sample event (ID: 699bb06d-ea19-4edf-8238-ba2103fa6509) with all nine
-     * demo users (waitlist) and three entrants in each bucket (selected / non-selected / cancelled).
-     * Invoke manually from onCreate(), a debug button, or temporarily when you need to reseed the data.
+     * Updates the bottom navigation icons and labels based on the selected page.
+     * Selected icons are light, unselected are dark.
      */
-    private void seedSampleParticipants() {
-        final String eventId = "c494766e-ddc8-4ef5-83a3-5fce4fbbac5f";
+    private void updateNavigationSelection(String selectedPage) {
+        // Dark blue for unselected items (brand color)
+        int unselectedColor = android.graphics.Color.parseColor("#223C65");
+        // iOS blue color for selected items
+        int selectedColor = android.graphics.Color.parseColor("#446EAF");
 
-        Map<String, ParticipantSeed> all = new LinkedHashMap<>();
-        all.put("c3hY3rcQwtPpKwJfEylBfwCar2", new ParticipantSeed("Caramel Verma", "carver123@ualberta.ca", "123123123"));
-        all.put("nF9GwuUQdahEPP4oJsoPe0smmn1", new ParticipantSeed("dukh antam", "dukhaitamaslay@gmail.com", "1234567890"));
-        all.put("LTrhOeKa3NnFa7SyHAtC9z2ut2", new ParticipantSeed("Baby Groot", "lamrgroot@gmail.com", "1234567890"));
-        all.put("JQDhJDOqLqPmDTv0QOqvBF9v2", new ParticipantSeed("Hair Gobi", "tharigobbrocks@gmail.com", "1234567890"));
-        all.put("D3W8BKiP40FHyLhhBXtK0mwdjH2", new ParticipantSeed("sam ver", "samver@gmail.com", "1234567899"));
-        all.put("qsF0hQGYCpYEOGUuhNd4vFLQp1", new ParticipantSeed("Sanika Verma", "sanika123@gmail.com", "123456789"));
-        all.put("LvaLG92OU0UuasiyS0ZfQSvpudym2", new ParticipantSeed("maan naam", "1manog@gmail.com", "7805551111"));
-        all.put("VVopE1dwcH54jS7na9cOsDiShL2", new ParticipantSeed("gainda monke", "two@gmail.com", "696969"));
-        all.put("4g0z3tuuAHc6y9miUh9hCR83dWn2", new ParticipantSeed("kyo bhang", "1kya@gmail.com", "12345678"));
-
-        List<String> selected = Arrays.asList(
-                "c3hY3rcQwtPpKwJfEylBfwCar2",
-                "nF9GwuUQdahEPP4oJsoPe0smmn1",
-                "LvaLG92OU0UuasiyS0ZfQSvpudym2");
-
-        List<String> nonSelected = Arrays.asList(
-                "LTrhOeKa3NnFa7SyHAtC9z2ut2",
-                "JQDhJDOqLqPmDTv0QOqvBF9v2",
-                "VVopE1dwcH54jS7na9cOsDiShL2");
-
-        List<String> cancelled = Arrays.asList(
-                "D3W8BKiP40FHyLhhBXtK0mwdjH2",
-                "qsF0hQGYCpYEOGUuhNd4vFLQp1",
-                "4g0z3tuuAHc6y9miUh9hCR83dWn2");
-
-        WriteBatch batch = db.batch();
-        DocumentReference eventRef = db.collection("events").document(eventId);
-
-        for (Map.Entry<String, ParticipantSeed> entry : all.entrySet()) {
-            String userId = entry.getKey();
-            ParticipantSeed info = entry.getValue();
-            Map<String, Object> payload = info.toMap();
-            payload.put("userId", userId);
-
-            batch.set(eventRef.collection("WaitlistedEntrants").document(userId), payload, SetOptions.merge());
-            if (selected.contains(userId)) {
-                batch.set(eventRef.collection("SelectedEntrants").document(userId), payload, SetOptions.merge());
-            }
-            if (nonSelected.contains(userId)) {
-                batch.set(eventRef.collection("NonSelectedEntrants").document(userId), payload, SetOptions.merge());
-            }
-            if (cancelled.contains(userId)) {
-                batch.set(eventRef.collection("CancelledEntrants").document(userId), payload, SetOptions.merge());
-            }
+        // Reset all to unselected (dark circles and dark text)
+        if (navIconMyEvents != null) {
+            navIconMyEvents.setImageResource(R.drawable.entrant_ic_my_events_circle_dark);
+        }
+        if (navIconCreate != null) {
+            navIconCreate.setImageResource(R.drawable.organizer_ic_add_circle_dark);
+        }
+        if (navIconAccount != null) {
+            navIconAccount.setImageResource(R.drawable.entrant_ic_account_circle_dark);
+        }
+        if (navLabelMyEvents != null) {
+            navLabelMyEvents.setTextColor(unselectedColor);
+        }
+        if (navLabelCreate != null) {
+            navLabelCreate.setTextColor(unselectedColor);
+        }
+        if (navLabelAccount != null) {
+            navLabelAccount.setTextColor(unselectedColor);
         }
 
-        batch.commit()
-                .addOnSuccessListener(unused -> Log.d("OrganizerMyEventActivity", "Seeded sample participants for " + eventId))
-                .addOnFailureListener(e -> Log.e("OrganizerMyEventActivity", "Failed to seed participants", e));
-    }
-
-    private static class ParticipantSeed {
-        final String name;
-        final String email;
-        final String phone;
-
-        ParticipantSeed(String name, String email, String phone) {
-            this.name = name;
-            this.email = email;
-            this.phone = phone;
-        }
-
-        Map<String, Object> toMap() {
-            Map<String, Object> m = new HashMap<>();
-            m.put("name", name);
-            m.put("email", email);
-            m.put("phoneNumber", phone);
-            return m;
+        // Set selected (light circle and blue text) based on page
+        if ("myEvents".equals(selectedPage)) {
+            if (navIconMyEvents != null) {
+                navIconMyEvents.setImageResource(R.drawable.entrant_ic_my_events_circle_light);
+            }
+            if (navLabelMyEvents != null) {
+                navLabelMyEvents.setTextColor(selectedColor);
+            }
+        } else if ("create".equals(selectedPage)) {
+            if (navIconCreate != null) {
+                navIconCreate.setImageResource(R.drawable.organizer_ic_add_circle_light);
+            }
+            if (navLabelCreate != null) {
+                navLabelCreate.setTextColor(selectedColor);
+            }
+        } else if ("account".equals(selectedPage)) {
+            if (navIconAccount != null) {
+                navIconAccount.setImageResource(R.drawable.entrant_ic_account_circle_light);
+            }
+            if (navLabelAccount != null) {
+                navLabelAccount.setTextColor(selectedColor);
+            }
         }
     }
+
 }

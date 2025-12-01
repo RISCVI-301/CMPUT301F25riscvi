@@ -1,6 +1,7 @@
 package com.example.eventease.model;
 
 import androidx.annotation.Nullable;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -9,10 +10,14 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Represents an event in the EventEase system.
- * Contains event details including title, location, capacity, waitlist, and admitted entrants.
+ * Event data model.
+ * Stores event information and handles serialization to/from Firestore.
+ * 
+ * Note: waitlistCount is deprecated, use waitlist.size() instead.
+ * description field is legacy, same as notes.
  */
-public class Event {
+public class Event implements Serializable {
+    private static final long serialVersionUID = 1L;
     /** Unique event identifier. */
     public String id;
     /** Event title. */
@@ -29,8 +34,6 @@ public class Event {
     public String location;
     /** Maximum capacity of the event. */
     public int capacity;
-    /** Sample size - number of invitations to send initially from waitlist. */
-    public int sampleSize;
     /** Current number of people on waitlist (deprecated - use waitlist.size()). */
     public int waitlistCount;
     /** List of user IDs on the waitlist. */
@@ -49,9 +52,14 @@ public class Event {
     public String organizerId;
     /** Event creation timestamp in milliseconds UTC. */
     public long createdAtEpochMs;
-    /** QR code payload string (e.g., "event:<id>"). */
+    /** QR code payload string (e.g., {@code "event:<id>"}). */
     @Nullable public String qrPayload;
+    /** Interests/tags for filtering (e.g., Outdoor, Music). */
+    @Nullable public List<String> interests;
 
+    /**
+     * Default constructor for Firestore deserialization.
+     */
     public Event() { /* for Firestore */ }
 
     /**
@@ -85,7 +93,6 @@ public class Event {
         m.put("registrationEnd", registrationEnd);
         m.put("location", location);
         m.put("capacity", capacity);
-        m.put("sampleSize", sampleSize);
         m.put("waitlistCount", waitlistCount);
         m.put("waitlist", waitlist != null ? waitlist : new ArrayList<>());
         m.put("admitted", admitted != null ? admitted : new ArrayList<>());
@@ -96,6 +103,12 @@ public class Event {
         m.put("organizerId", organizerId);
         m.put("createdAtEpochMs", createdAtEpochMs);
         m.put("qrPayload", qrPayload);
+        m.put("interests", interests != null ? interests : new ArrayList<>());
+        // CRITICAL: Initialize selection tracking fields to false
+        // These fields are required for the Cloud Function to find and process events
+        m.put("selectionProcessed", false);
+        m.put("selectionNotificationSent", false);
+        m.put("sorryNotificationSent", false);
         return m;
     }
     
@@ -113,6 +126,14 @@ public class Event {
         e.title = (String) m.get("title");
         
         Object startsAt = m.get("startsAtEpochMs");
+        if (startsAt == null) {
+            // Fallback to eventStartEpochMs (with "event" prefix) for backwards compatibility
+            startsAt = m.get("eventStartEpochMs");
+        }
+        if (startsAt == null) {
+            // Also check for eventStart (without EpochMs suffix) as another fallback
+            startsAt = m.get("eventStart");
+        }
         e.startsAtEpochMs = startsAt != null ? ((Number) startsAt).longValue() : 0;
         
         Object deadline = m.get("deadlineEpochMs");
@@ -128,9 +149,6 @@ public class Event {
         
         Object cap = m.get("capacity");
         e.capacity = cap != null ? ((Number) cap).intValue() : 0;
-        
-        Object sampleSize = m.get("sampleSize");
-        e.sampleSize = sampleSize != null ? ((Number) sampleSize).intValue() : 0;
         
         Object wc = m.get("waitlistCount");
         e.waitlistCount = wc != null ? ((Number) wc).intValue() : 0;
@@ -177,6 +195,15 @@ public class Event {
         
         e.qrPayload = (String) m.get("qrPayload");
         
+        Object interestsObj = m.get("interests");
+        if (interestsObj instanceof List) {
+            @SuppressWarnings("unchecked")
+            List<String> interestList = (List<String>) interestsObj;
+            e.interests = interestList != null ? new ArrayList<>(interestList) : new ArrayList<>();
+        } else {
+            e.interests = new ArrayList<>();
+        }
+        
         return e;
     }
 
@@ -221,6 +248,20 @@ public class Event {
      * @param startsAtEpochMs the start time in milliseconds
      */
     public void setStartsAtEpochMs(long startsAtEpochMs) { this.startsAtEpochMs = startsAtEpochMs; }
+
+    /**
+     * Gets the list of interests/tags associated with the event.
+     *
+     * @return the list of interests (e.g., Outdoor, Music), or null if not set
+     */
+    public List<String> getInterests() { return interests; }
+
+    /**
+     * Sets the list of interests/tags associated with the event.
+     *
+     * @param interests the list of interests to set
+     */
+    public void setInterests(List<String> interests) { this.interests = interests; }
 
     /**
      * Gets the event deadline in milliseconds since epoch (UTC).
@@ -286,20 +327,6 @@ public class Event {
      * @param capacity the event capacity to set
      */
     public void setCapacity(int capacity) { this.capacity = capacity; }
-
-    /**
-     * Gets the sample size (number of initial invitations to send).
-     *
-     * @return the sample size
-     */
-    public int getSampleSize() { return sampleSize; }
-
-    /**
-     * Sets the sample size (number of initial invitations to send).
-     *
-     * @param sampleSize the sample size to set
-     */
-    public void setSampleSize(int sampleSize) { this.sampleSize = sampleSize; }
 
     /**
      * Gets the waitlist count (deprecated - use getWaitlist().size() instead).

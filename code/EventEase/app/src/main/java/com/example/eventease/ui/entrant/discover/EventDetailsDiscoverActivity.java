@@ -1,10 +1,16 @@
 package com.example.eventease.ui.entrant.discover;
 
 import android.annotation.SuppressLint;
+import android.app.Dialog;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.Color;
 import android.os.Bundle;
+import android.provider.MediaStore;
 import android.text.TextUtils;
 import android.view.View;
+import android.view.ViewGroup;
+import android.view.Window;
 import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.ImageView;
@@ -16,16 +22,20 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
-import com.example.eventease.auth.AuthManager;
 import com.example.eventease.data.WaitlistRepository;
 import com.example.eventease.model.Event;
 import com.bumptech.glide.Glide;
 import com.example.eventease.App;
 import com.example.eventease.R;
+import com.google.android.material.button.MaterialButton;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.FirebaseFirestoreException;
 import com.google.firebase.firestore.ListenerRegistration;
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.WriterException;
+import com.google.zxing.common.BitMatrix;
+import com.google.zxing.qrcode.QRCodeWriter;
 
 import java.text.SimpleDateFormat;
 import java.util.List;
@@ -52,6 +62,7 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
     private ProgressBar progressBar;
     private ImageButton shareButton;
     private Button waitlistButton;
+    private androidx.cardview.widget.CardView waitlistCard;
     private String guidelinesBody;
 
     private ListenerRegistration eventRegistration;
@@ -59,7 +70,6 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
     private FirebaseFirestore firestore;
     
     private WaitlistRepository waitlistRepo;
-    private AuthManager authManager;
 
     private Event currentEvent;
     private String eventId;
@@ -76,7 +86,6 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
 
         // Initialize repositories
         waitlistRepo = App.graph().waitlists;
-        authManager = App.graph().auth;
 
         bindViews();
 
@@ -121,6 +130,7 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
         contentContainer = findViewById(R.id.eventDetailContent);
         shareButton = findViewById(R.id.btnShare);
         waitlistButton = findViewById(R.id.waitlist_join);
+        waitlistCard = findViewById(R.id.waitlistCard);
         Button guidelinesButton = findViewById(R.id.btnGuidelines);
         ImageButton backButton = findViewById(R.id.btnBack);
 
@@ -130,23 +140,9 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
         guidelinesBody = getString(R.string.event_details_guidelines_body);
 
         backButton.setOnClickListener(v -> getOnBackPressedDispatcher().onBackPressed());
-        shareButton.setOnClickListener(v -> shareEvent());
+        shareButton.setOnClickListener(v -> showEventQRDialog());
         waitlistButton.setOnClickListener(v -> handleJoinWaitlist());
         guidelinesButton.setOnClickListener(v -> showGuidelinesDialog());
-
-        // Wire bottom nav include buttons
-        android.widget.LinearLayout navButtonMyEvents = findViewById(R.id.nav_button_my_events);
-        android.widget.LinearLayout navButtonDiscover = findViewById(R.id.nav_button_discover);
-        android.widget.LinearLayout navButtonAccount = findViewById(R.id.nav_button_account);
-        if (navButtonDiscover != null) {
-            navButtonDiscover.setOnClickListener(v -> navigateToMain("discover"));
-        }
-        if (navButtonMyEvents != null) {
-            navButtonMyEvents.setOnClickListener(v -> navigateToMain("myEvents"));
-        }
-        if (navButtonAccount != null) {
-            navButtonAccount.setOnClickListener(v -> navigateToMain("account"));
-        }
     }
 
     private void showGuidelinesDialog() {
@@ -454,11 +450,11 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
      * Check if the current user is already in the waitlist
      */
     private void checkWaitlistStatus() {
-        if (authManager == null || waitlistRepo == null || TextUtils.isEmpty(eventId)) {
+        if (waitlistRepo == null || TextUtils.isEmpty(eventId)) {
             return;
         }
 
-        String uid = authManager.getUid();
+        String uid = com.example.eventease.auth.AuthHelper.getUid(this);
         waitlistRepo.isJoined(eventId, uid)
                 .addOnSuccessListener(joined -> {
                     isUserInWaitlist = joined != null && joined;
@@ -483,8 +479,8 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
             return;
         }
 
-        if (authManager == null || waitlistRepo == null || TextUtils.isEmpty(eventId)) {
-            android.util.Log.e("EventDetailsDiscover", "Cannot join: authManager=" + authManager + ", waitlistRepo=" + waitlistRepo + ", eventId=" + eventId);
+        if (waitlistRepo == null || TextUtils.isEmpty(eventId)) {
+            android.util.Log.e("EventDetailsDiscover", "Cannot join: waitlistRepo=" + waitlistRepo + ", eventId=" + eventId);
             Toast.makeText(this, "Unable to join waitlist. Please try again.", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -509,9 +505,10 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
 
         // Disable button to prevent multiple clicks
         waitlistButton.setEnabled(false);
-        android.util.Log.d("EventDetailsDiscover", "Calling waitlistRepo.join for eventId=" + eventId + ", uid=" + authManager.getUid());
+        String currentUid = com.example.eventease.auth.AuthHelper.getUid(this);
+        android.util.Log.d("EventDetailsDiscover", "Calling waitlistRepo.join for eventId=" + eventId + ", uid=" + currentUid);
 
-        String uid = authManager.getUid();
+        String uid = com.example.eventease.auth.AuthHelper.getUid(this);
         waitlistRepo.join(eventId, uid)
                 .addOnSuccessListener(aVoid -> {
                     android.util.Log.d("EventDetailsDiscover", "Successfully joined waitlist");
@@ -537,7 +534,7 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
      * Handle opt out from waitlist
      */
     private void handleOptOut() {
-        if (authManager == null || waitlistRepo == null || TextUtils.isEmpty(eventId)) {
+        if (waitlistRepo == null || TextUtils.isEmpty(eventId)) {
             Toast.makeText(this, "Unable to leave waitlist. Please try again.", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -545,7 +542,7 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
         // Disable button to prevent multiple clicks
         waitlistButton.setEnabled(false);
 
-        String uid = authManager.getUid();
+        String uid = com.example.eventease.auth.AuthHelper.getUid(this);
         waitlistRepo.leave(eventId, uid)
                 .addOnSuccessListener(aVoid -> {
                     isUserInWaitlist = false;
@@ -573,23 +570,41 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
         if (isUserInWaitlist) {
             waitlistButton.setText("Opt Out");
             waitlistButton.setEnabled(true);
+            // Change CardView background to red and text to white for Opt Out
+            if (waitlistCard != null) {
+                waitlistCard.setCardBackgroundColor(android.graphics.Color.parseColor("#E57373"));
+            }
+            waitlistButton.setTextColor(android.graphics.Color.WHITE);
         } else {
             // Check if capacity is full
             boolean isCapacityFull = isCapacityFull();
             if (isCapacityFull) {
                 waitlistButton.setText("Capacity Full");
                 waitlistButton.setEnabled(false);
+                // Keep blue color for disabled state
+                if (waitlistCard != null) {
+                    waitlistCard.setCardBackgroundColor(android.graphics.Color.parseColor("#7FDBDA"));
+                }
+                waitlistButton.setTextColor(android.graphics.Color.parseColor("#2C4A6E"));
             } else {
                 // Check if registration period has ended or other restrictions
                 boolean canJoin = canJoinWaitlist();
                 waitlistButton.setText("Join Waitlist");
                 waitlistButton.setEnabled(canJoin);
+                // Change CardView background to blue for Join Waitlist
+                if (waitlistCard != null) {
+                    waitlistCard.setCardBackgroundColor(android.graphics.Color.parseColor("#7FDBDA"));
+                }
+                waitlistButton.setTextColor(android.graphics.Color.parseColor("#2C4A6E"));
             }
         }
     }
     
     /**
      * Check if the waitlist capacity is full
+     * FIX: This method should ideally check the actual subcollection count,
+     * but for UI responsiveness, we use the cached waitlistCount.
+     * The actual check happens in FirebaseWaitlistRepository.join() which always verifies the real count.
      */
     private boolean isCapacityFull() {
         if (currentEvent == null) {
@@ -601,6 +616,8 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
             return false; // No capacity limit
         }
         
+        // Use the waitlistCount from the event, which should be kept in sync
+        // The actual verification happens server-side in FirebaseWaitlistRepository
         int waitlistCount = currentEvent.getWaitlistCount();
         return waitlistCount >= capacity;
     }
@@ -655,5 +672,203 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
         
         android.util.Log.d("EventDetailsDiscover", "canJoinWaitlist: All checks passed, can join");
         return true;
+    }
+
+    /**
+     * Shows the Event QR code dialog
+     */
+    private void showEventQRDialog() {
+        if (eventId == null || eventId.isEmpty()) {
+            Toast.makeText(this, "Event ID not available", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Get qrPayload from currentEvent if available, otherwise generate it
+        final String qrPayload;
+        if (currentEvent != null && currentEvent.getQrPayload() != null && !currentEvent.getQrPayload().isEmpty()) {
+            qrPayload = currentEvent.getQrPayload();
+        } else {
+            // Generate QR payload if not stored (use custom scheme format)
+            qrPayload = "eventease://event/" + eventId;
+        }
+
+        final String eventTitleText = currentEvent != null && !TextUtils.isEmpty(currentEvent.getTitle()) 
+            ? currentEvent.getTitle() : "Event";
+
+        // Create dialog
+        Dialog dialog = createCardDialog(R.layout.dialog_qr_preview);
+        TextView titleView = dialog.findViewById(R.id.tvEventTitle);
+        ImageView imgQr = dialog.findViewById(R.id.imgQr);
+        MaterialButton btnShare = dialog.findViewById(R.id.btnShare);
+        MaterialButton btnSave = dialog.findViewById(R.id.btnSave);
+        MaterialButton btnCopyLink = dialog.findViewById(R.id.btnCopyLink);
+        MaterialButton btnViewEvents = dialog.findViewById(R.id.btnViewEvents);
+
+        if (titleView != null) {
+            titleView.setText(eventTitleText);
+        }
+
+        final Bitmap qrBitmap = generateQrBitmap(qrPayload);
+        if (imgQr != null) {
+            if (qrBitmap != null) {
+                imgQr.setImageBitmap(qrBitmap);
+            } else {
+                imgQr.setImageResource(R.drawable.ic_event_poster_placeholder);
+            }
+        }
+
+        if (btnShare != null) {
+            btnShare.setOnClickListener(v -> {
+                if (qrBitmap != null) {
+                    shareQrBitmap(qrBitmap, qrPayload);
+                } else {
+                    shareQrText(qrPayload);
+                }
+            });
+        }
+
+        if (btnSave != null) {
+            btnSave.setOnClickListener(v -> {
+                if (qrBitmap != null) {
+                    boolean saved = saveQrToGallery(qrBitmap, eventTitleText);
+                    if (saved) {
+                        Toast.makeText(EventDetailsDiscoverActivity.this, "Saved to gallery", Toast.LENGTH_SHORT).show();
+                    }
+                } else {
+                    Toast.makeText(EventDetailsDiscoverActivity.this, "QR not ready yet.", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+
+        if (btnCopyLink != null) {
+            btnCopyLink.setOnClickListener(v -> {
+                android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+                android.content.ClipData clip = android.content.ClipData.newPlainText("Event Link", qrPayload);
+                clipboard.setPrimaryClip(clip);
+                Toast.makeText(EventDetailsDiscoverActivity.this, "Link copied to clipboard!", Toast.LENGTH_SHORT).show();
+            });
+        }
+
+        if (btnViewEvents != null) {
+            btnViewEvents.setOnClickListener(v -> dialog.dismiss());
+        }
+
+        dialog.show();
+    }
+
+    /**
+     * Creates a card-style dialog
+     */
+    private Dialog createCardDialog(int layoutRes) {
+        Dialog dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setContentView(layoutRes);
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));
+            dialog.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+        dialog.setCanceledOnTouchOutside(false);
+        return dialog;
+    }
+
+    /**
+     * Generates a QR code bitmap from the given payload
+     */
+    private Bitmap generateQrBitmap(String payload) {
+        try {
+            QRCodeWriter writer = new QRCodeWriter();
+            BitMatrix matrix = writer.encode(payload, BarcodeFormat.QR_CODE, 512, 512);
+            int width = matrix.getWidth();
+            int height = matrix.getHeight();
+            Bitmap bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            for (int x = 0; x < width; x++) {
+                for (int y = 0; y < height; y++) {
+                    bmp.setPixel(x, y, matrix.get(x, y) ? Color.BLACK : Color.WHITE);
+                }
+            }
+            return bmp;
+        } catch (WriterException e) {
+            android.util.Log.e("EventDetailsDiscover", "QR code generation failed", e);
+            return null;
+        }
+    }
+
+    /**
+     * Shares the QR code bitmap
+     */
+    private void shareQrBitmap(Bitmap bitmap, String payload) {
+        try {
+            java.io.File cacheDir = new java.io.File(getCacheDir(), "qr");
+            if (!cacheDir.exists() && !cacheDir.mkdirs()) {
+                throw new java.io.IOException("Unable to create cache directory");
+            }
+            java.io.File file = new java.io.File(cacheDir, "qr_" + System.currentTimeMillis() + ".png");
+            try (java.io.FileOutputStream out = new java.io.FileOutputStream(file)) {
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
+            }
+
+            android.net.Uri uri = androidx.core.content.FileProvider.getUriForFile(
+                this, getPackageName() + ".fileprovider", file);
+            Intent shareIntent = new Intent(Intent.ACTION_SEND);
+            shareIntent.setType("image/png");
+            shareIntent.putExtra(Intent.EXTRA_STREAM, uri);
+            shareIntent.putExtra(Intent.EXTRA_TEXT, "Scan this QR to view the event: " + payload);
+            shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(Intent.createChooser(shareIntent, "Share QR code"));
+        } catch (java.io.IOException e) {
+            android.util.Log.e("EventDetailsDiscover", "Failed to share QR bitmap", e);
+            Toast.makeText(this, "Unable to share QR. Try again.", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    /**
+     * Shares the QR code as text
+     */
+    private void shareQrText(String payload) {
+        Intent shareIntent = new Intent(Intent.ACTION_SEND);
+        shareIntent.setType("text/plain");
+        shareIntent.putExtra(Intent.EXTRA_TEXT, payload);
+        startActivity(Intent.createChooser(shareIntent, "Share event link"));
+    }
+
+    /**
+     * Saves QR code to gallery
+     */
+    private boolean saveQrToGallery(Bitmap bitmap, String title) {
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                android.content.ContentValues values = new android.content.ContentValues();
+                values.put(MediaStore.Images.Media.DISPLAY_NAME, "EventEase_QR_" + title.replaceAll("[^a-zA-Z0-9]", "_") + "_" + System.currentTimeMillis() + ".png");
+                values.put(MediaStore.Images.Media.MIME_TYPE, "image/png");
+                values.put(MediaStore.Images.Media.RELATIVE_PATH, android.os.Environment.DIRECTORY_PICTURES + "/EventEase");
+                android.net.Uri uri = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+                if (uri != null) {
+                    try (java.io.OutputStream outputStream = getContentResolver().openOutputStream(uri)) {
+                        if (outputStream != null) {
+                            bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream);
+                            return true;
+                        }
+                    }
+                }
+            } else {
+                java.io.File picturesDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_PICTURES);
+                java.io.File eventEaseDir = new java.io.File(picturesDir, "EventEase");
+                if (!eventEaseDir.exists()) {
+                    eventEaseDir.mkdirs();
+                }
+                java.io.File file = new java.io.File(eventEaseDir, "EventEase_QR_" + title.replaceAll("[^a-zA-Z0-9]", "_") + "_" + System.currentTimeMillis() + ".png");
+                try (java.io.FileOutputStream out = new java.io.FileOutputStream(file)) {
+                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
+                    // Notify media scanner
+                    Intent mediaScanIntent = new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE);
+                    mediaScanIntent.setData(android.net.Uri.fromFile(file));
+                    sendBroadcast(mediaScanIntent);
+                    return true;
+                }
+            }
+        } catch (Exception e) {
+            android.util.Log.e("EventDetailsDiscover", "Failed to save QR code", e);
+        }
+        return false;
     }
 }

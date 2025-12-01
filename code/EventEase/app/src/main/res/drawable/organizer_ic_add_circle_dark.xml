@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Circle Background - Dark version -->
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="@color/ee_icon_circle_dark"/>
+            <size android:width="48dp" android:height="48dp"/>
+        </shape>
+    </item>
+    <!-- Centered White Plus Icon -->
+    <item>
+        <inset
+            android:inset="12dp"
+            android:drawable="@drawable/organizer_ic_add_white"/>
+    </item>
+</layer-list>
+
+

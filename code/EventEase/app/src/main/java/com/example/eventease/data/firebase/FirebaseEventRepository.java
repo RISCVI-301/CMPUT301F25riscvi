@@ -10,6 +10,7 @@ import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.QuerySnapshot;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -85,10 +86,17 @@ public class FirebaseEventRepository implements EventRepository {
                         }
                     }
                     
-                    // Filter open events (and ensure they're not deleted)
+                    long nowMs = now != null ? now.getTime() : System.currentTimeMillis();
+                    // Filter open events
                     List<Event> result = new ArrayList<>();
-                    for (Event e : events.values()) {
-                        if (e.getStartAt() == null || e.getStartAt().after(now)) {
+                    for (Map.Entry<String, Event> entry : events.entrySet()) {
+                        Event e = entry.getValue();
+
+                        // CRITICAL: Do NOT remove events from cache based on registration deadline
+                        // Users who are already on the waitlist should continue to see the event
+                        // Only filter based on event start date
+                        Date startDate = e.getStartAt();
+                        if (startDate == null || startDate.after(now)) {
                             result.add(e);
                         }
                     }
@@ -110,7 +118,11 @@ public class FirebaseEventRepository implements EventRepository {
 
         ensureWaitlistListener(eventId);
 
-        // Notify with the latest cached value (or zero if none yet)
+        // Trigger an immediate refresh so the listener gets an accurate value,
+        // even if the cached count is stale.
+        queryWaitlistCount(eventId);
+
+        // Also notify with the latest cached value (or zero if none yet) for instant UI feedback
         l.onChanged(waitlistCounts.getOrDefault(eventId, 0));
 
         return new ListenerRegistration() {
@@ -132,23 +144,121 @@ public class FirebaseEventRepository implements EventRepository {
     }
     
     private void queryWaitlistCount(String eventId) {
+        // Compute a "logical" waitlist count depending on event state:
+        // - Before selectionProcessed: number of docs in WaitlistedEntrants
+        // - After selectionProcessed: NonSelectedEntrants
+        //   + SelectedEntrants with PENDING invitations
         db.collection("events")
                 .document(eventId)
-                .collection("WaitlistedEntrants")
+                .get()
+                .addOnSuccessListener(eventDoc -> {
+                    if (eventDoc == null || !eventDoc.exists()) {
+                        Log.w(TAG, "queryWaitlistCount: event not found: " + eventId);
+                        waitlistCounts.put(eventId, 0);
+                        notifyCount(eventId);
+                        return;
+                    }
+
+                    Boolean selectionProcessed = eventDoc.getBoolean("selectionProcessed");
+                    boolean isSelectionProcessed = selectionProcessed != null && selectionProcessed;
+
+                    if (!isSelectionProcessed) {
+                        // BEFORE SELECTION: use WaitlistedEntrants subcollection size
+                        eventDoc.getReference()
+                                .collection("WaitlistedEntrants")
                 .get()
                 .addOnSuccessListener(snap -> {
                     int actualCount = snap != null ? snap.size() : 0;
-                    Log.d(TAG, "Queried waitlist subcollection count for event " + eventId + ": " + actualCount);
+                                    Log.d(TAG, "Queried pre-selection waitlist count for event " + eventId + ": " + actualCount);
 
                     waitlistCounts.put(eventId, actualCount);
 
-                    db.collection("events").document(eventId)
+                                    eventDoc.getReference()
                             .update("waitlistCount", actualCount)
-                            .addOnFailureListener(e -> Log.e(TAG, "Failed to sync waitlistCount field", e));
+                                            .addOnFailureListener(e -> Log.e(TAG, "Failed to sync waitlistCount field (pre-selection)", e));
+
+                                    notifyCount(eventId);
+                                })
+                                .addOnFailureListener(e -> {
+                                    Log.e(TAG, "Failed to query WaitlistedEntrants for event " + eventId, e);
+                                    notifyCount(eventId);
+                                });
+                    } else {
+                        // AFTER SELECTION:
+                        // waitlistCount = NonSelectedEntrants
+                        //                + SelectedEntrants that still have PENDING invitations
+                        final DocumentSnapshot finalEventDoc = eventDoc;
+                        Task<QuerySnapshot> nonSelectedTask = eventDoc.getReference()
+                                .collection("NonSelectedEntrants")
+                                .get();
+                        Task<QuerySnapshot> selectedTask = eventDoc.getReference()
+                                .collection("SelectedEntrants")
+                                .get();
+                        Task<QuerySnapshot> pendingInvitesTask = db.collection("invitations")
+                                .whereEqualTo("eventId", eventId)
+                                .whereEqualTo("status", "PENDING")
+                                .get();
+
+                        Tasks.whenAllSuccess(nonSelectedTask, selectedTask, pendingInvitesTask)
+                                .addOnSuccessListener(results -> {
+                                    QuerySnapshot nonSelectedSnap = (QuerySnapshot) results.get(0);
+                                    QuerySnapshot selectedSnap = (QuerySnapshot) results.get(1);
+                                    QuerySnapshot pendingSnap = (QuerySnapshot) results.get(2);
+
+                                    int nonSelectedCount = nonSelectedSnap != null ? nonSelectedSnap.size() : 0;
+
+                                    // Build set of selected userIds
+                                    java.util.Set<String> selectedIds = new java.util.HashSet<>();
+                                    if (selectedSnap != null) {
+                                        for (DocumentSnapshot doc : selectedSnap.getDocuments()) {
+                                            selectedIds.add(doc.getId());
+                                        }
+                                    }
+
+                                    // Build set of uids with PENDING invitations
+                                    java.util.Set<String> pendingUids = new java.util.HashSet<>();
+                                    if (pendingSnap != null) {
+                                        for (DocumentSnapshot doc : pendingSnap.getDocuments()) {
+                                            String uid = doc.getString("uid");
+                                            if (uid != null && !uid.isEmpty()) {
+                                                pendingUids.add(uid);
+                                            }
+                                        }
+                                    }
+
+                                    // Count how many selected entrants still have PENDING invitations
+                                    int selectedPendingCount = 0;
+                                    for (String uid : pendingUids) {
+                                        if (selectedIds.contains(uid)) {
+                                            selectedPendingCount++;
+                                        }
+                                    }
+
+                                    int logicalCount = nonSelectedCount + selectedPendingCount;
+
+                                    Log.d(TAG, "Queried post-selection waitlist count for event " + eventId +
+                                            ": nonSelected=" + nonSelectedCount +
+                                            ", selectedPending=" + selectedPendingCount +
+                                            ", total=" + logicalCount);
+
+                                    waitlistCounts.put(eventId, logicalCount);
+
+                                    finalEventDoc.getReference()
+                                            .update("waitlistCount", logicalCount)
+                                            .addOnFailureListener(e -> Log.e(TAG, "Failed to sync waitlistCount field (post-selection)", e));
 
                     notifyCount(eventId);
                 })
-                .addOnFailureListener(e -> Log.e(TAG, "Failed to query waitlist count for event " + eventId, e));
+                                .addOnFailureListener(e -> {
+                                    Log.e(TAG, "Failed to compute post-selection waitlist count for event " + eventId, e);
+                                    notifyCount(eventId);
+                                });
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to load event for waitlist count: " + eventId, e);
+                    notifyCount(eventId);
+                });
     }
 
     /* package */ void incrementWaitlist(String eventId) {
@@ -197,30 +307,10 @@ public class FirebaseEventRepository implements EventRepository {
                         return;
                     }
 
-                    // Use DocumentChange for more accurate real-time updates
-                    if (snap != null && !snap.getDocumentChanges().isEmpty()) {
-                        // Process changes to update count incrementally
-                        int currentCount = waitlistCounts.getOrDefault(eventId, 0);
-                        for (com.google.firebase.firestore.DocumentChange change : snap.getDocumentChanges()) {
-                            if (change.getType() == com.google.firebase.firestore.DocumentChange.Type.ADDED) {
-                                currentCount++;
-                            } else if (change.getType() == com.google.firebase.firestore.DocumentChange.Type.REMOVED) {
-                                currentCount = Math.max(0, currentCount - 1);
-                            }
-                        }
-                        waitlistCounts.put(eventId, currentCount);
-                    } else {
-                        // Fallback to size if no changes (initial load)
-                        int count = snap != null ? snap.size() : 0;
-                        waitlistCounts.put(eventId, count);
-                    }
-
-                    int finalCount = waitlistCounts.get(eventId);
-                    db.collection("events").document(eventId)
-                            .update("waitlistCount", finalCount)
-                            .addOnFailureListener(e -> Log.e(TAG, "Failed to sync waitlistCount field", e));
-
-                    notifyCount(eventId);
+                    // Any change in WaitlistedEntrants should trigger a recomputation
+                    // of the logical waitlist count, which also considers NonSelected
+                    // and Selected+PENDING after selection.
+                    queryWaitlistCount(eventId);
                 });
 
         waitlistCountRegistrations.put(eventId, reg);

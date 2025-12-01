@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/dialogBlurBackground"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/entrant_dialog_blur_background"
+    android:clickable="true"
+    android:focusable="true">
+
+<androidx.cardview.widget.CardView
+    android:id="@+id/dialogCardView"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="32dp"
+    android:layout_gravity="center"
+    app:cardCornerRadius="20dp"
+    app:cardElevation="24dp"
+    android:backgroundTint="#FFFFFF">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Title Section -->
+        <TextView
+            android:id="@+id/tvCropTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Adjust Profile Picture"
+            android:textSize="32sp"
+            android:textColor="#223C65"
+            android:padding="24dp"
+            android:paddingBottom="16dp"
+            android:textStyle="bold"
+            android:background="#FFFFFF"
+            android:gravity="center"
+            android:shadowColor="#80000000"
+            android:shadowDx="0"
+            android:shadowDy="4"
+            android:shadowRadius="8"/>
+
+        <!-- Divider 1 (under title) -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="2dp"
+            android:background="#223C65"/>
+
+        <!-- Content Section -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="24dp"
+            android:paddingTop="20dp"
+            android:paddingBottom="20dp">
+
+            <!-- Instructions -->
+            <TextView
+                android:id="@+id/tvCropInstructions"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:layout_marginBottom="20dp"
+                android:text="Pinch to zoom, drag to position"
+                android:textColor="@color/ee_text_light"
+                android:textSize="14sp"
+                android:gravity="center"/>
+
+            <!-- Profile Picture Preview Card - Square for circle crop -->
+            <FrameLayout
+                android:layout_width="300dp"
+                android:layout_height="300dp"
+                android:layout_gravity="center"
+                android:layout_marginBottom="20dp"
+                android:background="#F5F5F5">
+
+                <ImageView
+                    android:id="@+id/profilePreviewCrop"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="matrix"
+                    android:contentDescription="Profile picture preview for cropping"/>
+
+                <!-- Circle overlay to show crop area -->
+                <com.example.eventease.ui.entrant.profile.CircleOverlayView
+                    android:id="@+id/circleOverlay"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"/>
+
+            </FrameLayout>
+
+        </LinearLayout>
+
+        <!-- Divider 2 (above buttons) -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="2dp"
+            android:background="#223C65"/>
+
+        <!-- Action Buttons -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:padding="24dp"
+            android:paddingTop="16dp"
+            android:paddingBottom="16dp"
+            android:gravity="center"
+            android:weightSum="2">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnCancelCrop"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="12dp"
+                android:text="Cancel"
+                android:textStyle="bold"
+                android:textSize="18sp"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#A7D4D4"
+                android:elevation="8dp"
+                app:cornerRadius="8dp"/>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnSaveCrop"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
+                android:layout_weight="1"
+                android:text="OK"
+                android:textStyle="bold"
+                android:textSize="18sp"
+                android:textColor="#FFFFFF"
+                android:backgroundTint="#223C65"
+                android:elevation="8dp"
+                app:cornerRadius="8dp"/>
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</androidx.cardview.widget.CardView>
+
+</FrameLayout>
+

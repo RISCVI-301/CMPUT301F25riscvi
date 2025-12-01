@@ -11,10 +11,15 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.eventease.R;
 import com.example.eventease.admin.event.data.AdminEventDatabaseController;
-import com.example.eventease.admin.event.data.Event;
+import com.example.eventease.model.Event;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import android.content.Intent;
+import android.widget.Button;
+import com.example.eventease.MainActivity;
+import android.util.Log;
 
 public class AdminEventManagementActivity extends AppCompatActivity {
 

@@ -4,10 +4,17 @@ import android.app.DatePickerDialog;
 import android.app.Dialog;
 import android.app.TimePickerDialog;
 import android.content.ContentValues;
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.ColorDrawable;
+import android.renderscript.Allocation;
+import android.renderscript.Element;
+import android.renderscript.RenderScript;
+import android.renderscript.ScriptIntrinsicBlur;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Build;
@@ -16,9 +23,12 @@ import android.os.Handler;
 import android.os.Looper;
 import android.text.TextUtils;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
+import android.view.WindowManager;
+import android.view.inputmethod.EditorInfo;
 import android.widget.*;
 import android.provider.MediaStore;
 import androidx.activity.result.ActivityResultLauncher;
@@ -27,11 +37,14 @@ import androidx.annotation.LayoutRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 
 import com.bumptech.glide.Glide;
 import com.example.eventease.R;
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.chip.Chip;
+import com.google.android.material.chip.ChipGroup;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
@@ -45,6 +58,7 @@ import com.google.zxing.WriterException;
 import com.google.zxing.common.BitMatrix;
 import com.google.zxing.qrcode.QRCodeWriter;
 
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -56,39 +70,19 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Activity for an organizer to create a new event.
- * 
- * <p>This class provides a comprehensive form for organizers to input event details including:
- * <ul>
- *   <li>Event title, description, location, and guidelines</li>
- *   <li>Registration period (start and end times)</li>
- *   <li>Deadline to accept/decline invitations</li>
- *   <li>Event date and event start date</li>
- *   <li>Event deadline (for replacements)</li>
- *   <li>Event capacity</li>
- *   <li>Event poster image</li>
- *   <li>QR code generation options</li>
- *   <li>Geolocation tracking options</li>
- * </ul>
- * 
- * <p>The activity performs validation on user input before saving the event. The creation process involves:
- * <ol>
- *   <li>Uploading the poster image to Firebase Storage (if provided)</li>
- *   <li>Generating a QR code for the event (if enabled)</li>
- *   <li>Creating a new document in the 'events' collection in Firestore</li>
- *   <li>Initializing subcollections for waitlist, admitted entrants, etc.</li>
- * </ol>
- * 
- * <p>After successful creation, the organizer is returned to the event list view.
+ * Activity for creating a new event.
+ * Handles event creation form, validation, and saving to Firestore.
  */
 public class OrganizerCreateEventActivity extends AppCompatActivity {
     private static final String TAG = "CreateEvent";
+    private static final int MAX_TAGS = 5;
     // --- UI Elements ---
     private ImageButton btnBack, btnPickPoster;
     private ImageView posterPreview;
     private androidx.cardview.widget.CardView posterPreviewCard;
     private com.google.android.material.button.MaterialButton btnCropPoster;
-    private EditText etTitle, etDescription, etGuidelines, etLocation, etCapacity, etSampleSize;
+    private EditText etTitle, etDescription, etGuidelines, etLocation, etCapacity, etSampleSize, etTags;
+    private ChipGroup chipGroupTags;
     private TextView tvSampleSize;
     private Button btnStart, btnEnd, btnDeadline, btnEventStart, btnSave;
     private Switch swGeo, swQr;
@@ -101,6 +95,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
     private Uri posterUri = null;
     private String organizerId;
     private boolean isResolvingOrganizerId;
+    private final ArrayList<String> interests = new ArrayList<>();
     
     // Image cropping
     private android.graphics.Matrix imageMatrix;
@@ -108,10 +103,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
     private float translateX = 0f;
     private float translateY = 0f;
 
-    /**
-     * Handles the result of the image picker intent.
-     * When an image is selected from the gallery, its URI is stored and automatically opens crop dialog.
-     */
+    // Handles image picker result
     private final ActivityResultLauncher<String> pickImage =
             registerForActivityResult(new ActivityResultContracts.GetContent(), uri -> {
                 if (uri != null) {
@@ -126,8 +118,6 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                     if (posterPreview != null) {
                         loadImageIntoPreview(uri);
                     }
-                    // Also update the button icon to show image was selected
-                    Glide.with(this).load(uri).into(btnPickPoster);
                     
                     // Automatically open crop dialog when first selecting an image
                     // Use post to ensure UI is ready
@@ -141,11 +131,9 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                     });
                 }
             });
-    /**
-     * Initializes the activity, sets up UI components, and attaches click listeners.
-     * @param savedInstanceState If the activity is being re-initialized, this Bundle contains the most recent data.
-     */
-    @Override protected void onCreate(@Nullable Bundle savedInstanceState) {
+
+    @Override
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.organizer_create_event);
 
@@ -170,6 +158,8 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         etCapacity = findViewById(R.id.etCapacity);
         etSampleSize = findViewById(R.id.etSampleSize);
         tvSampleSize = findViewById(R.id.tvSampleSize);
+        etTags = findViewById(R.id.etTags);
+        chipGroupTags = findViewById(R.id.chipGroupTags);
         btnStart = findViewById(R.id.btnStart);
         btnEnd = findViewById(R.id.btnEnd);
         btnDeadline = findViewById(R.id.btnDeadline);
@@ -180,6 +170,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         rgEntrants = findViewById(R.id.rgEntrants);
         rbAny = findViewById(R.id.rbAny);
         rbSpecific = findViewById(R.id.rbSpecific);
+        setupTagInput();
 
         organizerId = getIntent().getStringExtra(OrganizerMyEventActivity.EXTRA_ORGANIZER_ID);
         if (organizerId == null || organizerId.trim().isEmpty()) {
@@ -209,7 +200,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         btnEnd.setOnClickListener(v -> pickDateTime(false));
         btnDeadline.setOnClickListener(v -> pickDeadline());
         btnEventStart.setOnClickListener(v -> pickEventStartDate());
-        btnBack.setOnClickListener(v -> finish());
+        btnBack.setOnClickListener(v -> goToMyEvents());
         btnPickPoster.setOnClickListener(v -> pickImage.launch("image/*"));
         
         // Setup crop button
@@ -218,15 +209,94 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         }
         btnSave.setOnClickListener(v -> beginSaveEvent());
     }
+
+    private void setupTagInput() {
+        if (etTags == null) {
+            return;
+        }
+        etTags.setOnEditorActionListener((v, actionId, event) -> {
+            if (actionId == EditorInfo.IME_ACTION_DONE
+                    || actionId == EditorInfo.IME_ACTION_GO
+                    || actionId == EditorInfo.IME_ACTION_NEXT) {
+                addTagFromInput();
+                return true;
+            }
+            if (event != null && event.getKeyCode() == KeyEvent.KEYCODE_ENTER
+                    && event.getAction() == KeyEvent.ACTION_DOWN) {
+                addTagFromInput();
+                return true;
+            }
+            return false;
+        });
+        etTags.setOnKeyListener((v, keyCode, event) -> {
+            if (keyCode == KeyEvent.KEYCODE_ENTER && event.getAction() == KeyEvent.ACTION_DOWN) {
+                addTagFromInput();
+                return true;
+            }
+            return false;
+        });
+    }
+
+    private void addTagFromInput() {
+        if (etTags == null) {
+            return;
+        }
+        String raw = safe(etTags.getText());
+        if (raw.isEmpty()) {
+            return;
+        }
+        addTag(raw);
+        etTags.setText("");
+    }
+
+    private void addTag(String tag) {
+        if (TextUtils.isEmpty(tag)) {
+            return;
+        }
+        String normalized = tag.trim();
+        if (normalized.isEmpty()) {
+            return;
+        }
+        if (interests.size() >= MAX_TAGS) {
+            toast("You can add up to " + MAX_TAGS + " tags");
+            return;
+        }
+        for (String existing : interests) {
+            if (existing.equalsIgnoreCase(normalized)) {
+                return;
+            }
+        }
+        interests.add(normalized);
+        addChipForTag(normalized);
+    }
+
+    private void addChipForTag(String tag) {
+        if (chipGroupTags == null) {
+            return;
+        }
+        Chip chip = new Chip(this);
+        chip.setText(tag);
+        chip.setTextColor(ContextCompat.getColor(this, R.color.ee_text_light));
+        chip.setChipBackgroundColorResource(R.color.ee_card);
+        chip.setCloseIconVisible(true);
+        chip.setCloseIconResource(android.R.drawable.ic_menu_close_clear_cancel);
+        chip.setCloseIconTintResource(R.color.ee_text_light);
+        chip.setClickable(false);
+        chip.setCheckable(false);
+        chip.setOnCloseIconClickListener(v -> {
+            interests.removeIf(s -> s.equalsIgnoreCase(tag));
+            chipGroupTags.removeView(chip);
+        });
+        chipGroupTags.addView(chip);
+    }
     /**
-     * Displays a DatePickerDialog followed by a TimePickerDialog to allow the user
-     * to select a specific date and time.
-     *
-     * @param isStart A boolean flag to determine if the selected date/time is for the
-     *                registration start or end.
+     * Shows date and time pickers for registration start/end.
+     * @param isStart true for start time, false for end time
      */
     private void pickDateTime(boolean isStart) {
         final Calendar now = Calendar.getInstance();
+        final int defaultHour = now.get(Calendar.HOUR_OF_DAY);
+        final int defaultMinute = now.get(Calendar.MINUTE);
         
         // Calculate minimum date - prevent past dates
         long minDateMs = System.currentTimeMillis();
@@ -236,9 +306,9 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         }
         
         DatePickerDialog dp = new DatePickerDialog(
-                this, (view, y, m, d) -> {
+                this, R.style.EventEasePickerDialogTheme, (view, y, m, d) -> {
             TimePickerDialog tp = new TimePickerDialog(
-                    this, (vv, hh, mm) -> {
+                    this, R.style.EventEasePickerDialogTheme, (vv, hh, mm) -> {
                 Calendar chosen = Calendar.getInstance();
                 chosen.set(y, m, d, hh, mm, 0);
                 chosen.set(Calendar.MILLISECOND, 0);
@@ -265,17 +335,24 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                     btnEnd.setText(android.text.format.DateFormat
                             .format("MMM d, yyyy  h:mm a", chosen));
                 }
-            }, now.get(Calendar.HOUR_OF_DAY), now.get(Calendar.MINUTE), false);
+            }, defaultHour, defaultMinute, false);
             tp.show();
         }, now.get(Calendar.YEAR), now.get(Calendar.MONTH), now.get(Calendar.DAY_OF_MONTH));
         
         // Prevent selecting past dates
         dp.getDatePicker().setMinDate(minDateMs - 1000);
+        // Make entire calendar background use the EventEase top bar color
+        dp.setOnShowListener(dialog -> {
+            dp.getDatePicker().setBackgroundColor(
+                    androidx.core.content.ContextCompat.getColor(this, R.color.ee_topbar_bg));
+        });
         dp.show();
     }
 
     private void pickDeadline() {
         final Calendar now = Calendar.getInstance();
+        final int defaultHour = now.get(Calendar.HOUR_OF_DAY);
+        final int defaultMinute = now.get(Calendar.MINUTE);
         
         // Minimum date should be registration end if it's set
         long minDateMs = System.currentTimeMillis();
@@ -283,13 +360,10 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
             minDateMs = Math.max(minDateMs, regEndEpochMs);
         }
         
-        Calendar minDate = Calendar.getInstance();
-        minDate.setTimeInMillis(minDateMs);
-        
         DatePickerDialog dp = new DatePickerDialog(
-                this, (view, y, m, d) -> {
+                this, R.style.EventEasePickerDialogTheme, (view, y, m, d) -> {
             TimePickerDialog tp = new TimePickerDialog(
-                    this, (vv, hh, mm) -> {
+                    this, R.style.EventEasePickerDialogTheme, (vv, hh, mm) -> {
                 Calendar chosen = Calendar.getInstance();
                 chosen.set(y, m, d, hh, mm, 0);
                 chosen.set(Calendar.MILLISECOND, 0);
@@ -315,17 +389,24 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                 deadlineEpochMs = chosen.getTimeInMillis();
                 btnDeadline.setText(android.text.format.DateFormat
                         .format("MMM d, yyyy  h:mm a", chosen));
-            }, now.get(Calendar.HOUR_OF_DAY), now.get(Calendar.MINUTE), false);
+            }, defaultHour, defaultMinute, false);
             tp.show();
         }, now.get(Calendar.YEAR), now.get(Calendar.MONTH), now.get(Calendar.DAY_OF_MONTH));
         
         // Prevent selecting past dates and dates before registration end
         dp.getDatePicker().setMinDate(minDateMs - 1000);
+        // Make entire calendar background use the EventEase top bar color
+        dp.setOnShowListener(dialog -> {
+            dp.getDatePicker().setBackgroundColor(
+                    androidx.core.content.ContextCompat.getColor(this, R.color.ee_topbar_bg));
+        });
         dp.show();
     }
 
     private void pickEventStartDate() {
         final Calendar now = Calendar.getInstance();
+        final int defaultHour = now.get(Calendar.HOUR_OF_DAY);
+        final int defaultMinute = now.get(Calendar.MINUTE);
         
         // Minimum date should be after deadline to accept/reject if it's set
         long minDateMs = System.currentTimeMillis();
@@ -334,9 +415,9 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         }
         
         DatePickerDialog dp = new DatePickerDialog(
-                this, (view, y, m, d) -> {
+                this, R.style.EventEasePickerDialogTheme, (view, y, m, d) -> {
             TimePickerDialog tp = new TimePickerDialog(
-                    this, (vv, hh, mm) -> {
+                    this, R.style.EventEasePickerDialogTheme, (vv, hh, mm) -> {
                 Calendar chosen = Calendar.getInstance();
                 chosen.set(y, m, d, hh, mm, 0);
                 chosen.set(Calendar.MILLISECOND, 0);
@@ -356,34 +437,24 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                 eventStartEpochMs = chosen.getTimeInMillis();
                 btnEventStart.setText(android.text.format.DateFormat
                         .format("MMM d, yyyy  h:mm a", chosen));
-            }, now.get(Calendar.HOUR_OF_DAY), now.get(Calendar.MINUTE), false);
+            }, defaultHour, defaultMinute, false);
             tp.show();
         }, now.get(Calendar.YEAR), now.get(Calendar.MONTH), now.get(Calendar.DAY_OF_MONTH));
         
         // Prevent selecting past dates and dates before deadline
         dp.getDatePicker().setMinDate(minDateMs - 1000);
+        // Make entire calendar background use the EventEase top bar color
+        dp.setOnShowListener(dialog -> {
+            dp.getDatePicker().setBackgroundColor(
+                    androidx.core.content.ContextCompat.getColor(this, R.color.ee_topbar_bg));
+        });
         dp.show();
     }
-    /**
-     * Starts the process of saving the event. It first ensures the user is authenticated,
-     * signing in anonymously if necessary, before proceeding to validation.
-     */
+
+    // Starts saving the event
     private void beginSaveEvent() {
-        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        if (user == null) {
-            btnSave.setEnabled(false);
-            btnSave.setText("Signing in…");
-            FirebaseAuth.getInstance().signInAnonymously()
-                    .addOnSuccessListener(r -> doValidateAndSave())
-                    .addOnFailureListener(e -> {
-                        btnSave.setEnabled(true);
-                        btnSave.setText("SAVE CHANGES");
-                        toast("Sign-in failed: " + e.getMessage());
-                        Log.e(TAG, "Anon sign-in failed", e);
-                    });
-        } else {
-            doValidateAndSave();
-        }
+        // Device auth - no need to sign in, just save
+        doValidateAndSave();
     }
 
     private void resolveOrganizerId(@Nullable Runnable onReady) {
@@ -396,24 +467,30 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         if (isResolvingOrganizerId) {
             return;
         }
-        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        if (user == null) {
-            toast("Please sign in again.");
+        
+        // Get device ID as organizer ID
+        com.example.eventease.auth.DeviceAuthManager authManager = 
+            new com.example.eventease.auth.DeviceAuthManager(this);
+        String deviceId = authManager.getUid();
+        
+        if (deviceId == null || deviceId.isEmpty()) {
+            toast("Could not get device ID");
             return;
         }
+        
         isResolvingOrganizerId = true;
         FirebaseFirestore.getInstance()
                 .collection("users")
-                .document(user.getUid())
+                .document(deviceId)
                 .get()
                 .addOnSuccessListener(doc -> {
-                    organizerId = doc != null ? doc.getString("organizerId") : null;
-                    if (organizerId == null || organizerId.trim().isEmpty()) {
-                        organizerId = doc != null ? doc.getId() : user.getUid();
-                    }
+                    // Use device ID as organizer ID
+                    organizerId = deviceId;
                     isResolvingOrganizerId = false;
-                    if (organizerId == null || organizerId.trim().isEmpty()) {
-                        toast("Organizer profile not configured yet.");
+                    
+                    if (!doc.exists()) {
+                        Log.w(TAG, "User document doesn't exist for device: " + deviceId);
+                        toast("Please complete your profile setup first");
                     } else if (onReady != null) {
                         onReady.run();
                     }
@@ -428,6 +505,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
      * to upload the event poster and save the event details.
      */
     private void doValidateAndSave() {
+        addTagFromInput();
         String title = safe(etTitle.getText());
         if (title.isEmpty()) { etTitle.setError("Event name is required"); etTitle.requestFocus(); return; }
         if (title.length() > 80) { etTitle.setError("Max 80 characters"); etTitle.requestFocus(); return; }
@@ -503,22 +581,30 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         btnSave.setText("Saving…");
         doUploadAndSave(title, chosenCapacity, chosenSampleSize);
     }
-    /**
-     * Uploads the selected event poster to Firebase Storage and then calls
-     * {@link #writeEventDoc} to save the event details to Firestore.
-     *
-     * @param title          The validated title of the event.
-     * @param chosenCapacity The validated capacity of the event (-1 for unlimited).
-     * @param chosenSampleSize The validated sample size (number of initial invitations).
-     */
+    // Uploads poster and saves event
     private void doUploadAndSave(String title, int chosenCapacity, int chosenSampleSize) {
+        // Ensure organizer ID is available (device auth)
+        if (organizerId == null || organizerId.trim().isEmpty()) {
+            toast("Please complete your profile setup first");
+            btnSave.setEnabled(true);
+            btnSave.setText("SAVE CHANGES");
+            return;
+        }
+
         final String id = UUID.randomUUID().toString();
         final StorageReference ref = FirebaseStorage.getInstance()
                 .getReference("posters/" + id + ".jpg");
 
-        StorageMetadata meta = new StorageMetadata.Builder()
-                .setContentType("image/jpeg")
-                .build();
+        // Create metadata with device/organizer information for proper permissions
+        StorageMetadata.Builder metaBuilder = new StorageMetadata.Builder()
+                .setContentType("image/jpeg");
+        
+        // Add custom metadata with device ID (organizerId) to help with Storage rules
+        metaBuilder.setCustomMetadata("uploadedBy", organizerId);
+        metaBuilder.setCustomMetadata("organizerId", organizerId);
+        metaBuilder.setCustomMetadata("deviceId", organizerId);
+
+        StorageMetadata meta = metaBuilder.build();
 
         // Apply crop transformation if image was cropped
         if (posterUri != null && imageMatrix != null && !imageMatrix.isIdentity()) {
@@ -541,10 +627,18 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                                             if (!task.isSuccessful()) throw task.getException();
                                             return ref.getDownloadUrl();
                                         })
-                                        .addOnSuccessListener(download -> writeEventDoc(id, title, chosenCapacity, chosenSampleSize, download.toString()))
+                                        .addOnSuccessListener(download -> {
+                                            Log.d(TAG, "Poster upload successful (fallback), URL: " + download.toString());
+                                            writeEventDoc(id, title, chosenCapacity, chosenSampleSize, download.toString());
+                                        })
                                         .addOnFailureListener(e -> {
-                                            Log.e(TAG, "Poster upload failed", e);
-                                            toast("Upload failed: " + e.getMessage());
+                                            Log.e(TAG, "Poster upload failed (fallback)", e);
+                                            String errorMsg = e.getMessage();
+                                            if (errorMsg != null && errorMsg.contains("permission")) {
+                                                toast("Upload failed: Please check Firebase Storage permissions. Ensure you're signed in.");
+                                            } else {
+                                                toast("Upload failed: " + errorMsg);
+                                            }
                                             btnSave.setEnabled(true);
                                             btnSave.setText("SAVE CHANGES");
                                         });
@@ -561,10 +655,18 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                         if (!task.isSuccessful()) throw task.getException();
                         return ref.getDownloadUrl();
                     })
-                    .addOnSuccessListener(download -> writeEventDoc(id, title, chosenCapacity, chosenSampleSize, download.toString()))
+                    .addOnSuccessListener(download -> {
+                        Log.d(TAG, "Poster upload successful (no crop), URL: " + download.toString());
+                        writeEventDoc(id, title, chosenCapacity, chosenSampleSize, download.toString());
+                    })
                     .addOnFailureListener(e -> {
-                        Log.e(TAG, "Poster upload failed", e);
-                        toast("Upload failed: " + e.getMessage());
+                        Log.e(TAG, "Poster upload failed (no crop)", e);
+                        String errorMsg = e.getMessage();
+                        if (errorMsg != null && errorMsg.contains("permission")) {
+                            toast("Upload failed: Please check Firebase Storage permissions. Ensure you're signed in.");
+                        } else {
+                            toast("Upload failed: " + errorMsg);
+                        }
                         btnSave.setEnabled(true);
                         btnSave.setText("SAVE CHANGES");
                     });
@@ -659,10 +761,18 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                         if (!task.isSuccessful()) throw task.getException();
                         return ref.getDownloadUrl();
                     })
-                    .addOnSuccessListener(download -> writeEventDoc(id, title, chosenCapacity, chosenSampleSize, download.toString()))
+                    .addOnSuccessListener(download -> {
+                        Log.d(TAG, "Cropped poster upload successful, URL: " + download.toString());
+                        writeEventDoc(id, title, chosenCapacity, chosenSampleSize, download.toString());
+                    })
                     .addOnFailureListener(e -> {
-                        Log.e(TAG, "Poster upload failed", e);
-                        toast("Upload failed: " + e.getMessage());
+                        Log.e(TAG, "Cropped poster upload failed", e);
+                        String errorMsg = e.getMessage();
+                        if (errorMsg != null && errorMsg.contains("permission")) {
+                            toast("Upload failed: Please check Firebase Storage permissions. Ensure you're signed in.");
+                        } else {
+                            toast("Failed to process image: " + errorMsg);
+                        }
                         btnSave.setEnabled(true);
                         btnSave.setText("SAVE CHANGES");
                     });
@@ -673,15 +783,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
             btnSave.setText("SAVE CHANGES");
         }
     }
-    /**
-     * Writes the complete event document to the 'events' collection in Firestore.
-     *
-     * @param id             The unique ID generated for this event.
-     * @param title          The title of the event.
-     * @param chosenCapacity The maximum number of attendees (-1 for no limit).
-     * @param chosenSampleSize The number of initial invitations to send.
-     * @param posterUrl      The public URL of the uploaded poster in Firebase Storage.
-     */
+    // Saves event to Firestore
     private void writeEventDoc(String id, String title, int chosenCapacity, int chosenSampleSize, String posterUrl) {
         if (organizerId == null || organizerId.trim().isEmpty()) {
             toast("Organizer profile not configured.");
@@ -702,10 +804,12 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         doc.put("notes", TextUtils.isEmpty(description) ? null : description);
         doc.put("guidelines", TextUtils.isEmpty(guidelines) ? null : guidelines);
         doc.put("location", TextUtils.isEmpty(location) ? null : location);
+        doc.put("interests", new ArrayList<>(interests));
         doc.put("registrationStart", regStartEpochMs);
         doc.put("registrationEnd", regEndEpochMs);
         doc.put("deadlineEpochMs", deadlineEpochMs);
-        doc.put("eventStart", eventStartEpochMs);
+        doc.put("startsAtEpochMs", eventStartEpochMs); // Primary field name used by Event model and display screens
+        doc.put("eventStart", eventStartEpochMs); // Legacy fallback
         doc.put("eventStartEpochMs", eventStartEpochMs); // Also save with consistent naming
         doc.put("capacity", chosenCapacity);
         doc.put("sampleSize", chosenSampleSize);
@@ -715,7 +819,9 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         doc.put("organizerId", organizerId);
         doc.put("createdAt", System.currentTimeMillis());
         doc.put("createdAtEpochMs", System.currentTimeMillis());
-        doc.put("qrPayload", generateQr ? ("event:" + id) : null);
+        // Always generate QR payload for sharing (regardless of QR switch setting)
+        String qrPayload = "eventease://event/" + id;
+        doc.put("qrPayload", qrPayload);
         FirebaseFirestore.getInstance()
                 .collection("events")
                 .document(id)
@@ -723,7 +829,8 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                 .addOnSuccessListener(v -> {
                     btnSave.setEnabled(true);
                     btnSave.setText("SAVE CHANGES");
-                    showSuccessDialog(id, title, generateQr ? ("event:" + id) : null);
+                    // Always show QR dialog after creating event
+                    showQrPreparationDialog(title, qrPayload, id);
                 })
                 .addOnFailureListener(e -> {
                     Log.e(TAG, "Firestore write failed", e);
@@ -733,15 +840,11 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                 });
     }
 
-    private void showSuccessDialog(String id, String title, @Nullable String qrPayload) {
-        if (qrPayload == null) {
-            showEventOptionsDialog(title);
-        } else {
-            showQrPreparationDialog(title, qrPayload);
-        }
-    }
-
-    private void showQrPreparationDialog(String title, String qrPayload) {
+    private void showQrPreparationDialog(String title, String qrPayload, String eventId) {
+        // Capture screenshot and blur it for the background
+        Bitmap screenshot = captureScreenshot();
+        Bitmap blurredBitmap = blurBitmap(screenshot, 25f);
+        
         Dialog preparingDialog = createCardDialog(R.layout.dialog_event_created);
         TextView subtitle = preparingDialog.findViewById(R.id.tvSubtitle);
         TextView header = preparingDialog.findViewById(R.id.tvTitle);
@@ -751,43 +854,46 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         if (subtitle != null) {
             subtitle.setText("Generating QR code…");
         }
+        
+        // Apply blurred background
+        android.view.View blurBackground = preparingDialog.findViewById(R.id.dialogBlurBackground);
+        if (blurredBitmap != null && blurBackground != null) {
+            blurBackground.setBackground(new BitmapDrawable(getResources(), blurredBitmap));
+        }
+        
         preparingDialog.show();
+        
+        // Apply animations after dialog is shown
+        android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_fade_in);
+        android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_zoom_in);
+        
+        android.view.View cardView = preparingDialog.findViewById(R.id.dialogCardView);
+        if (blurBackground != null) {
+            blurBackground.startAnimation(fadeIn);
+        }
+        if (cardView != null) {
+            cardView.startAnimation(zoomIn);
+        }
 
+        final String finalEventId = eventId; // Store eventId for use in delayed callback
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
             preparingDialog.dismiss();
-            showQrDialog(title, qrPayload);
+            showQrDialog(title, qrPayload, finalEventId);
         }, 1200);
     }
 
-    private void showEventOptionsDialog(String title) {
-        Dialog dialog = createCardDialog(R.layout.dialog_event_options);
-        TextView titleView = dialog.findViewById(R.id.tvEventTitle);
-        TextView subtitleView = dialog.findViewById(R.id.tvEventSubtitle);
-        MaterialButton btnViewEvents = dialog.findViewById(R.id.btnViewEvents);
 
-        if (titleView != null) {
-            titleView.setText("Event Created Successfully");
-        }
-        if (subtitleView != null) {
-            subtitleView.setText("\"" + title + "\" is ready to share.");
-        }
-
-        if (btnViewEvents != null) {
-            btnViewEvents.setOnClickListener(v -> {
-                dialog.dismiss();
-                goToMyEvents();
-            });
-        }
-
-        dialog.show();
-    }
-
-    private void showQrDialog(String title, String qrPayload) {
+    private void showQrDialog(String title, String qrPayload, String eventId) {
+        // Capture screenshot and blur it for the background
+        Bitmap screenshot = captureScreenshot();
+        Bitmap blurredBitmap = blurBitmap(screenshot, 25f);
+        
         Dialog dialog = createCardDialog(R.layout.dialog_qr_preview);
         TextView titleView = dialog.findViewById(R.id.tvEventTitle);
         ImageView imgQr = dialog.findViewById(R.id.imgQr);
         MaterialButton btnShare = dialog.findViewById(R.id.btnShare);
         MaterialButton btnSave = dialog.findViewById(R.id.btnSave);
+        MaterialButton btnCopyLink = dialog.findViewById(R.id.btnCopyLink);
         MaterialButton btnViewEvents = dialog.findViewById(R.id.btnViewEvents);
 
         if (titleView != null) {
@@ -802,6 +908,17 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                 imgQr.setImageResource(R.drawable.ic_event_poster_placeholder);
             }
         }
+
+        // Flag to prevent double navigation
+        final boolean[] hasNavigated = {false};
+        final String finalEventId = eventId; // Store for use in lambda
+
+        // Helper method to navigate to event page
+        Runnable navigateToEvent = () -> {
+            if (hasNavigated[0]) return; // Prevent double navigation
+            hasNavigated[0] = true;
+            navigateToEventAfterDialog(finalEventId);
+        };
 
         if (btnShare != null) {
             btnShare.setOnClickListener(v -> {
@@ -826,23 +943,71 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
             });
         }
 
-        if (btnViewEvents != null) {
-            btnViewEvents.setOnClickListener(v -> {
-                dialog.dismiss();
-                goToMyEvents();
+        if (btnCopyLink != null) {
+            btnCopyLink.setOnClickListener(v -> {
+                android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                android.content.ClipData clip = android.content.ClipData.newPlainText("Event Link", qrPayload);
+                clipboard.setPrimaryClip(clip);
+                toast("Link copied to clipboard!");
             });
         }
 
+        if (btnViewEvents != null) {
+            btnViewEvents.setOnClickListener(v -> {
+                dialog.dismiss();
+                navigateToEvent.run();
+            });
+        }
+
+        // Navigate when dialog is dismissed (e.g., back button)
+        dialog.setOnDismissListener(d -> {
+            navigateToEvent.run();
+        });
+
+        // Apply blurred background
+        android.view.View blurBackground = dialog.findViewById(R.id.dialogBlurBackground);
+        if (blurredBitmap != null && blurBackground != null) {
+            blurBackground.setBackground(new BitmapDrawable(getResources(), blurredBitmap));
+        }
+
         dialog.show();
+        
+        // Apply animations after dialog is shown
+        android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_fade_in);
+        android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_zoom_in);
+        
+        android.view.View cardView = dialog.findViewById(R.id.dialogCardView);
+        if (blurBackground != null) {
+            blurBackground.startAnimation(fadeIn);
+        }
+        if (cardView != null) {
+            cardView.startAnimation(zoomIn);
+        }
+    }
+    
+    /**
+     * Helper method to navigate to event page after dialog dismissal
+     */
+    private void navigateToEventAfterDialog(String eventId) {
+        Intent intent = new Intent(OrganizerCreateEventActivity.this, OrganizerWaitlistActivity.class);
+        intent.putExtra("eventId", eventId);
+        startActivity(intent);
+        finish(); // Close the create event activity
     }
 
     private Dialog createCardDialog(@LayoutRes int layoutRes) {
-        Dialog dialog = new Dialog(this);
+        Dialog dialog = new Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
         dialog.setContentView(layoutRes);
         if (dialog.getWindow() != null) {
             dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            dialog.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            dialog.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+            
+            // Disable dim since we have our own blur background
+            WindowManager.LayoutParams layoutParams = dialog.getWindow().getAttributes();
+            layoutParams.dimAmount = 0f;
+            dialog.getWindow().setAttributes(layoutParams);
+            dialog.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
         }
         dialog.setCanceledOnTouchOutside(false);
         return dialog;
@@ -942,6 +1107,13 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         etGuidelines.setText("");
         etLocation.setText("");
         etCapacity.setText("");
+        if (etTags != null) {
+            etTags.setText("");
+        }
+        interests.clear();
+        if (chipGroupTags != null) {
+            chipGroupTags.removeAllViews();
+        }
         rgEntrants.check(R.id.rbAny);
         etCapacity.setVisibility(View.GONE);
         etCapacity.setEnabled(false);
@@ -999,7 +1171,8 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
     }
     
     /**
-     * Applies initial centerCrop transformation to the image
+     * Applies initial transformation to the image
+     * Ensures the image always fills the width of the container (no gaps on sides)
      */
     private void applyInitialCrop(android.graphics.Bitmap bitmap) {
         if (posterPreview == null || bitmap == null || imageMatrix == null) return;
@@ -1016,16 +1189,14 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         float bitmapWidth = bitmap.getWidth();
         float bitmapHeight = bitmap.getHeight();
         
-        // Calculate scale to fill view (centerCrop)
-        float scaleX = viewWidth / bitmapWidth;
-        float scaleY = viewHeight / bitmapHeight;
-        float scale = Math.max(scaleX, scaleY);
+        // Always scale to fill width (ensures no gaps on left/right)
+        float scale = viewWidth / bitmapWidth;
         
-        // Center the image
+        // Center the image vertically
         float scaledWidth = bitmapWidth * scale;
         float scaledHeight = bitmapHeight * scale;
-        float dx = (viewWidth - scaledWidth) / 2f;
-        float dy = (viewHeight - scaledHeight) / 2f;
+        float dx = 0; // No horizontal offset - image fills width
+        float dy = (viewHeight - scaledHeight) / 2f; // Center vertically
         
         imageMatrix.reset();
         imageMatrix.postScale(scale, scale);
@@ -1047,53 +1218,94 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
             return;
         }
         
-        // Create a dialog with a larger crop view
-        android.app.Dialog cropDialog = new android.app.Dialog(this);
-        cropDialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        // Capture screenshot and blur it
+        Bitmap screenshot = captureScreenshot();
+        Bitmap blurredBitmap = blurBitmap(screenshot, 25f);
+        
+        // Create custom dialog with full screen to show blur background
+        android.app.Dialog cropDialog = new android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
         cropDialog.setContentView(R.layout.dialog_crop_poster);
         
-        ImageView cropImageView = cropDialog.findViewById(R.id.cropImageView);
-        Button btnZoomIn = cropDialog.findViewById(R.id.btnZoomIn);
-        Button btnZoomOut = cropDialog.findViewById(R.id.btnZoomOut);
-        Button btnReset = cropDialog.findViewById(R.id.btnReset);
-        Button btnDone = cropDialog.findViewById(R.id.btnDone);
-        Button btnCancel = cropDialog.findViewById(R.id.btnCancel);
-        
-        if (cropImageView == null) {
-            // Create layout programmatically if not found
-            createCropDialogLayout(cropDialog);
-            return;
+        // Set window properties
+        Window window = cropDialog.getWindow();
+        if (window != null) {
+            window.setLayout(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT
+            );
+            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            
+            // Disable dim since we have our own blur background
+            android.view.WindowManager.LayoutParams layoutParams = window.getAttributes();
+            layoutParams.dimAmount = 0f;
+            window.setAttributes(layoutParams);
+            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);
         }
+        
+        // Apply blurred background
+        android.view.View blurBackground = cropDialog.findViewById(R.id.dialogBlurBackground);
+        if (blurredBitmap != null && blurBackground != null) {
+            blurBackground.setBackground(new BitmapDrawable(getResources(), blurredBitmap));
+        }
+        
+        // Make the background clickable to dismiss
+        if (blurBackground != null) {
+            blurBackground.setOnClickListener(v -> cropDialog.dismiss());
+        }
+        
+        // Get the CardView for animation
+        androidx.cardview.widget.CardView cardView = cropDialog.findViewById(R.id.dialogCardView);
+        
+        ImageView cropImageView = cropDialog.findViewById(R.id.posterPreviewCrop);
+        com.google.android.material.button.MaterialButton btnDone = cropDialog.findViewById(R.id.btnSaveCrop);
+        com.google.android.material.button.MaterialButton btnCancel = cropDialog.findViewById(R.id.btnCancelCrop);
         
         // Load image into crop view
-        Glide.with(this)
-                .asBitmap()
-                .load(posterUri)
-                .into(new com.bumptech.glide.request.target.CustomTarget<android.graphics.Bitmap>() {
-                    @Override
-                    public void onResourceReady(@NonNull android.graphics.Bitmap resource, 
-                                                @Nullable com.bumptech.glide.request.transition.Transition<? super android.graphics.Bitmap> transition) {
-                        setupCropView(cropImageView, resource);
-                    }
-                    
-                    @Override
-                    public void onLoadCleared(@Nullable android.graphics.drawable.Drawable placeholder) {}
-                });
+        if (cropImageView != null) {
+            Glide.with(this)
+                    .asBitmap()
+                    .load(posterUri)
+                    .into(new com.bumptech.glide.request.target.CustomTarget<Bitmap>() {
+                        @Override
+                        public void onResourceReady(@NonNull Bitmap resource, 
+                                                    @Nullable com.bumptech.glide.request.transition.Transition<? super Bitmap> transition) {
+                            setupCropView(cropImageView, resource);
+                        }
+                        
+                        @Override
+                        public void onLoadCleared(@Nullable android.graphics.drawable.Drawable placeholder) {}
+                    });
+        }
         
-        // Setup zoom buttons
-        if (btnZoomIn != null) {
-            btnZoomIn.setOnClickListener(v -> zoomImage(cropImageView, 1.2f));
-        }
-        if (btnZoomOut != null) {
-            btnZoomOut.setOnClickListener(v -> zoomImage(cropImageView, 0.8f));
-        }
-        if (btnReset != null) {
-            btnReset.setOnClickListener(v -> resetCrop(cropImageView));
-        }
+        // Setup buttons
         if (btnDone != null) {
             btnDone.setOnClickListener(v -> {
-                applyCropToPreview(cropImageView);
-                cropDialog.dismiss();
+                // Extract cropped bitmap from crop view
+                android.graphics.Matrix cropMatrix = (android.graphics.Matrix) cropImageView.getTag();
+                if (cropMatrix != null && posterUri != null) {
+                    Glide.with(this)
+                            .asBitmap()
+                            .load(posterUri)
+                            .into(new com.bumptech.glide.request.target.CustomTarget<Bitmap>() {
+                                @Override
+                                public void onResourceReady(@NonNull Bitmap originalBitmap,
+                                                            @Nullable com.bumptech.glide.request.transition.Transition<? super Bitmap> transition) {
+                                    // Extract the visible region from the crop view
+                                    android.graphics.Bitmap croppedBitmap = extractCroppedBitmap(
+                                            originalBitmap, cropMatrix, cropImageView.getWidth(), cropImageView.getHeight());
+                                    if (croppedBitmap != null) {
+                                        // Save cropped bitmap and update preview
+                                        saveCroppedBitmapAndUpdatePreview(croppedBitmap);
+                                    }
+                                    cropDialog.dismiss();
+                                }
+                                
+                                @Override
+                                public void onLoadCleared(@Nullable android.graphics.drawable.Drawable placeholder) {}
+                            });
+                } else {
+                    cropDialog.dismiss();
+                }
             });
         }
         if (btnCancel != null) {
@@ -1104,107 +1316,123 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         setupPanAndZoom(cropImageView);
         
         cropDialog.show();
+        
+        // Apply animations after dialog is shown
+        android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_fade_in);
+        android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_zoom_in);
+        
+        if (blurBackground != null) {
+            blurBackground.startAnimation(fadeIn);
+        }
+        if (cardView != null) {
+            cardView.startAnimation(zoomIn);
+        }
     }
     
     /**
-     * Creates crop dialog layout programmatically if XML doesn't exist
+     * Extracts a cropped bitmap from the original bitmap based on the crop view's matrix
      */
-    private void createCropDialogLayout(android.app.Dialog dialog) {
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(32, 32, 32, 32);
-        root.setBackgroundColor(Color.parseColor("#1E1E1E"));
+    private android.graphics.Bitmap extractCroppedBitmap(android.graphics.Bitmap originalBitmap, 
+                                                         android.graphics.Matrix cropMatrix,
+                                                         int cropViewWidth, int cropViewHeight) {
+        if (originalBitmap == null || cropMatrix == null || cropViewWidth == 0 || cropViewHeight == 0) {
+            return null;
+        }
         
-        // Title
-        TextView title = new TextView(this);
-        title.setText("Adjust Poster Crop");
-        title.setTextColor(Color.WHITE);
-        title.setTextSize(20);
-        title.setTypeface(null, android.graphics.Typeface.BOLD);
-        title.setPadding(0, 0, 0, 16);
-        root.addView(title);
+        try {
+            // Create inverse matrix to map from view coordinates to bitmap coordinates
+            android.graphics.Matrix inverseMatrix = new android.graphics.Matrix();
+            cropMatrix.invert(inverseMatrix);
+            
+            // Get the four corners of the crop view in view coordinates
+            float[] viewCorners = {
+                0, 0,                              // top-left
+                cropViewWidth, 0,                  // top-right
+                cropViewWidth, cropViewHeight,     // bottom-right
+                0, cropViewHeight                  // bottom-left
+            };
+            
+            // Map view corners to bitmap coordinates
+            float[] bitmapCorners = new float[8];
+            inverseMatrix.mapPoints(bitmapCorners, viewCorners);
+            
+            // Find the bounding box in bitmap coordinates
+            float minX = Math.min(Math.min(bitmapCorners[0], bitmapCorners[2]), 
+                                 Math.min(bitmapCorners[4], bitmapCorners[6]));
+            float minY = Math.min(Math.min(bitmapCorners[1], bitmapCorners[3]), 
+                                 Math.min(bitmapCorners[5], bitmapCorners[7]));
+            float maxX = Math.max(Math.max(bitmapCorners[0], bitmapCorners[2]), 
+                                 Math.max(bitmapCorners[4], bitmapCorners[6]));
+            float maxY = Math.max(Math.max(bitmapCorners[1], bitmapCorners[3]), 
+                                 Math.max(bitmapCorners[5], bitmapCorners[7]));
+            
+            // Clamp to bitmap bounds
+            int srcLeft = Math.max(0, (int)minX);
+            int srcTop = Math.max(0, (int)minY);
+            int srcRight = Math.min(originalBitmap.getWidth(), (int)maxX);
+            int srcBottom = Math.min(originalBitmap.getHeight(), (int)maxY);
+            
+            int srcWidth = srcRight - srcLeft;
+            int srcHeight = srcBottom - srcTop;
+            
+            if (srcWidth <= 0 || srcHeight <= 0) {
+                return originalBitmap; // Invalid crop, return original
+            }
+            
+            // Create cropped bitmap from the source rectangle
+            android.graphics.Bitmap croppedBitmap = android.graphics.Bitmap.createBitmap(
+                originalBitmap,
+                srcLeft,
+                srcTop,
+                srcWidth,
+                srcHeight
+            );
+            
+            return croppedBitmap;
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to extract cropped bitmap", e);
+            return originalBitmap;
+        }
+    }
+    
+    /**
+     * Saves the cropped bitmap to a file and updates the preview
+     */
+    private void saveCroppedBitmapAndUpdatePreview(android.graphics.Bitmap croppedBitmap) {
+        if (croppedBitmap == null || posterPreview == null) return;
         
-        // Crop image view
-        ImageView cropView = new ImageView(this);
-        cropView.setId(R.id.cropImageView);
-        cropView.setLayoutParams(new LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, 400));
-        cropView.setScaleType(ImageView.ScaleType.MATRIX);
-        cropView.setBackgroundColor(Color.BLACK);
-        root.addView(cropView);
-        
-        // Instructions
-        TextView instructions = new TextView(this);
-        instructions.setText("Pinch to zoom, drag to pan");
-        instructions.setTextColor(Color.GRAY);
-        instructions.setTextSize(14);
-        instructions.setPadding(0, 16, 0, 16);
-        root.addView(instructions);
-        
-        // Buttons
-        LinearLayout buttonRow = new LinearLayout(this);
-        buttonRow.setOrientation(LinearLayout.HORIZONTAL);
-        buttonRow.setPadding(0, 16, 0, 0);
-        
-        Button zoomIn = new Button(this);
-        zoomIn.setText("Zoom In");
-        zoomIn.setId(R.id.btnZoomIn);
-        Button zoomOut = new Button(this);
-        zoomOut.setText("Zoom Out");
-        zoomOut.setId(R.id.btnZoomOut);
-        Button reset = new Button(this);
-        reset.setText("Reset");
-        reset.setId(R.id.btnReset);
-        Button done = new Button(this);
-        done.setText("Done");
-        done.setId(R.id.btnDone);
-        Button cancel = new Button(this);
-        cancel.setText("Cancel");
-        cancel.setId(R.id.btnCancel);
-        
-        LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(0, 
-            LinearLayout.LayoutParams.WRAP_CONTENT, 1.0f);
-        btnParams.setMargins(4, 0, 4, 0);
-        
-        buttonRow.addView(zoomIn, btnParams);
-        buttonRow.addView(zoomOut, btnParams);
-        buttonRow.addView(reset, btnParams);
-        buttonRow.addView(done, btnParams);
-        buttonRow.addView(cancel, btnParams);
-        
-        root.addView(buttonRow);
-        
-        dialog.setContentView(root);
-        
-        // Load image and setup
-        Glide.with(this)
-                .asBitmap()
-                .load(posterUri)
-                .into(new com.bumptech.glide.request.target.CustomTarget<android.graphics.Bitmap>() {
-                    @Override
-                    public void onResourceReady(@NonNull android.graphics.Bitmap resource, 
-                                                @Nullable com.bumptech.glide.request.transition.Transition<? super android.graphics.Bitmap> transition) {
-                        setupCropView(cropView, resource);
-                    }
-                    
-                    @Override
-                    public void onLoadCleared(@Nullable android.graphics.drawable.Drawable placeholder) {}
-                });
-        
-        zoomIn.setOnClickListener(v -> zoomImage(cropView, 1.2f));
-        zoomOut.setOnClickListener(v -> zoomImage(cropView, 0.8f));
-        reset.setOnClickListener(v -> resetCrop(cropView));
-        done.setOnClickListener(v -> {
-            applyCropToPreview(cropView);
-            dialog.dismiss();
-        });
-        cancel.setOnClickListener(v -> dialog.dismiss());
-        
-        setupPanAndZoom(cropView);
+        try {
+            // Save to a temporary file
+            File imageFile = new File(getCacheDir(), "cropped_poster_" + System.currentTimeMillis() + ".jpg");
+            FileOutputStream fos = new FileOutputStream(imageFile);
+            croppedBitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, fos);
+            fos.flush();
+            fos.close();
+            
+            // Update the poster URI to the cropped version using FileProvider
+            posterUri = androidx.core.content.FileProvider.getUriForFile(
+                this,
+                getPackageName() + ".fileprovider",
+                imageFile
+            );
+            
+            // Update preview with the cropped bitmap
+            // Use matrix to properly display it - scale to fill width while maintaining aspect ratio
+            posterPreview.post(() -> {
+                posterPreview.setScaleType(ImageView.ScaleType.MATRIX);
+                posterPreview.setImageBitmap(croppedBitmap);
+                applyInitialCrop(croppedBitmap);
+            });
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to save cropped bitmap", e);
+            toast("Failed to save cropped image");
+        }
     }
     
     /**
      * Sets up the crop view with initial image
+     * Ensures image fills width with no gaps
      */
     private void setupCropView(ImageView cropView, android.graphics.Bitmap bitmap) {
         if (cropView == null || bitmap == null) return;
@@ -1224,15 +1452,14 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         float bitmapWidth = bitmap.getWidth();
         float bitmapHeight = bitmap.getHeight();
         
-        // Initial centerCrop
-        float scaleX = viewWidth / bitmapWidth;
-        float scaleY = viewHeight / bitmapHeight;
-        float scale = Math.max(scaleX, scaleY);
+        // Always scale to fill width (ensures no gaps on sides)
+        float scale = viewWidth / bitmapWidth;
         
+        // Center vertically
         float scaledWidth = bitmapWidth * scale;
         float scaledHeight = bitmapHeight * scale;
-        float dx = (viewWidth - scaledWidth) / 2f;
-        float dy = (viewHeight - scaledHeight) / 2f;
+        float dx = 0; // No horizontal offset - fills width
+        float dy = (viewHeight - scaledHeight) / 2f; // Center vertically
         
         matrix.postScale(scale, scale);
         matrix.postTranslate(dx, dy);
@@ -1280,19 +1507,85 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
     
     /**
      * Applies the crop from dialog to the preview
+     * Ensures the image fills the preview width with no gaps
      */
     private void applyCropToPreview(ImageView cropView) {
-        android.graphics.Matrix matrix = (android.graphics.Matrix) cropView.getTag();
-        if (matrix != null && posterPreview != null) {
-            imageMatrix.set(matrix);
-            posterPreview.setImageMatrix(imageMatrix);
-            
-            // Extract scale and translation
-            float[] values = new float[9];
-            matrix.getValues(values);
-            scaleFactor = values[android.graphics.Matrix.MSCALE_X];
-            translateX = values[android.graphics.Matrix.MTRANS_X];
-            translateY = values[android.graphics.Matrix.MTRANS_Y];
+        android.graphics.Matrix cropMatrix = (android.graphics.Matrix) cropView.getTag();
+        if (cropMatrix != null && posterPreview != null && posterUri != null) {
+            // Reload the bitmap to recalculate transformation for preview dimensions
+            Glide.with(this)
+                    .asBitmap()
+                    .load(posterUri)
+                    .into(new com.bumptech.glide.request.target.CustomTarget<android.graphics.Bitmap>() {
+                        @Override
+                        public void onResourceReady(@NonNull android.graphics.Bitmap bitmap, 
+                                                    @Nullable com.bumptech.glide.request.transition.Transition<? super android.graphics.Bitmap> transition) {
+                            if (posterPreview == null) return;
+                            
+                            int previewWidth = posterPreview.getWidth();
+                            int previewHeight = posterPreview.getHeight();
+                            
+                            if (previewWidth == 0 || previewHeight == 0) {
+                                posterPreview.post(() -> applyCropToPreview(cropView));
+                                return;
+                            }
+                            
+                            int cropWidth = cropView.getWidth();
+                            int cropHeight = cropView.getHeight();
+                            
+                            if (cropWidth == 0 || cropHeight == 0) {
+                                // Fallback: just copy matrix
+                                imageMatrix.set(cropMatrix);
+                                posterPreview.setImageBitmap(bitmap);
+                                posterPreview.setImageMatrix(imageMatrix);
+                                return;
+                            }
+                            
+                            // Extract crop transformation
+                            float[] cropValues = new float[9];
+                            cropMatrix.getValues(cropValues);
+                            float cropScale = cropValues[android.graphics.Matrix.MSCALE_X];
+                            float cropDx = cropValues[android.graphics.Matrix.MTRANS_X];
+                            float cropDy = cropValues[android.graphics.Matrix.MTRANS_Y];
+                            
+                            // Calculate visible region in bitmap coordinates
+                            // In bitmap space: visible region starts at (-dx/scale, -dy/scale)
+                            // and has size (cropWidth/scale, cropHeight/scale)
+                            float visibleStartX = -cropDx / cropScale;
+                            float visibleStartY = -cropDy / cropScale;
+                            float visibleWidth = cropWidth / cropScale;
+                            float visibleHeight = cropHeight / cropScale;
+                            
+                            // Scale to fill preview width
+                            float scale = previewWidth / visibleWidth;
+                            
+                            // Calculate translation: map visible region to preview
+                            // We want visibleStartX to map to 0, and visibleStartX+visibleWidth to map to previewWidth
+                            float dx = -visibleStartX * scale;
+                            float dy = (previewHeight - visibleHeight * scale) / 2f - visibleStartY * scale;
+                            
+                            // Ensure width is filled
+                            if (visibleWidth * scale < previewWidth) {
+                                scale = previewWidth / visibleWidth;
+                                dx = -visibleStartX * scale;
+                                dy = (previewHeight - visibleHeight * scale) / 2f - visibleStartY * scale;
+                            }
+                            
+                            imageMatrix.reset();
+                            imageMatrix.postScale(scale, scale);
+                            imageMatrix.postTranslate(dx, dy);
+                            
+                            posterPreview.setImageBitmap(bitmap);
+                            posterPreview.setImageMatrix(imageMatrix);
+                            
+                            scaleFactor = scale;
+                            translateX = dx;
+                            translateY = dy;
+                        }
+                        
+                        @Override
+                        public void onLoadCleared(@Nullable android.graphics.drawable.Drawable placeholder) {}
+                    });
         }
     }
     
@@ -1367,6 +1660,50 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                 return (float) Math.sqrt(x * x + y * y);
             }
         });
+    }
+
+    /**
+     * Captures a screenshot of the current activity
+     */
+    private Bitmap captureScreenshot() {
+        android.view.View rootView = getWindow().getDecorView().getRootView();
+        rootView.setDrawingCacheEnabled(true);
+        Bitmap bitmap = Bitmap.createBitmap(rootView.getDrawingCache());
+        rootView.setDrawingCacheEnabled(false);
+        return bitmap;
+    }
+    
+    /**
+     * Blurs a bitmap using RenderScript
+     */
+    private Bitmap blurBitmap(Bitmap bitmap, float radius) {
+        if (bitmap == null) return null;
+        
+        try {
+            // Scale down for better performance
+            int width = Math.round(bitmap.getWidth() * 0.4f);
+            int height = Math.round(bitmap.getHeight() * 0.4f);
+            Bitmap inputBitmap = Bitmap.createScaledBitmap(bitmap, width, height, false);
+            Bitmap outputBitmap = Bitmap.createBitmap(inputBitmap);
+            
+            RenderScript rs = RenderScript.create(this);
+            ScriptIntrinsicBlur blurScript = ScriptIntrinsicBlur.create(rs, Element.U8_4(rs));
+            Allocation tmpIn = Allocation.createFromBitmap(rs, inputBitmap);
+            Allocation tmpOut = Allocation.createFromBitmap(rs, outputBitmap);
+            
+            blurScript.setRadius(radius);
+            blurScript.setInput(tmpIn);
+            blurScript.forEach(tmpOut);
+            tmpOut.copyTo(outputBitmap);
+            
+            rs.destroy();
+            
+            // Scale back up
+            return Bitmap.createScaledBitmap(outputBitmap, bitmap.getWidth(), bitmap.getHeight(), true);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return bitmap;
+        }
     }
 
     private static String safe(CharSequence cs) { return cs == null ? "" : cs.toString().trim(); }
