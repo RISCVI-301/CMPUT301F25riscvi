@@ -74,7 +74,9 @@ public class LocationPermissionFragment extends Fragment {
                         // Note: We can't detect which option user chose, so we'll default to "whileUsing"
                         selectedPermissionType = PERMISSION_WHILE_USING;
                         savePermissionPreference(selectedPermissionType);
-                        captureAndSaveLocation();
+                        // Request notification permission immediately after location permission is granted
+                        // Location will be captured after notification permission is handled
+                        requestNotificationPermission();
                     } else {
                         // Permission denied
                         savePermissionPreference(PERMISSION_DENIED);
@@ -100,8 +102,14 @@ public class LocationPermissionFragment extends Fragment {
                             FCMTokenManager.getInstance().initialize(getContext());
                         }
                     }
-                    // Navigate to discover after notification permission is handled
-                    navigateToDiscover();
+                    // Capture location if permission was granted, then navigate to discover
+                    if (ActivityCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+                            ActivityCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                        captureAndSaveLocation();
+                    } else {
+                        // Location permission was denied, just navigate to discover
+                        navigateToDiscover();
+                    }
                 });
     }
 
@@ -130,7 +138,7 @@ public class LocationPermissionFragment extends Fragment {
     private void handleAllowPermission() {
         // Set permission type to "while using app" as default
         selectedPermissionType = PERMISSION_WHILE_USING;
-        // Request location permission first, then notification permission will be requested after
+        // Request location permission first, then notification permission will be requested after location is handled
         requestLocationPermission();
     }
 
@@ -138,9 +146,11 @@ public class LocationPermissionFragment extends Fragment {
         // Check if permission is already granted
         if (ActivityCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
                 ActivityCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            // Permission already granted
+            // Permission already granted - still request notification permission first
+            selectedPermissionType = PERMISSION_WHILE_USING;
             savePermissionPreference(selectedPermissionType);
-            captureAndSaveLocation();
+            // Request notification permission, location will be captured after notification permission is handled
+            requestNotificationPermission();
         } else {
             // Request permission
             locationPermissionLauncher.launch(new String[]{
@@ -229,15 +239,15 @@ public class LocationPermissionFragment extends Fragment {
                 .addOnSuccessListener(aVoid -> {
                     setLoading(false);
                     Toast.makeText(requireContext(), "Location saved successfully!", Toast.LENGTH_SHORT).show();
-                    // Request notification permission after location is saved
-                    requestNotificationPermission();
+                    // Navigate to discover after location is saved
+                    navigateToDiscover();
                 })
                 .addOnFailureListener(e -> {
                     setLoading(false);
                     Log.e(TAG, "Failed to save location: " + e.getMessage(), e);
                     Toast.makeText(requireContext(), "Failed to save location: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                    // Still request notification permission even if location save failed
-                    requestNotificationPermission();
+                    // Navigate to discover even if location save failed
+                    navigateToDiscover();
                 });
     }
     

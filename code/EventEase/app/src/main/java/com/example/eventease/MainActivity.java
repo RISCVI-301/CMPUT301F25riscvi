@@ -94,11 +94,9 @@ public class MainActivity extends AppCompatActivity {
                 }
         );
 
-        // Only request notification permission if user has already completed location permission flow
-        // (to avoid showing notification popup before user sees the permission explanation page)
-        if (hasCompletedPermissionFlow()) {
-            requestNotificationPermission();
-        }
+        // Don't request notification permission here - it will be requested in LocationPermissionFragment
+        // after the user clicks "Allow Permission" and completes the location permission flow
+        // This prevents the notification popup from appearing as soon as the app opens
 
         // Don't draw behind system bars
         WindowCompat.setDecorFitsSystemWindows(getWindow(), true);

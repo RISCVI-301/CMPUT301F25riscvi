@@ -1082,6 +1082,12 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
                 // Perform replacement with selected deadline
                 performReplacementSwap(count, selectedDeadline);
             }, defaultHour, defaultMinute, false);
+            // Make time picker background use the EventEase top bar color
+            tp.setOnShowListener(dialog -> {
+                if (tp.getWindow() != null) {
+                    tp.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+                }
+            });
             tp.show();
         }, now.get(Calendar.YEAR), now.get(Calendar.MONTH), now.get(Calendar.DAY_OF_MONTH));
         

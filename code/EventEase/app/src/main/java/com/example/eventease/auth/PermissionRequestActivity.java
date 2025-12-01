@@ -47,10 +47,7 @@ public class PermissionRequestActivity extends AppCompatActivity {
     
     private TextView tvTitle;
     private TextView tvDescription;
-    private Button btnAllowOnce;
-    private Button btnWhileUsingApp;
-    private Button btnDontAllow;
-    private Button btnSkip;
+    private Button btnAllowPermission;
     private ProgressBar progressBar;
     
     private FusedLocationProviderClient fusedLocationClient;
@@ -78,10 +75,7 @@ public class PermissionRequestActivity extends AppCompatActivity {
         // Initialize views
         tvTitle = findViewById(R.id.tvTitle);
         tvDescription = findViewById(R.id.tvDescription);
-        btnAllowOnce = findViewById(R.id.btnAllowOnce);
-        btnWhileUsingApp = findViewById(R.id.btnWhileUsingApp);
-        btnDontAllow = findViewById(R.id.btnDontAllow);
-        btnSkip = findViewById(R.id.btnSkip);
+        btnAllowPermission = findViewById(R.id.btnAllowPermission);
         progressBar = findViewById(R.id.progressBar);
         
         // Set up title and description
@@ -89,7 +83,7 @@ public class PermissionRequestActivity extends AppCompatActivity {
             tvTitle.setText("Enable Location & Notifications");
         }
         if (tvDescription != null) {
-            tvDescription.setText("We need your location to show nearby events and notifications to keep you updated about your events.");
+            tvDescription.setText("We need your location and notification permissions to provide the best experience.");
         }
         
         // Initialize permission launchers
@@ -100,11 +94,17 @@ public class PermissionRequestActivity extends AppCompatActivity {
                     Boolean coarseLocationGranted = result.get(Manifest.permission.ACCESS_COARSE_LOCATION);
                     
                     if (Boolean.TRUE.equals(fineLocationGranted) || Boolean.TRUE.equals(coarseLocationGranted)) {
+                        // Permission granted - determine type based on what user selected in system dialog
+                        // Note: We can't detect which option user chose, so we'll default to "whileUsing"
+                        selectedPermissionType = PERMISSION_WHILE_USING;
                         savePermissionPreference(selectedPermissionType);
-                        captureAndSaveLocation();
+                        // Request notification permission immediately after location permission is granted
+                        // Location will be captured after notification permission is handled
+                        requestNotificationPermission();
                     } else {
+                        // Permission denied
                         savePermissionPreference(PERMISSION_DENIED);
-                        Toast.makeText(this, "Location permission denied", Toast.LENGTH_SHORT).show();
+                        // Still request notification permission even if location was denied
                         requestNotificationPermission();
                     }
                 });
@@ -124,65 +124,40 @@ public class PermissionRequestActivity extends AppCompatActivity {
                             FCMTokenManager.getInstance().initialize(getApplicationContext());
                         }
                     }
-                    navigateToMainApp();
+                    // Capture location if permission was granted, then navigate to main app
+                    if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+                            ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                        captureAndSaveLocation();
+                    } else {
+                        // Location permission was denied, just navigate to main app
+                        navigateToMainApp();
+                    }
                 });
         
-        // Set click listeners
-        if (btnAllowOnce != null) {
-            btnAllowOnce.setOnClickListener(v -> handleAllowOnce());
-        }
-        if (btnWhileUsingApp != null) {
-            btnWhileUsingApp.setOnClickListener(v -> handleWhileUsingApp());
-        }
-        if (btnDontAllow != null) {
-            btnDontAllow.setOnClickListener(v -> handleDontAllow());
-        }
-        if (btnSkip != null) {
-            btnSkip.setOnClickListener(v -> {
-                // Skip all permissions and go to main app
-                requestNotificationPermission();
-            });
+        // Set click listener for Allow Permission button
+        if (btnAllowPermission != null) {
+            btnAllowPermission.setOnClickListener(v -> handleAllowPermission());
         }
     }
     
-    private void handleAllowOnce() {
-        selectedPermissionType = PERMISSION_ONCE;
-        requestLocationPermission();
-    }
-    
-    private void handleWhileUsingApp() {
+    private void handleAllowPermission() {
+        // Set permission type to "while using app" as default
         selectedPermissionType = PERMISSION_WHILE_USING;
+        // Request location permission first, then notification permission will be requested after location is handled
         requestLocationPermission();
-    }
-    
-    private void handleDontAllow() {
-        selectedPermissionType = PERMISSION_DENIED;
-        savePermissionPreference(PERMISSION_DENIED);
-        
-        String uid = authManager.getUid();
-        if (uid != null) {
-            Map<String, Object> updates = new HashMap<>();
-            updates.put("location", null);
-            updates.put("locationPermission", PERMISSION_DENIED);
-            
-            db.collection("users").document(uid)
-                    .update(updates)
-                    .addOnSuccessListener(aVoid -> requestNotificationPermission())
-                    .addOnFailureListener(e -> {
-                        Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                        requestNotificationPermission();
-                    });
-        } else {
-            requestNotificationPermission();
-        }
     }
     
     private void requestLocationPermission() {
+        // Check if permission is already granted
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
                 ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            // Permission already granted - still request notification permission first
+            selectedPermissionType = PERMISSION_WHILE_USING;
             savePermissionPreference(selectedPermissionType);
-            captureAndSaveLocation();
+            // Request notification permission, location will be captured after notification permission is handled
+            requestNotificationPermission();
         } else {
+            // Request permission
             locationPermissionLauncher.launch(new String[]{
                     Manifest.permission.ACCESS_FINE_LOCATION,
                     Manifest.permission.ACCESS_COARSE_LOCATION
@@ -194,7 +169,7 @@ public class PermissionRequestActivity extends AppCompatActivity {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
                 ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             Toast.makeText(this, "Location permission not granted", Toast.LENGTH_SHORT).show();
-            requestNotificationPermission();
+            navigateToMainApp();
             return;
         }
         
@@ -211,7 +186,7 @@ public class PermissionRequestActivity extends AppCompatActivity {
                 .addOnFailureListener(e -> {
                     setLoading(false);
                     Toast.makeText(this, "Failed to get location: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                    requestNotificationPermission();
+                    navigateToMainApp();
                 });
     }
     
@@ -231,13 +206,13 @@ public class PermissionRequestActivity extends AppCompatActivity {
                 } else {
                     setLoading(false);
                     Toast.makeText(this, "Unable to get location. Please enable location services.", Toast.LENGTH_SHORT).show();
-                    requestNotificationPermission();
+                    navigateToMainApp();
                 }
             }
         } catch (Exception e) {
             setLoading(false);
             Toast.makeText(this, "Error getting location", Toast.LENGTH_SHORT).show();
-            requestNotificationPermission();
+            navigateToMainApp();
         }
     }
     
@@ -246,7 +221,7 @@ public class PermissionRequestActivity extends AppCompatActivity {
         if (uid == null) {
             setLoading(false);
             Toast.makeText(this, "User not authenticated", Toast.LENGTH_SHORT).show();
-            requestNotificationPermission();
+            navigateToMainApp();
             return;
         }
         
@@ -264,12 +239,14 @@ public class PermissionRequestActivity extends AppCompatActivity {
                 .addOnSuccessListener(aVoid -> {
                     setLoading(false);
                     Toast.makeText(this, "Location saved successfully!", Toast.LENGTH_SHORT).show();
-                    requestNotificationPermission();
+                    // Navigate to main app after location is saved
+                    navigateToMainApp();
                 })
                 .addOnFailureListener(e -> {
                     setLoading(false);
                     Toast.makeText(this, "Failed to save location: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                    requestNotificationPermission();
+                    // Navigate to main app even if location save failed
+                    navigateToMainApp();
                 });
     }
     
@@ -312,17 +289,8 @@ public class PermissionRequestActivity extends AppCompatActivity {
         if (progressBar != null) {
             progressBar.setVisibility(loading ? View.VISIBLE : View.GONE);
         }
-        if (btnAllowOnce != null) {
-            btnAllowOnce.setEnabled(!loading);
-        }
-        if (btnWhileUsingApp != null) {
-            btnWhileUsingApp.setEnabled(!loading);
-        }
-        if (btnDontAllow != null) {
-            btnDontAllow.setEnabled(!loading);
-        }
-        if (btnSkip != null) {
-            btnSkip.setEnabled(!loading);
+        if (btnAllowPermission != null) {
+            btnAllowPermission.setEnabled(!loading);
         }
     }
     
