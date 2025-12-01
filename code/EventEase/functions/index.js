@@ -702,6 +702,7 @@ exports.processAutomaticEntrantSelection = functions.pubsub
                             processed: false
                         };
                         
+                        
                         console.log(`=== CREATING SELECTION NOTIFICATION REQUEST ===`);
                         console.log(`Event ID: ${eventId}`);
                         console.log(`Event Title: ${eventTitle}`);

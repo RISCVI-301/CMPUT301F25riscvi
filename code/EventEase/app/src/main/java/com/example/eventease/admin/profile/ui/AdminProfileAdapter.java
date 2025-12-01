@@ -220,6 +220,20 @@ public class AdminProfileAdapter extends RecyclerView.Adapter<AdminProfileAdapte
                         if (pos != RecyclerView.NO_POSITION) {
                             notifyItemChanged(pos);
                         }
+
+                        // Notify the entrant that their organizer profile has been approved
+                        String displayName = profile.getName() != null && !profile.getName().trim().isEmpty()
+                                ? profile.getName().trim()
+                                : "there";
+                        String title = "Organizer profile approved";
+                        String message = "Hi " + displayName + ", your organizer profile has been approved. "
+                                + "You can now create and manage events in EventEase.";
+                        sendOrganizerApplicationDecisionNotification(
+                                profile.getUid(),
+                                title,
+                                message
+                        );
+
                         Toast.makeText(v.getContext(), "Organizer role granted", Toast.LENGTH_SHORT).show();
                         dialog.dismiss();
                     }
@@ -248,10 +262,19 @@ public class AdminProfileAdapter extends RecyclerView.Adapter<AdminProfileAdapte
                             notifyItemChanged(pos);
                         }
 
-                        // Send a notification to the user about the rejection
-                        sendOrganizerApplicationDecisionNotification(profile.getUid(),
-                                "Organizer application declined",
-                                "Your request to become an organizer has been declined by an administrator.");
+                        // Send a notification to the user about the rejection with a clear reason
+                        String displayName = profile.getName() != null && !profile.getName().trim().isEmpty()
+                                ? profile.getName().trim()
+                                : "there";
+                        String title = "Organizer application not approved";
+                        String message = "Hi " + displayName + ", your organizer application was not approved. "
+                                + "This usually means the information provided was incomplete or did not meet our organizer criteria. "
+                                + "You can review your details and apply again if you’d like.";
+                        sendOrganizerApplicationDecisionNotification(
+                                profile.getUid(),
+                                title,
+                                message
+                        );
 
                         Toast.makeText(v.getContext(), "Application declined", Toast.LENGTH_SHORT).show();
                         dialog.dismiss();

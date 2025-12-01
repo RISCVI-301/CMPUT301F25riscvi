@@ -8,6 +8,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.ColorDrawable;
 import android.renderscript.Allocation;
@@ -56,6 +57,7 @@ import com.google.zxing.BarcodeFormat;
 import com.google.zxing.WriterException;
 import com.google.zxing.common.BitMatrix;
 import com.google.zxing.qrcode.QRCodeWriter;
+
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -315,7 +317,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         chipGroupTags.addView(chip);
     }
     /**
-     * Displays a DatePickerDialog followed by a TimePickerDialog to allow the user
+     * Displays a DatePickerDialog followed by a spinner-based TimePickerDialog to allow the user
      * to select a specific date and time.
      *
      * @param isStart A boolean flag to determine if the selected date/time is for the
@@ -323,6 +325,8 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
      */
     private void pickDateTime(boolean isStart) {
         final Calendar now = Calendar.getInstance();
+        final int defaultHour = now.get(Calendar.HOUR_OF_DAY);
+        final int defaultMinute = now.get(Calendar.MINUTE);
         
         // Calculate minimum date - prevent past dates
         long minDateMs = System.currentTimeMillis();
@@ -361,17 +365,24 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                     btnEnd.setText(android.text.format.DateFormat
                             .format("MMM d, yyyy  h:mm a", chosen));
                 }
-            }, now.get(Calendar.HOUR_OF_DAY), now.get(Calendar.MINUTE), false);
+            }, defaultHour, defaultMinute, false);
             tp.show();
         }, now.get(Calendar.YEAR), now.get(Calendar.MONTH), now.get(Calendar.DAY_OF_MONTH));
         
         // Prevent selecting past dates
         dp.getDatePicker().setMinDate(minDateMs - 1000);
+        // Make entire calendar background use the EventEase top bar color
+        dp.setOnShowListener(dialog -> {
+            dp.getDatePicker().setBackgroundColor(
+                    androidx.core.content.ContextCompat.getColor(this, R.color.ee_topbar_bg));
+        });
         dp.show();
     }
 
     private void pickDeadline() {
         final Calendar now = Calendar.getInstance();
+        final int defaultHour = now.get(Calendar.HOUR_OF_DAY);
+        final int defaultMinute = now.get(Calendar.MINUTE);
         
         // Minimum date should be registration end if it's set
         long minDateMs = System.currentTimeMillis();
@@ -408,17 +419,24 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                 deadlineEpochMs = chosen.getTimeInMillis();
                 btnDeadline.setText(android.text.format.DateFormat
                         .format("MMM d, yyyy  h:mm a", chosen));
-            }, now.get(Calendar.HOUR_OF_DAY), now.get(Calendar.MINUTE), false);
+            }, defaultHour, defaultMinute, false);
             tp.show();
         }, now.get(Calendar.YEAR), now.get(Calendar.MONTH), now.get(Calendar.DAY_OF_MONTH));
         
         // Prevent selecting past dates and dates before registration end
         dp.getDatePicker().setMinDate(minDateMs - 1000);
+        // Make entire calendar background use the EventEase top bar color
+        dp.setOnShowListener(dialog -> {
+            dp.getDatePicker().setBackgroundColor(
+                    androidx.core.content.ContextCompat.getColor(this, R.color.ee_topbar_bg));
+        });
         dp.show();
     }
 
     private void pickEventStartDate() {
         final Calendar now = Calendar.getInstance();
+        final int defaultHour = now.get(Calendar.HOUR_OF_DAY);
+        final int defaultMinute = now.get(Calendar.MINUTE);
         
         // Minimum date should be after deadline to accept/reject if it's set
         long minDateMs = System.currentTimeMillis();
@@ -449,14 +467,20 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                 eventStartEpochMs = chosen.getTimeInMillis();
                 btnEventStart.setText(android.text.format.DateFormat
                         .format("MMM d, yyyy  h:mm a", chosen));
-            }, now.get(Calendar.HOUR_OF_DAY), now.get(Calendar.MINUTE), false);
+            }, defaultHour, defaultMinute, false);
             tp.show();
         }, now.get(Calendar.YEAR), now.get(Calendar.MONTH), now.get(Calendar.DAY_OF_MONTH));
         
         // Prevent selecting past dates and dates before deadline
         dp.getDatePicker().setMinDate(minDateMs - 1000);
+        // Make entire calendar background use the EventEase top bar color
+        dp.setOnShowListener(dialog -> {
+            dp.getDatePicker().setBackgroundColor(
+                    androidx.core.content.ContextCompat.getColor(this, R.color.ee_topbar_bg));
+        });
         dp.show();
     }
+
     /**
      * Starts the process of saving the event. It first ensures the user is authenticated,
      * signing in anonymously if necessary, before proceeding to validation.

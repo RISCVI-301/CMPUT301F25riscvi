@@ -211,6 +211,18 @@ public class AccountFragment extends Fragment {
         return root;
     }
 
+    @Override
+    public void onResume() {
+        super.onResume();
+        // When returning to the account page (e.g., after viewing notifications),
+        // hide the badge. The real-time listener in checkForNewNotifications()
+        // will turn it back on automatically if any *new* notifications arrive
+        // after the last seen time was updated in NotificationsActivity.
+        if (notificationBadge != null) {
+            notificationBadge.setVisibility(View.GONE);
+        }
+    }
+
     /**
      * Handles notification permission click from account page.
      * Checks current permission status and requests if needed.
