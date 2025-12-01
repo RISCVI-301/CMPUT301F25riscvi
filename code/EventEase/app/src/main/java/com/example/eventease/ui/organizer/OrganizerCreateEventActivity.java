@@ -623,25 +623,15 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
      * @param chosenSampleSize The validated sample size (number of initial invitations).
      */
     private void doUploadAndSave(String title, int chosenCapacity, int chosenSampleSize) {
-        // Get device ID for device-based authentication
-        com.example.eventease.auth.DeviceAuthManager deviceAuth = 
-            new com.example.eventease.auth.DeviceAuthManager(this);
-        String deviceId = deviceAuth.getUid();
-        
-        // Sign in anonymously to get Firebase Auth token for Storage rules
-        FirebaseAuth.getInstance().signInAnonymously()
-            .addOnSuccessListener(authResult -> {
-                // Now proceed with upload
-                performUpload(title, chosenCapacity, chosenSampleSize, deviceId, authResult.getUser().getUid());
-            })
-            .addOnFailureListener(e -> {
-                Log.e(TAG, "Failed to sign in anonymously for upload", e);
-                // Try uploading anyway with device ID (might work if Storage rules allow)
-                performUpload(title, chosenCapacity, chosenSampleSize, deviceId, deviceId);
-            });
-    }
-    
-    private void performUpload(String title, int chosenCapacity, int chosenSampleSize, String deviceId, String authUid) {
+        // Ensure user is authenticated before upload
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        if (user == null) {
+            toast("Please sign in to upload images");
+            btnSave.setEnabled(true);
+            btnSave.setText("SAVE CHANGES");
+            return;
+        }
+
         final String id = UUID.randomUUID().toString();
         final StorageReference ref = FirebaseStorage.getInstance()
                 .getReference("posters/" + id + ".jpg");
@@ -651,15 +641,12 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                 .setContentType("image/jpeg");
         
         // Add custom metadata with user ID to help with Storage rules
-        metaBuilder.setCustomMetadata("uploadedBy", authUid);
-        if (deviceId != null && !deviceId.isEmpty()) {
-            metaBuilder.setCustomMetadata("deviceId", deviceId);
-        }
+        metaBuilder.setCustomMetadata("uploadedBy", user.getUid());
         if (organizerId != null && !organizerId.isEmpty()) {
             metaBuilder.setCustomMetadata("organizerId", organizerId);
         }
 
-        final StorageMetadata meta = metaBuilder.build();
+        StorageMetadata meta = metaBuilder.build();
 
         // Apply crop transformation if image was cropped
         if (posterUri != null && imageMatrix != null && !imageMatrix.isIdentity()) {
@@ -885,11 +872,6 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         // Always generate QR payload for sharing (regardless of QR switch setting)
         String qrPayload = "eventease://event/" + id;
         doc.put("qrPayload", qrPayload);
-        // CRITICAL: Initialize selection tracking fields to false
-        // These fields are required for the Cloud Function to find and process events
-        doc.put("selectionProcessed", false);
-        doc.put("selectionNotificationSent", false);
-        doc.put("sorryNotificationSent", false);
         FirebaseFirestore.getInstance()
                 .collection("events")
                 .document(id)
@@ -898,7 +880,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                     btnSave.setEnabled(true);
                     btnSave.setText("SAVE CHANGES");
                     // Always show QR dialog after creating event
-                    showQrPreparationDialog(title, qrPayload, id);
+                    showQrPreparationDialog(title, qrPayload);
                 })
                 .addOnFailureListener(e -> {
                     Log.e(TAG, "Firestore write failed", e);
@@ -908,40 +890,8 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                 });
     }
 
-    private void showQrPreparationDialog(String title, String qrPayload, String eventId) {
-        // Capture screenshot and blur it
-        Bitmap screenshot = captureScreenshot();
-        Bitmap blurredBitmap = blurBitmap(screenshot, 25f);
-        
-        // Create custom dialog with full screen to show blur background
-        Dialog preparingDialog = new Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
-        preparingDialog.setContentView(R.layout.dialog_event_created);
-        
-        // Set window properties
-        Window window = preparingDialog.getWindow();
-        if (window != null) {
-            window.setLayout(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            );
-            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            
-            // Disable dim since we have our own blur background
-            WindowManager.LayoutParams layoutParams = window.getAttributes();
-            layoutParams.dimAmount = 0f;
-            window.setAttributes(layoutParams);
-            window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
-        }
-        
-        // Apply blurred background
-        View blurBackground = preparingDialog.findViewById(R.id.dialogBlurBackground);
-        if (blurredBitmap != null && blurBackground != null) {
-            blurBackground.setBackground(new BitmapDrawable(getResources(), blurredBitmap));
-        }
-        
-        // Get the CardView for animation
-        androidx.cardview.widget.CardView cardView = preparingDialog.findViewById(R.id.dialogCardView);
-        
+    private void showQrPreparationDialog(String title, String qrPayload) {
+        Dialog preparingDialog = createCardDialog(R.layout.dialog_event_created);
         TextView subtitle = preparingDialog.findViewById(R.id.tvSubtitle);
         TextView header = preparingDialog.findViewById(R.id.tvTitle);
         if (header != null) {
@@ -971,49 +921,8 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
     }
 
 
-    private void showQrDialog(String title, String qrPayload, String eventId) {
-        // Capture screenshot and blur it
-        Bitmap screenshot = captureScreenshot();
-        Bitmap blurredBitmap = blurBitmap(screenshot, 25f);
-        
-        // Create custom dialog with full screen to show blur background
-        Dialog dialog = new Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
-        dialog.setContentView(R.layout.dialog_qr_preview);
-        
-        // Set window properties
-        Window window = dialog.getWindow();
-        if (window != null) {
-            window.setLayout(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            );
-            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            
-            // Disable dim since we have our own blur background
-            WindowManager.LayoutParams layoutParams = window.getAttributes();
-            layoutParams.dimAmount = 0f;
-            window.setAttributes(layoutParams);
-            window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
-        }
-        
-        // Apply blurred background
-        View blurBackground = dialog.findViewById(R.id.dialogBlurBackground);
-        if (blurredBitmap != null && blurBackground != null) {
-            blurBackground.setBackground(new BitmapDrawable(getResources(), blurredBitmap));
-        }
-        
-        // Make the background clickable to dismiss
-        if (blurBackground != null) {
-            blurBackground.setOnClickListener(v -> {
-                dialog.dismiss();
-                // Navigate when background is clicked
-                navigateToEventAfterDialog(eventId);
-            });
-        }
-        
-        // Get the CardView for animation
-        androidx.cardview.widget.CardView cardView = dialog.findViewById(R.id.dialogCardView);
-        
+    private void showQrDialog(String title, String qrPayload) {
+        Dialog dialog = createCardDialog(R.layout.dialog_qr_preview);
         TextView titleView = dialog.findViewById(R.id.tvEventTitle);
         ImageView imgQr = dialog.findViewById(R.id.imgQr);
         MaterialButton btnShare = dialog.findViewById(R.id.btnShare);
