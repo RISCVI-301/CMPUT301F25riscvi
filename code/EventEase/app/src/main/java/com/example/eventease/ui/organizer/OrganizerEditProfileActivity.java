@@ -114,10 +114,35 @@ public class OrganizerEditProfileActivity extends AppCompatActivity {
             uri -> {
                 if (uri != null) {
                     selectedImageUri = uri;
-                    Glide.with(this)
-                        .load(uri)
-                        .circleCrop()
-                        .into(profileImage);
+                    // Show circle crop dialog instead of directly setting image
+                    com.example.eventease.ui.entrant.profile.CircleCropHelper.showCircleCropDialog(
+                        this, uri, 
+                        croppedBitmap -> {
+                            // Save cropped bitmap to a file and update URI
+                            try {
+                                java.io.File croppedFile = new java.io.File(
+                                    getCacheDir(), 
+                                    "cropped_profile_" + System.currentTimeMillis() + ".jpg"
+                                );
+                                java.io.FileOutputStream fos = new java.io.FileOutputStream(croppedFile);
+                                croppedBitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, fos);
+                                fos.flush();
+                                fos.close();
+                                
+                                selectedImageUri = androidx.core.content.FileProvider.getUriForFile(
+                                    this,
+                                    getPackageName() + ".fileprovider",
+                                    croppedFile
+                                );
+                                
+                                // Update profile image with cropped version
+                                profileImage.setImageBitmap(croppedBitmap);
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                                Toast.makeText(this, "Failed to save cropped image", Toast.LENGTH_SHORT).show();
+                            }
+                        }
+                    );
                 }
             }
         );

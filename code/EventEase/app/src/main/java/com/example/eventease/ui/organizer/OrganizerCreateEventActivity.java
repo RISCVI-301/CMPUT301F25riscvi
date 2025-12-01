@@ -880,7 +880,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                     btnSave.setEnabled(true);
                     btnSave.setText("SAVE CHANGES");
                     // Always show QR dialog after creating event
-                    showQrPreparationDialog(title, qrPayload);
+                    showQrPreparationDialog(title, qrPayload, id);
                 })
                 .addOnFailureListener(e -> {
                     Log.e(TAG, "Firestore write failed", e);
@@ -890,7 +890,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                 });
     }
 
-    private void showQrPreparationDialog(String title, String qrPayload) {
+    private void showQrPreparationDialog(String title, String qrPayload, String eventId) {
         Dialog preparingDialog = createCardDialog(R.layout.dialog_event_created);
         TextView subtitle = preparingDialog.findViewById(R.id.tvSubtitle);
         TextView header = preparingDialog.findViewById(R.id.tvTitle);
@@ -907,6 +907,9 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_fade_in);
         android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_zoom_in);
         
+        android.view.View blurBackground = preparingDialog.findViewById(R.id.dialogBlurBackground);
+        androidx.cardview.widget.CardView cardView = preparingDialog.findViewById(R.id.dialogCard);
+        
         if (blurBackground != null) {
             blurBackground.startAnimation(fadeIn);
         }
@@ -914,14 +917,15 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
             cardView.startAnimation(zoomIn);
         }
 
+        final String finalEventId = eventId; // Store eventId for use in delayed callback
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
             preparingDialog.dismiss();
-            showQrDialog(title, qrPayload, eventId);
+            showQrDialog(title, qrPayload, finalEventId);
         }, 1200);
     }
 
 
-    private void showQrDialog(String title, String qrPayload) {
+    private void showQrDialog(String title, String qrPayload, String eventId) {
         Dialog dialog = createCardDialog(R.layout.dialog_qr_preview);
         TextView titleView = dialog.findViewById(R.id.tvEventTitle);
         ImageView imgQr = dialog.findViewById(R.id.imgQr);
@@ -945,12 +949,13 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
 
         // Flag to prevent double navigation
         final boolean[] hasNavigated = {false};
+        final String finalEventId = eventId; // Store for use in lambda
 
         // Helper method to navigate to event page
         Runnable navigateToEvent = () -> {
             if (hasNavigated[0]) return; // Prevent double navigation
             hasNavigated[0] = true;
-            navigateToEventAfterDialog(eventId);
+            navigateToEventAfterDialog(finalEventId);
         };
 
         if (btnShare != null) {
@@ -1002,6 +1007,9 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         // Apply animations after dialog is shown
         android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_fade_in);
         android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_zoom_in);
+        
+        android.view.View blurBackground = dialog.findViewById(R.id.dialogBlurBackground);
+        androidx.cardview.widget.CardView cardView = dialog.findViewById(R.id.dialogCard);
         
         if (blurBackground != null) {
             blurBackground.startAnimation(fadeIn);
