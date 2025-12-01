@@ -623,10 +623,9 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
      * @param chosenSampleSize The validated sample size (number of initial invitations).
      */
     private void doUploadAndSave(String title, int chosenCapacity, int chosenSampleSize) {
-        // Ensure user is authenticated before upload
-        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        if (user == null) {
-            toast("Please sign in to upload images");
+        // Ensure organizer ID is available (device auth)
+        if (organizerId == null || organizerId.trim().isEmpty()) {
+            toast("Please complete your profile setup first");
             btnSave.setEnabled(true);
             btnSave.setText("SAVE CHANGES");
             return;
@@ -636,15 +635,14 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         final StorageReference ref = FirebaseStorage.getInstance()
                 .getReference("posters/" + id + ".jpg");
 
-        // Create metadata with user information for proper permissions
+        // Create metadata with device/organizer information for proper permissions
         StorageMetadata.Builder metaBuilder = new StorageMetadata.Builder()
                 .setContentType("image/jpeg");
         
-        // Add custom metadata with user ID to help with Storage rules
-        metaBuilder.setCustomMetadata("uploadedBy", user.getUid());
-        if (organizerId != null && !organizerId.isEmpty()) {
-            metaBuilder.setCustomMetadata("organizerId", organizerId);
-        }
+        // Add custom metadata with device ID (organizerId) to help with Storage rules
+        metaBuilder.setCustomMetadata("uploadedBy", organizerId);
+        metaBuilder.setCustomMetadata("organizerId", organizerId);
+        metaBuilder.setCustomMetadata("deviceId", organizerId);
 
         StorageMetadata meta = metaBuilder.build();
 
@@ -880,7 +878,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                     btnSave.setEnabled(true);
                     btnSave.setText("SAVE CHANGES");
                     // Always show QR dialog after creating event
-                    showQrPreparationDialog(title, qrPayload);
+                    showQrPreparationDialog(title, qrPayload, id);
                 })
                 .addOnFailureListener(e -> {
                     Log.e(TAG, "Firestore write failed", e);
@@ -890,7 +888,11 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                 });
     }
 
-    private void showQrPreparationDialog(String title, String qrPayload) {
+    private void showQrPreparationDialog(String title, String qrPayload, String eventId) {
+        // Capture screenshot and blur it for the background
+        Bitmap screenshot = captureScreenshot();
+        Bitmap blurredBitmap = blurBitmap(screenshot, 25f);
+        
         Dialog preparingDialog = createCardDialog(R.layout.dialog_event_created);
         TextView subtitle = preparingDialog.findViewById(R.id.tvSubtitle);
         TextView header = preparingDialog.findViewById(R.id.tvTitle);
@@ -901,12 +903,19 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
             subtitle.setText("Generating QR code…");
         }
         
+        // Apply blurred background
+        android.view.View blurBackground = preparingDialog.findViewById(R.id.dialogBlurBackground);
+        if (blurredBitmap != null && blurBackground != null) {
+            blurBackground.setBackground(new BitmapDrawable(getResources(), blurredBitmap));
+        }
+        
         preparingDialog.show();
         
         // Apply animations after dialog is shown
         android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_fade_in);
         android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_zoom_in);
         
+        android.view.View cardView = preparingDialog.findViewById(R.id.dialogCardView);
         if (blurBackground != null) {
             blurBackground.startAnimation(fadeIn);
         }
@@ -921,7 +930,11 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
     }
 
 
-    private void showQrDialog(String title, String qrPayload) {
+    private void showQrDialog(String title, String qrPayload, String eventId) {
+        // Capture screenshot and blur it for the background
+        Bitmap screenshot = captureScreenshot();
+        Bitmap blurredBitmap = blurBitmap(screenshot, 25f);
+        
         Dialog dialog = createCardDialog(R.layout.dialog_qr_preview);
         TextView titleView = dialog.findViewById(R.id.tvEventTitle);
         ImageView imgQr = dialog.findViewById(R.id.imgQr);
@@ -997,12 +1010,19 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
             navigateToEvent.run();
         });
 
+        // Apply blurred background
+        android.view.View blurBackground = dialog.findViewById(R.id.dialogBlurBackground);
+        if (blurredBitmap != null && blurBackground != null) {
+            blurBackground.setBackground(new BitmapDrawable(getResources(), blurredBitmap));
+        }
+
         dialog.show();
         
         // Apply animations after dialog is shown
         android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_fade_in);
         android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_zoom_in);
         
+        android.view.View cardView = dialog.findViewById(R.id.dialogCardView);
         if (blurBackground != null) {
             blurBackground.startAnimation(fadeIn);
         }
@@ -1022,12 +1042,18 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
     }
 
     private Dialog createCardDialog(@LayoutRes int layoutRes) {
-        Dialog dialog = new Dialog(this);
+        Dialog dialog = new Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
         dialog.setContentView(layoutRes);
         if (dialog.getWindow() != null) {
             dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            dialog.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            dialog.getWindow().setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+            
+            // Disable dim since we have our own blur background
+            WindowManager.LayoutParams layoutParams = dialog.getWindow().getAttributes();
+            layoutParams.dimAmount = 0f;
+            dialog.getWindow().setAttributes(layoutParams);
+            dialog.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
         }
         dialog.setCanceledOnTouchOutside(false);
         return dialog;
