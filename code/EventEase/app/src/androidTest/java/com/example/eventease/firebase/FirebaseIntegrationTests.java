@@ -97,7 +97,7 @@ public class FirebaseIntegrationTests {
         // Verify it was saved
         assertTrue("Document should exist in Firestore", doc.exists());
         assertEquals("Title should match", "Integration Test Event", doc.getString("title"));
-        assertEquals("Capacity should match", 50L, doc.getLong("capacity"));
+        assertEquals("Capacity should match", Long.valueOf(50L), doc.getLong("capacity"));
         assertEquals("Organizer ID should match", testDeviceId, doc.getString("organizerId"));
         
         Log.d(TAG, "✓ Firestore write/read test PASSED");
@@ -159,7 +159,7 @@ public class FirebaseIntegrationTests {
         
         assertTrue("Document should exist", doc.exists());
         assertEquals("Status should be updated", "UPDATED", doc.getString("status"));
-        assertEquals("Value should be updated", 20L, doc.getLong("value"));
+        assertEquals("Value should be updated", Long.valueOf(20L), doc.getLong("value"));
         
         Log.d(TAG, "✓ Firestore update test PASSED");
         System.out.println("✓ REAL Firestore document updated successfully!");

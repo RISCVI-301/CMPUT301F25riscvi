@@ -4,6 +4,7 @@ import com.example.eventease.model.Event;
 import com.example.eventease.testdata.TestDataHelper;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
+import com.example.eventease.TestTasks;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -49,24 +50,24 @@ public class WaitlistRepositoryTest {
     public void testJoinWaitlist_success() throws Exception {
         // US 01.01.01: Join waiting list for a specific event
         Task<Void> joinTask = waitlistRepo.join(testEventId, testUserId);
-        Tasks.await(joinTask);
+        TestTasks.await(joinTask);
         
         assertTrue("Join task should succeed", joinTask.isSuccessful());
         
         // Verify user is on waitlist
         Task<Boolean> isJoinedTask = waitlistRepo.isJoined(testEventId, testUserId);
-        Boolean isJoined = Tasks.await(isJoinedTask);
+        Boolean isJoined = TestTasks.await(isJoinedTask);
         assertTrue("User should be on waitlist", isJoined);
     }
     
     @Test
     public void testJoinWaitlist_alreadyJoined() throws Exception {
         // Join once
-        Tasks.await(waitlistRepo.join(testEventId, testUserId));
+        TestTasks.await(waitlistRepo.join(testEventId, testUserId));
         
         // Try to join again - should succeed (idempotent)
         Task<Void> joinAgainTask = waitlistRepo.join(testEventId, testUserId);
-        Tasks.await(joinAgainTask);
+        TestTasks.await(joinAgainTask);
         assertTrue("Joining again should succeed (idempotent)", joinAgainTask.isSuccessful());
     }
     
@@ -81,7 +82,6 @@ public class WaitlistRepositoryTest {
         eventRepo.addEvent(futureEvent);
         
         Task<Void> joinTask = waitlistRepo.join("futureEvent", testUserId);
-        Tasks.await(joinTask);
         
         assertFalse("Join should fail when registration not started", joinTask.isSuccessful());
         assertNotNull("Should have exception", joinTask.getException());
@@ -98,7 +98,6 @@ public class WaitlistRepositoryTest {
         eventRepo.addEvent(pastEvent);
         
         Task<Void> joinTask = waitlistRepo.join("pastEvent", testUserId);
-        Tasks.await(joinTask);
         
         assertFalse("Join should fail when registration ended", joinTask.isSuccessful());
         assertNotNull("Should have exception", joinTask.getException());
@@ -116,12 +115,11 @@ public class WaitlistRepositoryTest {
         eventRepo.addEvent(limitedEvent);
         
         // Fill capacity
-        Tasks.await(waitlistRepo.join("limitedEvent", "user1"));
-        Tasks.await(waitlistRepo.join("limitedEvent", "user2"));
+        TestTasks.await(waitlistRepo.join("limitedEvent", "user1"));
+        TestTasks.await(waitlistRepo.join("limitedEvent", "user2"));
         
         // Try to join when full
         Task<Void> joinTask = waitlistRepo.join("limitedEvent", testUserId);
-        Tasks.await(joinTask);
         
         assertFalse("Join should fail when capacity reached", joinTask.isSuccessful());
         assertNotNull("Should have exception", joinTask.getException());
@@ -131,20 +129,20 @@ public class WaitlistRepositoryTest {
     public void testLeaveWaitlist_success() throws Exception {
         // US 01.01.02: Leave waiting list for a specific event
         // First join
-        Tasks.await(waitlistRepo.join(testEventId, testUserId));
+        TestTasks.await(waitlistRepo.join(testEventId, testUserId));
         
         // Verify joined
-        Boolean isJoined = Tasks.await(waitlistRepo.isJoined(testEventId, testUserId));
+        Boolean isJoined = TestTasks.await(waitlistRepo.isJoined(testEventId, testUserId));
         assertTrue("User should be on waitlist before leaving", isJoined);
         
         // Leave
         Task<Void> leaveTask = waitlistRepo.leave(testEventId, testUserId);
-        Tasks.await(leaveTask);
+        TestTasks.await(leaveTask);
         
         assertTrue("Leave task should succeed", leaveTask.isSuccessful());
         
         // Verify user is no longer on waitlist
-        Boolean stillJoined = Tasks.await(waitlistRepo.isJoined(testEventId, testUserId));
+        Boolean stillJoined = TestTasks.await(waitlistRepo.isJoined(testEventId, testUserId));
         assertFalse("User should not be on waitlist after leaving", stillJoined);
     }
     
@@ -152,7 +150,7 @@ public class WaitlistRepositoryTest {
     public void testLeaveWaitlist_notOnWaitlist() throws Exception {
         // Try to leave when not on waitlist - should succeed (idempotent)
         Task<Void> leaveTask = waitlistRepo.leave(testEventId, testUserId);
-        Tasks.await(leaveTask);
+        TestTasks.await(leaveTask);
         
         // Should succeed even if not on waitlist (idempotent operation)
         assertTrue("Leave should succeed even if not on waitlist", leaveTask.isSuccessful());
@@ -162,7 +160,7 @@ public class WaitlistRepositoryTest {
     public void testIsJoined_notJoined() throws Exception {
         // Check if user is joined when they haven't joined
         Task<Boolean> isJoinedTask = waitlistRepo.isJoined(testEventId, testUserId);
-        Boolean isJoined = Tasks.await(isJoinedTask);
+        Boolean isJoined = TestTasks.await(isJoinedTask);
         
         assertFalse("User should not be on waitlist", isJoined);
     }
@@ -170,11 +168,11 @@ public class WaitlistRepositoryTest {
     @Test
     public void testIsJoined_afterJoin() throws Exception {
         // Join waitlist
-        Tasks.await(waitlistRepo.join(testEventId, testUserId));
+        TestTasks.await(waitlistRepo.join(testEventId, testUserId));
         
         // Check if joined
         Task<Boolean> isJoinedTask = waitlistRepo.isJoined(testEventId, testUserId);
-        Boolean isJoined = Tasks.await(isJoinedTask);
+        Boolean isJoined = TestTasks.await(isJoinedTask);
         
         assertTrue("User should be on waitlist after joining", isJoined);
     }
@@ -186,20 +184,19 @@ public class WaitlistRepositoryTest {
         String user2 = "user2";
         String user3 = "user3";
         
-        Tasks.await(waitlistRepo.join(testEventId, user1));
-        Tasks.await(waitlistRepo.join(testEventId, user2));
-        Tasks.await(waitlistRepo.join(testEventId, user3));
+        TestTasks.await(waitlistRepo.join(testEventId, user1));
+        TestTasks.await(waitlistRepo.join(testEventId, user2));
+        TestTasks.await(waitlistRepo.join(testEventId, user3));
         
-        assertTrue("User1 should be on waitlist", Tasks.await(waitlistRepo.isJoined(testEventId, user1)));
-        assertTrue("User2 should be on waitlist", Tasks.await(waitlistRepo.isJoined(testEventId, user2)));
-        assertTrue("User3 should be on waitlist", Tasks.await(waitlistRepo.isJoined(testEventId, user3)));
+        assertTrue("User1 should be on waitlist", TestTasks.await(waitlistRepo.isJoined(testEventId, user1)));
+        assertTrue("User2 should be on waitlist", TestTasks.await(waitlistRepo.isJoined(testEventId, user2)));
+        assertTrue("User3 should be on waitlist", TestTasks.await(waitlistRepo.isJoined(testEventId, user3)));
     }
     
     @Test
     public void testJoinWaitlist_eventNotFound() throws Exception {
         // Try to join non-existent event
         Task<Void> joinTask = waitlistRepo.join("nonexistent", testUserId);
-        Tasks.await(joinTask);
         
         assertFalse("Join should fail for non-existent event", joinTask.isSuccessful());
         assertNotNull("Should have exception", joinTask.getException());
@@ -219,45 +216,36 @@ public class WaitlistRepositoryTest {
         
         @Override
         public Task<Void> join(String eventId, String uid) {
-            return eventRepo.getEvent(eventId).continueWithTask(eventTask -> {
-                if (!eventTask.isSuccessful() || eventTask.getResult() == null) {
-                    return Tasks.forException(new Exception("Event not found"));
+            Event event = eventRepo.getEventSync(eventId);
+            if (event == null) {
+                return Tasks.forException(new Exception("Event not found"));
+            }
+            
+            if (event.getAdmitted().contains(uid)) {
+                return Tasks.forException(new Exception("User is already admitted to this event"));
+            }
+            
+            long now = System.currentTimeMillis();
+            if (event.getRegistrationStart() > 0 && now < event.getRegistrationStart()) {
+                return Tasks.forException(new Exception("Registration period has not started yet"));
+            }
+            
+            if (event.getRegistrationEnd() > 0 && now > event.getRegistrationEnd()) {
+                return Tasks.forException(new Exception("Registration period has ended"));
+            }
+            
+            if (event.getCapacity() > 0) {
+                Set<String> waitlist = waitlists.getOrDefault(eventId, new HashSet<>());
+                if (waitlist.size() >= event.getCapacity()) {
+                    return Tasks.forException(new Exception("Waitlist is full. Capacity reached."));
                 }
-                
-                Event event = eventTask.getResult();
-                
-                // Check if already admitted
-                if (event.getAdmitted().contains(uid)) {
-                    return Tasks.forException(new Exception("User is already admitted to this event"));
-                }
-                
-                // Check registration period
-                long now = System.currentTimeMillis();
-                if (event.getRegistrationStart() > 0 && now < event.getRegistrationStart()) {
-                    return Tasks.forException(new Exception("Registration period has not started yet"));
-                }
-                
-                if (event.getRegistrationEnd() > 0 && now > event.getRegistrationEnd()) {
-                    return Tasks.forException(new Exception("Registration period has ended"));
-                }
-                
-                // Check capacity
-                if (event.getCapacity() > 0) {
-                    Set<String> waitlist = waitlists.getOrDefault(eventId, new HashSet<>());
-                    if (waitlist.size() >= event.getCapacity()) {
-                        return Tasks.forException(new Exception("Waitlist is full. Capacity reached."));
-                    }
-                }
-                
-                // Add to waitlist
-                waitlists.computeIfAbsent(eventId, k -> ConcurrentHashMap.newKeySet()).add(uid);
-                
-                // Update event waitlist count
-                event.getWaitlist().add(uid);
-                event.setWaitlistCount(event.getWaitlist().size());
-                
-                return Tasks.forResult(null);
-            });
+            }
+            
+            waitlists.computeIfAbsent(eventId, k -> ConcurrentHashMap.newKeySet()).add(uid);
+            event.getWaitlist().add(uid);
+            event.setWaitlistCount(event.getWaitlist().size());
+            
+            return Tasks.forResult(null);
         }
         
         @Override
@@ -274,14 +262,11 @@ public class WaitlistRepositoryTest {
             Set<String> waitlist = waitlists.get(eventId);
             if (waitlist != null) {
                 waitlist.remove(uid);
-                
-                // Update event waitlist
-                eventRepo.getEvent(eventId).addOnSuccessListener(event -> {
-                    if (event != null) {
-                        event.getWaitlist().remove(uid);
-                        event.setWaitlistCount(event.getWaitlist().size());
-                    }
-                });
+                Event event = eventRepo.getEventSync(eventId);
+                if (event != null) {
+                    event.getWaitlist().remove(uid);
+                    event.setWaitlistCount(event.getWaitlist().size());
+                }
             }
             return Tasks.forResult(null);
         }
@@ -303,6 +288,10 @@ public class WaitlistRepositoryTest {
                 return Tasks.forException(new Exception("Event not found"));
             }
             return Tasks.forResult(event);
+        }
+
+        public Event getEventSync(String eventId) {
+            return events.get(eventId);
         }
     }
 }

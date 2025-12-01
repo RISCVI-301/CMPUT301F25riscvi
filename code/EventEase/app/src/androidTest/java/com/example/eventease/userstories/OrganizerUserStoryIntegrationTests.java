@@ -149,7 +149,7 @@ public class OrganizerUserStoryIntegrationTests {
         
         // Verify update
         DocumentSnapshot eventDoc = Tasks.await(db.collection("events").document(eventId).get());
-        assertEquals("Capacity should be updated", 100L, eventDoc.getLong("capacity"));
+        assertEquals("Capacity should be updated", Long.valueOf(100L), eventDoc.getLong("capacity"));
         
         Log.d(TAG, "✓ US 02.01.02 PASSED: Event capacity updated in REAL Firestore");
         System.out.println("✓ US 02.01.02: Successfully updated event capacity in REAL Firestore!");
@@ -425,40 +425,5 @@ public class OrganizerUserStoryIntegrationTests {
         return eventId;
     }
     
-    // ============================================
-    // Test Runner
-    // ============================================
-    
-    @Test
-    public void runAllOrganizerIntegrationTests() throws Exception {
-        System.out.println("\n========================================");
-        System.out.println("ORGANIZER USER STORY INTEGRATION TESTS");
-        System.out.println("========================================");
-        System.out.println("These tests use REAL Firebase/Firestore!");
-        System.out.println("========================================\n");
-        
-        try {
-            testUS020101_createEvent_realFirestore();
-            testUS020102_setEventCapacity_realFirestore();
-            testUS020103_setEventLocation_realFirestore();
-            testUS020104_setRegistrationPeriod_realFirestore();
-            testUS020105_generateQRCode_realFirestore();
-            testUS020201_viewWaitlist_realFirestore();
-            testUS020202_sendNotifications_realFCM();
-            testUS020301_viewAdmittedEntrants_realFirestore();
-            testUS020501_viewEventHistory_realFirestore();
-            
-            System.out.println("\n========================================");
-            System.out.println("✓ ALL ORGANIZER INTEGRATION TESTS PASSED!");
-            System.out.println("========================================\n");
-        } catch (Exception e) {
-            System.err.println("\n========================================");
-            System.err.println("✗ SOME ORGANIZER INTEGRATION TESTS FAILED!");
-            System.err.println("Error: " + e.getMessage());
-            System.err.println("========================================\n");
-            e.printStackTrace();
-            throw e;
-        }
-    }
 }
 

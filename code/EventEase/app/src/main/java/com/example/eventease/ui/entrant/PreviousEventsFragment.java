@@ -29,6 +29,12 @@ import com.example.eventease.R;
 import com.example.eventease.data.AdmittedRepository;
 import com.example.eventease.model.Event;
 import com.example.eventease.ui.entrant.eventdetail.EventDetailActivity;
+import com.google.android.gms.tasks.Task;
+import com.google.android.gms.tasks.Tasks;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
+import com.google.firebase.firestore.QuerySnapshot;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -129,15 +135,103 @@ public class PreviousEventsFragment extends Fragment {
         admittedRepo.getPreviousEvents(uid)
                 .addOnSuccessListener(events -> {
                     if (!isAdded()) return;
-                    android.util.Log.d("PreviousEventsFragment", "Loaded " + (events != null ? events.size() : 0) + " previous events");
-                    if (events != null && !events.isEmpty()) {
-                        for (Event event : events) {
-                            android.util.Log.d("PreviousEventsFragment", "  - Previous Event: " + event.getTitle() + " (id: " + event.getId() + ")");
-                        }
+                    List<Event> baseEvents = events != null ? new ArrayList<>(events) : new ArrayList<>();
+                    
+                    android.util.Log.d("PreviousEventsFragment", "Loaded " + baseEvents.size() + " previous events from repository");
+                    for (Event event : baseEvents) {
+                        android.util.Log.d("PreviousEventsFragment", "  - Previous Event: " + event.getTitle() + " (id: " + event.getId() + ")");
                     }
-                    setLoading(false);
-                    adapter.submitEvents(events != null ? events : new ArrayList<>());
-                    updateEmptyState(events == null || events.isEmpty());
+
+                    // Also include events where the user has explicitly declined an invitation.
+                    // These should appear in "Previous Events" immediately, even if the event start
+                    // date has not yet passed, and should no longer appear in the waitlisted list.
+                    FirebaseFirestore db = FirebaseFirestore.getInstance();
+                    db.collection("invitations")
+                            .whereEqualTo("uid", uid)
+                            .whereEqualTo("status", "DECLINED")
+                            .get()
+                            .addOnSuccessListener(invSnapshot -> {
+                                if (!isAdded()) return;
+
+                                List<String> declinedEventIds = new ArrayList<>();
+                                if (invSnapshot != null) {
+                                    for (QueryDocumentSnapshot doc : invSnapshot) {
+                                        String eventId = doc.getString("eventId");
+                                        if (eventId != null && !eventId.isEmpty()) {
+                                            declinedEventIds.add(eventId);
+                                        }
+                                    }
+                                }
+
+                                android.util.Log.d("PreviousEventsFragment", "Found " + declinedEventIds.size() + " events with DECLINED invitations");
+
+                                // Filter out any events already in the base list
+                                java.util.Set<String> existingIds = new java.util.HashSet<>();
+                                for (Event e : baseEvents) {
+                                    if (e != null && e.getId() != null) {
+                                        existingIds.add(e.getId());
+                                    }
+                                }
+
+                                List<Task<DocumentSnapshot>> eventTasks = new ArrayList<>();
+                                for (String eventId : declinedEventIds) {
+                                    if (!existingIds.contains(eventId)) {
+                                        eventTasks.add(db.collection("events").document(eventId).get());
+                                    }
+                                }
+
+                                if (eventTasks.isEmpty()) {
+                                    android.util.Log.d("PreviousEventsFragment", "No additional declined events to load");
+                                    setLoading(false);
+                                    adapter.submitEvents(baseEvents);
+                                    updateEmptyState(baseEvents.isEmpty());
+                                    return;
+                                }
+
+                                Tasks.whenAllSuccess(eventTasks)
+                                        .addOnSuccessListener(results -> {
+                                            if (!isAdded()) return;
+
+                                            for (Object obj : results) {
+                                                if (!(obj instanceof DocumentSnapshot)) continue;
+                                                DocumentSnapshot doc = (DocumentSnapshot) obj;
+                                                if (!doc.exists()) continue;
+                                                try {
+                                                    java.util.Map<String, Object> data = doc.getData();
+                                                    if (data == null) continue;
+                                                    Event event = Event.fromMap(data);
+                                                    if (event != null) {
+                                                        if (event.getId() == null || event.getId().isEmpty()) {
+                                                            event.setId(doc.getId());
+                                                        }
+                                                        baseEvents.add(event);
+                                                        android.util.Log.d("PreviousEventsFragment", "  - Added DECLINED invitation event: " + event.getTitle() + " (id: " + event.getId() + ")");
+                                                    }
+                                                } catch (Exception ex) {
+                                                    android.util.Log.e("PreviousEventsFragment", "Error parsing declined event " + doc.getId(), ex);
+                                                }
+                                            }
+
+                                            setLoading(false);
+                                            adapter.submitEvents(baseEvents);
+                                            updateEmptyState(baseEvents.isEmpty());
+                                        })
+                                        .addOnFailureListener(ex -> {
+                                            if (!isAdded()) return;
+                                            android.util.Log.e("PreviousEventsFragment", "Failed to load events for declined invitations", ex);
+                                            setLoading(false);
+                                            // Even if declined events fail to load, still show base previous events
+                                            adapter.submitEvents(baseEvents);
+                                            updateEmptyState(baseEvents.isEmpty());
+                                        });
+                            })
+                            .addOnFailureListener(ex -> {
+                                if (!isAdded()) return;
+                                android.util.Log.e("PreviousEventsFragment", "Failed to query declined invitations", ex);
+                                setLoading(false);
+                                adapter.submitEvents(baseEvents);
+                                updateEmptyState(baseEvents.isEmpty());
+                            });
                 })
                 .addOnFailureListener(e -> {
                     if (!isAdded()) return;

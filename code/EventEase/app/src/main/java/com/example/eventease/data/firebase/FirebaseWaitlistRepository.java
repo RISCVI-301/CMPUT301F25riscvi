@@ -137,21 +137,25 @@ public class FirebaseWaitlistRepository implements WaitlistRepository {
 
     @Override
     public Task<Boolean> isJoined(String eventId, String uid) {
-        // Check in-memory cache first
-        if (membership.contains(key(eventId, uid))) {
-            return Tasks.forResult(true);
-        }
-        
-        // Query Firestore - check waitlist subcollection document
+        // Always verify against Firestore to avoid stale membership cache,
+        // then keep the in-memory set in sync with the latest value.
         return db.collection("events")
                 .document(eventId)
                 .collection("WaitlistedEntrants")
                 .document(uid)
                 .get()
                 .continueWith(task -> {
-                    boolean exists = task.isSuccessful() && task.getResult() != null && task.getResult().exists();
+                    boolean exists = task.isSuccessful()
+                            && task.getResult() != null
+                            && task.getResult().exists();
+
+                    String k = key(eventId, uid);
                     if (exists) {
-                        membership.add(key(eventId, uid));
+                        // Keep cache in sync when user is still on the waitlist
+                        membership.add(k);
+                    } else {
+                        // Ensure we do NOT treat user as joined after they leave/are removed
+                        membership.remove(k);
                     }
                     return exists;
                 });

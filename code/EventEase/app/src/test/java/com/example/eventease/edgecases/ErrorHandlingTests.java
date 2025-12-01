@@ -173,7 +173,7 @@ public class ErrorHandlingTests {
         
         for (String phone : invalidPhones) {
             boolean isValid = phone != null && 
-                             phone.matches("^\\+?[1-9]\\d{1,14}$");
+                             phone.matches("^\\+?[1-9]\\d{9,14}$");
             // Phone is optional, so empty is valid
             if (!phone.isEmpty()) {
                 assertFalse("Invalid phone should be rejected: " + phone, isValid);

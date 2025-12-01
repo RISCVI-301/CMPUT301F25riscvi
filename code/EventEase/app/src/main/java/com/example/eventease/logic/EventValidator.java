@@ -52,7 +52,7 @@ public final class EventValidator {
      */
     public static String validateWhen(long epochMs) {
         long now = System.currentTimeMillis();
-        if (epochMs < now) return "Start must be in the future";
+        if (epochMs <= now) return "Start must be in the future";
         return null;
     }
 }

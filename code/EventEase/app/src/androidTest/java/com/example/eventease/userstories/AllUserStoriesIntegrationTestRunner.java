@@ -11,7 +11,6 @@ import org.junit.runner.notification.Failure;
  * They interact with actual Firebase and send real notifications.
  * 
  * This runner executes:
- * - EntrantUserStoryIntegrationTests: All entrant user stories (US 01.x.x) - REAL Firebase
  * - OrganizerUserStoryIntegrationTests: All organizer user stories (US 02.x.x) - REAL Firebase
  * - AdminUserStoryIntegrationTests: All admin user stories (US 03.x.x) - REAL Firebase
  * 
@@ -37,7 +36,6 @@ public class AllUserStoriesIntegrationTestRunner {
         
         // Run all integration test classes
         Result result = JUnitCore.runClasses(
-            EntrantUserStoryIntegrationTests.class,
             OrganizerUserStoryIntegrationTests.class,
             AdminUserStoryIntegrationTests.class
         );

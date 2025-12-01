@@ -4,6 +4,7 @@ import com.example.eventease.model.Event;
 import com.example.eventease.testdata.TestDataHelper;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
+import com.example.eventease.TestTasks;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -58,7 +59,7 @@ public class EventDetailsTest {
         String qrPayload = "event:" + testEventId;
         
         Task<Event> eventTask = eventDetailsRepo.getEventFromQRCode(qrPayload);
-        Event event = Tasks.await(eventTask);
+        Event event = TestTasks.await(eventTask);
         
         assertTrue("Get event from QR code should succeed", eventTask.isSuccessful());
         assertNotNull("Event should not be null", event);
@@ -71,7 +72,6 @@ public class EventDetailsTest {
     public void testGetEventDetailsFromQRCode_invalidFormat() throws Exception {
         // Try with invalid QR code format
         Task<Event> eventTask = eventDetailsRepo.getEventFromQRCode("invalid-format");
-        Tasks.await(eventTask);
         
         assertFalse("Should fail for invalid QR code format", eventTask.isSuccessful());
         assertNotNull("Should have exception", eventTask.getException());
@@ -81,7 +81,6 @@ public class EventDetailsTest {
     public void testGetEventDetailsFromQRCode_nonexistentEvent() throws Exception {
         // Try with valid format but non-existent event
         Task<Event> eventTask = eventDetailsRepo.getEventFromQRCode("event:nonexistent");
-        Tasks.await(eventTask);
         
         assertFalse("Should fail for non-existent event", eventTask.isSuccessful());
         assertNotNull("Should have exception", eventTask.getException());
@@ -93,18 +92,18 @@ public class EventDetailsTest {
         // Get event details first
         String qrPayload = "event:" + testEventId;
         Task<Event> eventTask = eventDetailsRepo.getEventFromQRCode(qrPayload);
-        Event event = Tasks.await(eventTask);
+        Event event = TestTasks.await(eventTask);
         assertNotNull("Event should be retrieved", event);
         
         // Join waitlist from event details
         Task<Void> joinTask = eventDetailsRepo.joinWaitlistFromEventDetails(testEventId, testUserId);
-        Tasks.await(joinTask);
+        TestTasks.await(joinTask);
         
         assertTrue("Join waitlist from event details should succeed", joinTask.isSuccessful());
         
         // Verify user is on waitlist
         Task<Boolean> isJoinedTask = waitlistRepo.isJoined(testEventId, testUserId);
-        Boolean isJoined = Tasks.await(isJoinedTask);
+        Boolean isJoined = TestTasks.await(isJoinedTask);
         assertTrue("User should be on waitlist", isJoined);
     }
     
@@ -114,7 +113,7 @@ public class EventDetailsTest {
         String qrPayload = "event:" + testEventId;
         
         Task<Event> eventTask = eventDetailsRepo.getEventFromQRCode(qrPayload);
-        Event event = Tasks.await(eventTask);
+        Event event = TestTasks.await(eventTask);
         
         assertTrue("Get event should succeed", eventTask.isSuccessful());
         assertNotNull("Event should not be null", event);
@@ -130,7 +129,7 @@ public class EventDetailsTest {
         String qrPayload = "event:" + testEventId;
         
         Task<Event> eventTask = eventDetailsRepo.getEventFromQRCode(qrPayload);
-        Event event = Tasks.await(eventTask);
+        Event event = TestTasks.await(eventTask);
         
         assertTrue("Get event should succeed", eventTask.isSuccessful());
         assertNotNull("Event should not be null", event);
@@ -147,14 +146,14 @@ public class EventDetailsTest {
     public void testViewWaitlistCountFromEventDetails() throws Exception {
         // US 01.05.04: Know how many total entrants are on the waiting list
         // Add some users to waitlist
-        Tasks.await(waitlistRepo.join(testEventId, "user1"));
-        Tasks.await(waitlistRepo.join(testEventId, "user2"));
-        Tasks.await(waitlistRepo.join(testEventId, "user3"));
+        TestTasks.await(waitlistRepo.join(testEventId, "user1"));
+        TestTasks.await(waitlistRepo.join(testEventId, "user2"));
+        TestTasks.await(waitlistRepo.join(testEventId, "user3"));
         
         // Get event details
         String qrPayload = "event:" + testEventId;
         Task<Event> eventTask = eventDetailsRepo.getEventFromQRCode(qrPayload);
-        Event event = Tasks.await(eventTask);
+        Event event = TestTasks.await(eventTask);
         
         assertTrue("Get event should succeed", eventTask.isSuccessful());
         assertNotNull("Event should not be null", event);
@@ -179,7 +178,6 @@ public class EventDetailsTest {
         
         // Try to join waitlist from event details when registration is closed
         Task<Void> joinTask = closedEventDetailsRepo.joinWaitlistFromEventDetails("closedEvent", testUserId);
-        Tasks.await(joinTask);
         
         assertFalse("Join should fail when registration is closed", joinTask.isSuccessful());
         assertNotNull("Should have exception", joinTask.getException());
@@ -226,30 +224,25 @@ public class EventDetailsTest {
         
         @Override
         public Task<Void> join(String eventId, String uid) {
-            return eventRepo.getEvent(eventId).continueWithTask(eventTask -> {
-                if (!eventTask.isSuccessful() || eventTask.getResult() == null) {
-                    return Tasks.forException(new Exception("Event not found"));
-                }
-                
-                Event event = eventTask.getResult();
-                
-                // Check registration period
-                long now = System.currentTimeMillis();
-                if (event.getRegistrationStart() > 0 && now < event.getRegistrationStart()) {
-                    return Tasks.forException(new Exception("Registration period has not started yet"));
-                }
-                
-                if (event.getRegistrationEnd() > 0 && now > event.getRegistrationEnd()) {
-                    return Tasks.forException(new Exception("Registration period has ended"));
-                }
-                
-                // Add to waitlist
-                waitlists.computeIfAbsent(eventId, k -> ConcurrentHashMap.newKeySet()).add(uid);
-                event.getWaitlist().add(uid);
-                event.setWaitlistCount(event.getWaitlist().size());
-                
-                return Tasks.forResult(null);
-            });
+            Event event = eventRepo.getEventSync(eventId);
+            if (event == null) {
+                return Tasks.forException(new Exception("Event not found"));
+            }
+            
+            long now = System.currentTimeMillis();
+            if (event.getRegistrationStart() > 0 && now < event.getRegistrationStart()) {
+                return Tasks.forException(new Exception("Registration period has not started yet"));
+            }
+            
+            if (event.getRegistrationEnd() > 0 && now > event.getRegistrationEnd()) {
+                return Tasks.forException(new Exception("Registration period has ended"));
+            }
+            
+            waitlists.computeIfAbsent(eventId, k -> ConcurrentHashMap.newKeySet()).add(uid);
+            event.getWaitlist().add(uid);
+            event.setWaitlistCount(event.getWaitlist().size());
+            
+            return Tasks.forResult(null);
         }
         
         @Override
@@ -263,12 +256,11 @@ public class EventDetailsTest {
             Set<String> waitlist = waitlists.get(eventId);
             if (waitlist != null) {
                 waitlist.remove(uid);
-                eventRepo.getEvent(eventId).addOnSuccessListener(event -> {
-                    if (event != null) {
-                        event.getWaitlist().remove(uid);
-                        event.setWaitlistCount(event.getWaitlist().size());
-                    }
-                });
+                Event event = eventRepo.getEventSync(eventId);
+                if (event != null) {
+                    event.getWaitlist().remove(uid);
+                    event.setWaitlistCount(event.getWaitlist().size());
+                }
             }
             return Tasks.forResult(null);
         }
@@ -290,6 +282,10 @@ public class EventDetailsTest {
                 return Tasks.forException(new Exception("Event not found"));
             }
             return Tasks.forResult(event);
+        }
+
+        public Event getEventSync(String eventId) {
+            return events.get(eventId);
         }
         
     }

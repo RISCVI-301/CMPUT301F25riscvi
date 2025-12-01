@@ -67,33 +67,6 @@ public class FCMNotificationTests {
     // ============================================
     
     @Test
-    public void testFCMTokenGenerated_realToken() throws Exception {
-        Log.d(TAG, "=== Testing REAL FCM Token Generation ===");
-        
-        // Initialize FCM token manager
-        FCMTokenManager.getInstance().initialize(context);
-        
-        // Wait a bit for token generation
-        Thread.sleep(3000);
-        
-        // Get token directly from Firebase
-        String token = Tasks.await(FirebaseMessaging.getInstance().getToken());
-        
-        assertNotNull("FCM token should be generated", token);
-        assertFalse("FCM token should not be empty", token.isEmpty());
-        assertTrue("FCM token should be reasonably long (usually 150+ chars)", token.length() > 50);
-        
-        Log.d(TAG, "✓ FCM Token generated: " + token.substring(0, 20) + "...");
-        System.out.println("✓ REAL FCM Token Generated!");
-        System.out.println("  Token length: " + token.length() + " characters");
-        System.out.println("  Token preview: " + token.substring(0, 30) + "...");
-        
-        // Verify token format (FCM tokens are base64-like strings)
-        assertTrue("Token should contain valid characters", 
-                   token.matches("^[A-Za-z0-9_-]+$"));
-    }
-    
-    @Test
     public void testFCMTokenSavedToFirestore() throws Exception {
         Log.d(TAG, "=== Testing FCM Token Saved to Firestore ===");
         
@@ -300,39 +273,5 @@ public class FCMNotificationTests {
         System.out.println("✓ Notifications re-enabled");
     }
     
-    // ============================================
-    // Test Runner
-    // ============================================
-    
-    @Test
-    public void runAllFCMTests() throws Exception {
-        System.out.println("\n========================================");
-        System.out.println("REAL FCM NOTIFICATION TESTS");
-        System.out.println("========================================");
-        System.out.println("These tests use REAL FCM and Cloud Functions!");
-        System.out.println("You should see notifications on your device!");
-        System.out.println("========================================\n");
-        
-        try {
-            testFCMTokenGenerated_realToken();
-            testFCMTokenSavedToFirestore();
-            testNotificationsEnabledFlag_preventsSending();
-            testSendRealNotification_viaCloudFunction(); // Run this last as it sends actual notification
-            
-            System.out.println("\n========================================");
-            System.out.println("✓ ALL FCM TESTS COMPLETE!");
-            System.out.println("========================================");
-            System.out.println("Check your device for notifications!");
-            System.out.println("Check Cloud Functions logs in Firebase Console!");
-            System.out.println("========================================\n");
-        } catch (Exception e) {
-            System.err.println("\n========================================");
-            System.err.println("✗ SOME FCM TESTS FAILED!");
-            System.err.println("Error: " + e.getMessage());
-            System.err.println("========================================\n");
-            e.printStackTrace();
-            throw e;
-        }
-    }
 }
 

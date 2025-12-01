@@ -4,9 +4,9 @@ import org.junit.runner.JUnitCore;
 import org.junit.runner.Result;
 import org.junit.runner.notification.Failure;
 
-import com.example.eventease.userstories.EntrantUserStoryTests;
-import com.example.eventease.userstories.OrganizerUserStoryTests;
-import com.example.eventease.userstories.AdminUserStoryTests;
+import com.example.eventease.userstories.EntrantUserStoryUnitTests;
+import com.example.eventease.userstories.OrganizerUserStoryUnitTests;
+import com.example.eventease.userstories.AdminUserStoryUnitTests;
 import com.example.eventease.edgecases.EdgeCaseTests;
 import com.example.eventease.edgecases.ErrorHandlingTests;
 import com.example.eventease.edgecases.IntegrationTests;
@@ -45,9 +45,9 @@ public class AllTestsRunner {
         // Run all test classes
         Result result = JUnitCore.runClasses(
             // User Story Tests
-            EntrantUserStoryTests.class,
-            OrganizerUserStoryTests.class,
-            AdminUserStoryTests.class,
+            EntrantUserStoryUnitTests.class,
+            OrganizerUserStoryUnitTests.class,
+            AdminUserStoryUnitTests.class,
             // Edge Case Tests
             EdgeCaseTests.class,
             ErrorHandlingTests.class,
