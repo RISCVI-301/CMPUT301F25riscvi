@@ -92,7 +92,21 @@ loadScripts(document, 'script');</script>
 <div class="type-signature"><span class="modifiers">public class </span><span class="element-name type-name-label">AdmittedEntry</span>
 <span class="extends-implements">extends <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Object.html" title="class or interface in java.lang" class="external-link">Object</a></span></div>
 <div class="block">Represents an admitted entry for an event.
- Tracks when a user was admitted and when they accepted the invitation.</div>
+
+ <p>This class serves as a data model (Data Transfer Object pattern) for tracking users who have
+ been admitted to an event. It records both when a user was admitted to the event (moved from
+ waitlist to admitted status) and when they accepted the invitation, providing a complete
+ audit trail of the admission process.</p>
+
+ <p>This class follows the JavaBean pattern with private fields and public getter/setter methods.
+ It is used in conjunction with the <a href="Invitation.html" title="class in com.example.eventease.model"><code>Invitation</code></a> class to manage the complete lifecycle
+ from waitlist to admission to acceptance.</p>
+
+ <p><b>Role in Application:</b> Used by the event management system to track which users have
+ been admitted to events and when they accepted their invitations. This information is used for
+ event capacity management, attendee lists, and check-in processing.</p>
+
+ <p><b>Outstanding Issues:</b> None currently.</p></div>
 </section>
 <section class="summary">
 <ul class="summary-list">

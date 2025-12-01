@@ -137,6 +137,19 @@ loadScripts(document, 'script');</script>
 <div class="table-header col-second">Method</div>
 <div class="table-header col-last">Description</div>
 <div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>void</code></div>
+<div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#approveOrganizerApplication(java.lang.String,com.example.eventease.admin.profile.data.AdminProfileDatabaseController.DeleteCallback)" class="member-name-link">approveOrganizerApplication</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;uid,
+ <a href="AdminProfileDatabaseController.DeleteCallback.html" title="interface in com.example.eventease.admin.profile.data">AdminProfileDatabaseController.DeleteCallback</a>&nbsp;callback)</code></div>
+<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="block">Approves a user's organizer application by adding the organizer role and
+ marking the application as APPROVED.</div>
+</div>
+<div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>void</code></div>
+<div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#declineOrganizerApplication(java.lang.String,com.example.eventease.admin.profile.data.AdminProfileDatabaseController.DeleteCallback)" class="member-name-link">declineOrganizerApplication</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;uid,
+ <a href="AdminProfileDatabaseController.DeleteCallback.html" title="interface in com.example.eventease.admin.profile.data">AdminProfileDatabaseController.DeleteCallback</a>&nbsp;callback)</code></div>
+<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="block">Declines a user's organizer application by marking it as DECLINED.</div>
+</div>
+<div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>void</code></div>
 <div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#deleteProfile(android.content.Context,com.example.eventease.admin.profile.data.UserProfile,com.example.eventease.admin.profile.data.AdminProfileDatabaseController.DeleteCallback)" class="member-name-link">deleteProfile</a><wbr>(android.content.Context&nbsp;context,
  <a href="UserProfile.html" title="class in com.example.eventease.admin.profile.data">UserProfile</a>&nbsp;profile,
  <a href="AdminProfileDatabaseController.DeleteCallback.html" title="interface in com.example.eventease.admin.profile.data">AdminProfileDatabaseController.DeleteCallback</a>&nbsp;callback)</code></div>
@@ -144,6 +157,10 @@ loadScripts(document, 'script');</script>
 <div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>void</code></div>
 <div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#fetchProfiles(com.example.eventease.admin.profile.data.AdminProfileDatabaseController.ProfilesCallback)" class="member-name-link">fetchProfiles</a><wbr>(<a href="AdminProfileDatabaseController.ProfilesCallback.html" title="interface in com.example.eventease.admin.profile.data">AdminProfileDatabaseController.ProfilesCallback</a>&nbsp;cb)</code></div>
 <div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
+<div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>void</code></div>
+<div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#removeOrganizerRole(java.lang.String,com.example.eventease.admin.profile.data.AdminProfileDatabaseController.DeleteCallback)" class="member-name-link">removeOrganizerRole</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;uid,
+ <a href="AdminProfileDatabaseController.DeleteCallback.html" title="interface in com.example.eventease.admin.profile.data">AdminProfileDatabaseController.DeleteCallback</a>&nbsp;callback)</code></div>
+<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
 </div>
 </div>
 </div>
@@ -191,6 +208,36 @@ loadScripts(document, 'script');</script>
  <a href="UserProfile.html" title="class in com.example.eventease.admin.profile.data">UserProfile</a>&nbsp;profile,
  @NonNull
  <a href="AdminProfileDatabaseController.DeleteCallback.html" title="interface in com.example.eventease.admin.profile.data">AdminProfileDatabaseController.DeleteCallback</a>&nbsp;callback)</span></div>
+</section>
+</li>
+<li>
+<section class="detail" id="removeOrganizerRole(java.lang.String,com.example.eventease.admin.profile.data.AdminProfileDatabaseController.DeleteCallback)">
+<h3>removeOrganizerRole</h3>
+<div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type">void</span>&nbsp;<span class="element-name">removeOrganizerRole</span><wbr><span class="parameters">(@NonNull
+ <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;uid,
+ @NonNull
+ <a href="AdminProfileDatabaseController.DeleteCallback.html" title="interface in com.example.eventease.admin.profile.data">AdminProfileDatabaseController.DeleteCallback</a>&nbsp;callback)</span></div>
+</section>
+</li>
+<li>
+<section class="detail" id="approveOrganizerApplication(java.lang.String,com.example.eventease.admin.profile.data.AdminProfileDatabaseController.DeleteCallback)">
+<h3>approveOrganizerApplication</h3>
+<div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type">void</span>&nbsp;<span class="element-name">approveOrganizerApplication</span><wbr><span class="parameters">(@NonNull
+ <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;uid,
+ @NonNull
+ <a href="AdminProfileDatabaseController.DeleteCallback.html" title="interface in com.example.eventease.admin.profile.data">AdminProfileDatabaseController.DeleteCallback</a>&nbsp;callback)</span></div>
+<div class="block">Approves a user's organizer application by adding the organizer role and
+ marking the application as APPROVED.</div>
+</section>
+</li>
+<li>
+<section class="detail" id="declineOrganizerApplication(java.lang.String,com.example.eventease.admin.profile.data.AdminProfileDatabaseController.DeleteCallback)">
+<h3>declineOrganizerApplication</h3>
+<div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type">void</span>&nbsp;<span class="element-name">declineOrganizerApplication</span><wbr><span class="parameters">(@NonNull
+ <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;uid,
+ @NonNull
+ <a href="AdminProfileDatabaseController.DeleteCallback.html" title="interface in com.example.eventease.admin.profile.data">AdminProfileDatabaseController.DeleteCallback</a>&nbsp;callback)</span></div>
+<div class="block">Declines a user's organizer application by marking it as DECLINED.</div>
 </section>
 </li>
 </ul>

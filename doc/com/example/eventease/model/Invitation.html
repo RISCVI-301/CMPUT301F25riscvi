@@ -92,7 +92,22 @@ loadScripts(document, 'script');</script>
 <div class="type-signature"><span class="modifiers">public class </span><span class="element-name type-name-label">Invitation</span>
 <span class="extends-implements">extends <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Object.html" title="class or interface in java.lang" class="external-link">Object</a></span></div>
 <div class="block">Represents an invitation sent to an entrant for an event.
- Tracks invitation status and timing information.</div>
+
+ <p>This class serves as a data model (Data Transfer Object pattern) for event invitations in the
+ EventEase application. It tracks the lifecycle of invitations sent to users who are on the waitlist
+ for an event, including their current status (pending, accepted, or declined) and timing information
+ for expiration handling.</p>
+
+ <p>This class follows the JavaBean pattern with private fields and public getter/setter methods,
+ and includes a status enumeration to represent the invitation state. The class is used by the
+ invitation management system to track user responses and manage invitation deadlines.</p>
+
+ <p><b>Role in Application:</b> Central to the waitlist-to-admission workflow. When an organizer
+ admits users from the waitlist, invitations are created and sent. This class tracks the invitation
+ status and expiration, enabling automatic processing of expired invitations and user response
+ handling.</p>
+
+ <p><b>Outstanding Issues:</b> None currently.</p></div>
 </section>
 <section class="summary">
 <ul class="summary-list">

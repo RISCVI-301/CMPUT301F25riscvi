@@ -5,6 +5,7 @@ com.example.eventease.admin.event.data
 com.example.eventease.admin.event.ui
 com.example.eventease.admin.image.data
 com.example.eventease.admin.image.ui
+com.example.eventease.admin.logs.data
 com.example.eventease.admin.logs.ui
 com.example.eventease.admin.profile.data
 com.example.eventease.admin.profile.ui

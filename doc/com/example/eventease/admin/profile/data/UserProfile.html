@@ -92,7 +92,20 @@ loadScripts(document, 'script');</script>
 <div class="type-signature"><span class="modifiers">public class </span><span class="element-name type-name-label">UserProfile</span>
 <span class="extends-implements">extends <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Object.html" title="class or interface in java.lang" class="external-link">Object</a></span></div>
 <div class="block">Represents a user profile in the admin system.
- Contains user information including display name, email, phone number, roles, and creation timestamp.</div>
+
+ <p>This class serves as a data model (Data Transfer Object pattern) for user profile information
+ used by the admin interface. It extends the basic profile information with role management
+ capabilities, allowing administrators to view and manage user roles within the system.</p>
+
+ <p>This class follows the JavaBean pattern with private fields and public getter/setter methods.
+ It is used exclusively by the admin interface for user management and role assignment operations,
+ providing a comprehensive view of user information including their assigned roles.</p>
+
+ <p><b>Role in Application:</b> Used by the admin interface to display and manage user profiles
+ with role information. This class enables administrators to view user details, assign roles
+ (such as organizer, entrant, or admin), and manage user accounts in the system.</p>
+
+ <p><b>Outstanding Issues:</b> None currently.</p></div>
 </section>
 <section class="summary">
 <ul class="summary-list">
@@ -147,6 +160,16 @@ loadScripts(document, 'script');</script>
 <div class="block">Gets the user's name.</div>
 </div>
 <div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></code></div>
+<div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#getOrganizerApplicationIdImageUrl()" class="member-name-link">getOrganizerApplicationIdImageUrl</a>()</code></div>
+<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="block">Gets the download URL of the user's organizer application ID image.</div>
+</div>
+<div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></code></div>
+<div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#getOrganizerApplicationStatus()" class="member-name-link">getOrganizerApplicationStatus</a>()</code></div>
+<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="block">Gets the status of the user's organizer application.</div>
+</div>
+<div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></code></div>
 <div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#getPhoneNumber()" class="member-name-link">getPhoneNumber</a>()</code></div>
 <div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
 <div class="block">Gets the user's phone number.</div>
@@ -175,6 +198,16 @@ loadScripts(document, 'script');</script>
 <div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#setName(java.lang.String)" class="member-name-link">setName</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;name)</code></div>
 <div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
 <div class="block">Sets the user's name.</div>
+</div>
+<div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>void</code></div>
+<div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#setOrganizerApplicationIdImageUrl(java.lang.String)" class="member-name-link">setOrganizerApplicationIdImageUrl</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;organizerApplicationIdImageUrl)</code></div>
+<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="block">Sets the download URL of the user's organizer application ID image.</div>
+</div>
+<div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>void</code></div>
+<div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#setOrganizerApplicationStatus(java.lang.String)" class="member-name-link">setOrganizerApplicationStatus</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;organizerApplicationStatus)</code></div>
+<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="block">Sets the status of the user's organizer application.</div>
 </div>
 <div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>void</code></div>
 <div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#setPhoneNumber(java.lang.String)" class="member-name-link">setPhoneNumber</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;phoneNumber)</code></div>
@@ -373,6 +406,43 @@ loadScripts(document, 'script');</script>
 <dl class="notes">
 <dt>Parameters:</dt>
 <dd><code>createdAt</code> - the creation timestamp in milliseconds</dd>
+</dl>
+</section>
+</li>
+<li>
+<section class="detail" id="getOrganizerApplicationStatus()">
+<h3>getOrganizerApplicationStatus</h3>
+<div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type"><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></span>&nbsp;<span class="element-name">getOrganizerApplicationStatus</span>()</div>
+<div class="block">Gets the status of the user's organizer application.
+ Expected values: null, "PENDING", "APPROVED", "DECLINED".</div>
+</section>
+</li>
+<li>
+<section class="detail" id="setOrganizerApplicationStatus(java.lang.String)">
+<h3>setOrganizerApplicationStatus</h3>
+<div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type">void</span>&nbsp;<span class="element-name">setOrganizerApplicationStatus</span><wbr><span class="parameters">(<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;organizerApplicationStatus)</span></div>
+<div class="block">Sets the status of the user's organizer application.</div>
+<dl class="notes">
+<dt>Parameters:</dt>
+<dd><code>organizerApplicationStatus</code> - the new application status</dd>
+</dl>
+</section>
+</li>
+<li>
+<section class="detail" id="getOrganizerApplicationIdImageUrl()">
+<h3>getOrganizerApplicationIdImageUrl</h3>
+<div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type"><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></span>&nbsp;<span class="element-name">getOrganizerApplicationIdImageUrl</span>()</div>
+<div class="block">Gets the download URL of the user's organizer application ID image.</div>
+</section>
+</li>
+<li>
+<section class="detail" id="setOrganizerApplicationIdImageUrl(java.lang.String)">
+<h3>setOrganizerApplicationIdImageUrl</h3>
+<div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type">void</span>&nbsp;<span class="element-name">setOrganizerApplicationIdImageUrl</span><wbr><span class="parameters">(<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;organizerApplicationIdImageUrl)</span></div>
+<div class="block">Sets the download URL of the user's organizer application ID image.</div>
+<dl class="notes">
+<dt>Parameters:</dt>
+<dd><code>organizerApplicationIdImageUrl</code> - the image URL</dd>
 </dl>
 </section>
 </li>

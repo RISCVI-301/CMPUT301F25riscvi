@@ -88,11 +88,41 @@ loadScripts(document, 'script');</script>
 <div class="inheritance">com.example.eventease.model.Event</div>
 </div>
 <section class="class-description" id="class-description">
+<dl class="notes">
+<dt>All Implemented Interfaces:</dt>
+<dd><code><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/io/Serializable.html" title="class or interface in java.io" class="external-link">Serializable</a></code></dd>
+</dl>
 <hr>
 <div class="type-signature"><span class="modifiers">public class </span><span class="element-name type-name-label">Event</span>
-<span class="extends-implements">extends <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Object.html" title="class or interface in java.lang" class="external-link">Object</a></span></div>
+<span class="extends-implements">extends <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Object.html" title="class or interface in java.lang" class="external-link">Object</a>
+implements <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/io/Serializable.html" title="class or interface in java.io" class="external-link">Serializable</a></span></div>
 <div class="block">Represents an event in the EventEase system.
- Contains event details including title, location, capacity, waitlist, and admitted entrants.</div>
+
+ <p>This class serves as a data model (Data Transfer Object pattern) for events in the EventEase
+ application. It encapsulates all event-related information including scheduling, capacity management,
+ waitlist handling, and attendee tracking. Instances of this class are used throughout the application
+ for event creation, display, and management by both organizers and entrants.</p>
+
+ <p>This class supports serialization to/from Firestore Map format via <a href="#toMap()"><code>toMap()</code></a> and
+ <a href="#fromMap(java.util.Map)"><code>fromMap(Map)</code></a> methods, enabling persistence in the Firebase backend. The class follows
+ the Value Object pattern for immutable data representation, though it uses public fields for
+ Firestore compatibility.</p>
+
+ <p><b>Role in Application:</b> Central data model for the event management system. Used by
+ organizers to create and manage events, by entrants to view and register for events, and by
+ the backend services for event processing and notifications.</p>
+
+ <p><b>Outstanding Issues:</b> The <code>waitlistCount</code> field is deprecated in favor of using
+ <code>waitlist.size()</code>, but is maintained for backwards compatibility with existing Firestore data.
+ The <code>description</code> field is a legacy field that mirrors <code>notes</code>.</p></div>
+<dl class="notes">
+<dt>See Also:</dt>
+<dd>
+<ul class="tag-list">
+<li><a href="../../../../serialized-form.html#com.example.eventease.model.Event">Serialized Form</a></li>
+</ul>
+</dd>
+</dl>
 </section>
 <section class="summary">
 <ul class="summary-list">
@@ -168,7 +198,7 @@ loadScripts(document, 'script');</script>
 <div class="col-first even-row-color"><code><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></code></div>
 <div class="col-second even-row-color"><code><a href="#qrPayload" class="member-name-link">qrPayload</a></code></div>
 <div class="col-last even-row-color">
-<div class="block">QR code payload string (e.g., "event:<id>").</div>
+<div class="block">QR code payload string (e.g., <code>"event:&lt;id&gt;"</code>).</div>
 </div>
 <div class="col-first odd-row-color"><code>long</code></div>
 <div class="col-second odd-row-color"><code><a href="#registrationEnd" class="member-name-link">registrationEnd</a></code></div>
@@ -584,7 +614,7 @@ loadScripts(document, 'script');</script>
 <h3>qrPayload</h3>
 <div class="member-signature"><span class="annotations">@Nullable
 </span><span class="modifiers">public</span>&nbsp;<span class="return-type"><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></span>&nbsp;<span class="element-name">qrPayload</span></div>
-<div class="block">QR code payload string (e.g., "event:<id>").</div>
+<div class="block">QR code payload string (e.g., <code>"event:&lt;id&gt;"</code>).</div>
 </section>
 </li>
 <li>

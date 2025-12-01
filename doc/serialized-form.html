@@ -52,11 +52,11 @@ loadScripts(document, 'script');</script>
 <ul class="block-list">
 <li>
 <section class="serialized-package-container">
-<h2 title="Package">Package&nbsp;<a href="com/example/eventease/admin/event/data/package-summary.html">com.example.eventease.admin.event.data</a></h2>
+<h2 title="Package">Package&nbsp;<a href="com/example/eventease/model/package-summary.html">com.example.eventease.model</a></h2>
 <ul class="block-list">
 <li>
-<section class="serialized-class-details" id="com.example.eventease.admin.event.data.Event">
-<h3>Class&nbsp;<a href="com/example/eventease/admin/event/data/Event.html" title="class in com.example.eventease.admin.event.data">com.example.eventease.admin.event.data.Event</a></h3>
+<section class="serialized-class-details" id="com.example.eventease.model.Event">
+<h3>Class&nbsp;<a href="com/example/eventease/model/Event.html" title="class in com.example.eventease.model">com.example.eventease.model.Event</a></h3>
 <div class="type-signature">class Event extends <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Object.html" title="class or interface in java.lang" class="external-link">Object</a> implements <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/io/Serializable.html" title="class or interface in java.io" class="external-link">Serializable</a></div>
 <dl class="name-value">
 <dt>serialVersionUID:</dt>
@@ -68,60 +68,99 @@ loadScripts(document, 'script');</script>
 <h4>Serialized Fields</h4>
 <ul class="block-list">
 <li class="block-list">
-<h5>capacity</h5>
-<pre>int capacity</pre>
+<h5>admitted</h5>
+<pre><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html" title="class or interface in java.util" class="external-link">List</a>&lt;<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&gt; admitted</pre>
+<div class="block">List of user IDs who have been admitted to the event.</div>
 </li>
 <li class="block-list">
-<h5>createdAt</h5>
-<pre>long createdAt</pre>
+<h5>capacity</h5>
+<pre>int capacity</pre>
+<div class="block">Maximum capacity of the event.</div>
+</li>
+<li class="block-list">
+<h5>createdAtEpochMs</h5>
+<pre>long createdAtEpochMs</pre>
+<div class="block">Event creation timestamp in milliseconds UTC.</div>
+</li>
+<li class="block-list">
+<h5>deadlineEpochMs</h5>
+<pre>long deadlineEpochMs</pre>
+<div class="block">Event deadline in milliseconds UTC.</div>
 </li>
 <li class="block-list">
 <h5>description</h5>
 <pre><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a> description</pre>
-</li>
-<li class="block-list">
-<h5>geolocation</h5>
-<pre>boolean geolocation</pre>
+<div class="block">Event description (legacy field, same as notes).</div>
 </li>
 <li class="block-list">
 <h5>guidelines</h5>
 <pre><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a> guidelines</pre>
+<div class="block">Event-specific rules and requirements.</div>
 </li>
 <li class="block-list">
 <h5>id</h5>
 <pre><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a> id</pre>
+<div class="block">Unique event identifier.</div>
+</li>
+<li class="block-list">
+<h5>interests</h5>
+<pre><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html" title="class or interface in java.util" class="external-link">List</a>&lt;<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&gt; interests</pre>
+<div class="block">Interests/tags for filtering (e.g., Outdoor, Music).</div>
+</li>
+<li class="block-list">
+<h5>location</h5>
+<pre><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a> location</pre>
+<div class="block">Event location.</div>
+</li>
+<li class="block-list">
+<h5>notes</h5>
+<pre><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a> notes</pre>
+<div class="block">Event notes or description.</div>
 </li>
 <li class="block-list">
 <h5>organizerId</h5>
 <pre><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a> organizerId</pre>
+<div class="block">Unique identifier of the event organizer.</div>
 </li>
 <li class="block-list">
 <h5>posterUrl</h5>
 <pre><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a> posterUrl</pre>
-</li>
-<li class="block-list">
-<h5>qrEnabled</h5>
-<pre>boolean qrEnabled</pre>
+<div class="block">URL of the event poster image.</div>
 </li>
 <li class="block-list">
 <h5>qrPayload</h5>
 <pre><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a> qrPayload</pre>
+<div class="block">QR code payload string (e.g., <code>"event:&lt;id&gt;"</code>).</div>
 </li>
 <li class="block-list">
 <h5>registrationEnd</h5>
 <pre>long registrationEnd</pre>
+<div class="block">Registration end time in milliseconds UTC.</div>
 </li>
 <li class="block-list">
 <h5>registrationStart</h5>
 <pre>long registrationStart</pre>
+<div class="block">Registration start time in milliseconds UTC.</div>
+</li>
+<li class="block-list">
+<h5>startsAtEpochMs</h5>
+<pre>long startsAtEpochMs</pre>
+<div class="block">Event start time in milliseconds UTC.</div>
 </li>
 <li class="block-list">
 <h5>title</h5>
 <pre><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a> title</pre>
+<div class="block">Event title.</div>
 </li>
 <li class="block-list">
-<h5>waitlist_count</h5>
-<pre>int waitlist_count</pre>
+<h5>waitlist</h5>
+<pre><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html" title="class or interface in java.util" class="external-link">List</a>&lt;<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&gt; waitlist</pre>
+<div class="block">List of user IDs on the waitlist.</div>
+</li>
+<li class="block-list">
+<h5>waitlistCount</h5>
+<pre>int waitlistCount</pre>
+<div class="block">Current number of people on waitlist (deprecated - use waitlist.size()).</div>
 </li>
 </ul>
 </section>

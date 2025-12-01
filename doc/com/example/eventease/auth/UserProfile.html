@@ -92,7 +92,21 @@ loadScripts(document, 'script');</script>
 <div class="type-signature"><span class="modifiers">public class </span><span class="element-name type-name-label">UserProfile</span>
 <span class="extends-implements">extends <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Object.html" title="class or interface in java.lang" class="external-link">Object</a></span></div>
 <div class="block">Represents a user profile in the authentication system.
- Contains basic user information stored in Firestore.</div>
+
+ <p>This class serves as a data model (Data Transfer Object pattern) for basic user profile
+ information stored in Firestore during the authentication process. It contains minimal user
+ information required for device-based authentication and initial profile setup.</p>
+
+ <p>This class uses public fields for Firestore compatibility and follows a simple data structure
+ pattern. It is distinct from the <a href="../model/Profile.html" title="class in com.example.eventease.model"><code>Profile</code></a> class, which contains
+ more detailed user information used throughout the application.</p>
+
+ <p><b>Role in Application:</b> Used during the authentication and profile setup workflow to
+ store initial user information in Firestore. This class is primarily used by the
+ <a href="DeviceAuthManager.html" title="class in com.example.eventease.auth"><code>DeviceAuthManager</code></a> and profile setup activities to create and manage user accounts
+ in the Firebase backend.</p>
+
+ <p><b>Outstanding Issues:</b> None currently.</p></div>
 </section>
 <section class="summary">
 <ul class="summary-list">

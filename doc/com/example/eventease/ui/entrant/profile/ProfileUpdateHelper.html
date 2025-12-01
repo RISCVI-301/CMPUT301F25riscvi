@@ -140,12 +140,13 @@ loadScripts(document, 'script');</script>
 <div class="table-header col-second">Method</div>
 <div class="table-header col-last">Description</div>
 <div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>void</code></div>
-<div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#saveChanges(java.lang.String,java.lang.String,android.net.Uri,com.example.eventease.ui.entrant.profile.ProfileUpdateHelper.UpdateCallback)" class="member-name-link">saveChanges</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;name,
+<div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#saveChanges(java.lang.String,java.lang.String,java.lang.String,android.net.Uri,com.example.eventease.ui.entrant.profile.ProfileUpdateHelper.UpdateCallback)" class="member-name-link">saveChanges</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;name,
  <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;phone,
+ <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;email,
  android.net.Uri&nbsp;imageUri,
  <a href="ProfileUpdateHelper.UpdateCallback.html" title="interface in com.example.eventease.ui.entrant.profile">ProfileUpdateHelper.UpdateCallback</a>&nbsp;callback)</code></div>
 <div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
-<div class="block">Saves profile changes (name, phone, and optionally profile picture).</div>
+<div class="block">Saves profile changes (name, phone, email, and optionally profile picture).</div>
 </div>
 <div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>void</code></div>
 <div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#syncEmailToFirestore()" class="member-name-link">syncEmailToFirestore</a>()</code></div>
@@ -189,17 +190,19 @@ loadScripts(document, 'script');</script>
 <h2>Method Details</h2>
 <ul class="member-list">
 <li>
-<section class="detail" id="saveChanges(java.lang.String,java.lang.String,android.net.Uri,com.example.eventease.ui.entrant.profile.ProfileUpdateHelper.UpdateCallback)">
+<section class="detail" id="saveChanges(java.lang.String,java.lang.String,java.lang.String,android.net.Uri,com.example.eventease.ui.entrant.profile.ProfileUpdateHelper.UpdateCallback)">
 <h3>saveChanges</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type">void</span>&nbsp;<span class="element-name">saveChanges</span><wbr><span class="parameters">(<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;name,
  <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;phone,
+ <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;email,
  android.net.Uri&nbsp;imageUri,
  <a href="ProfileUpdateHelper.UpdateCallback.html" title="interface in com.example.eventease.ui.entrant.profile">ProfileUpdateHelper.UpdateCallback</a>&nbsp;callback)</span></div>
-<div class="block">Saves profile changes (name, phone, and optionally profile picture).</div>
+<div class="block">Saves profile changes (name, phone, email, and optionally profile picture).</div>
 <dl class="notes">
 <dt>Parameters:</dt>
 <dd><code>name</code> - the new name (or empty to keep current)</dd>
 <dd><code>phone</code> - the new phone (or empty to keep current)</dd>
+<dd><code>email</code> - the new email (or empty to keep current)</dd>
 <dd><code>imageUri</code> - the new image URI (or null to keep current)</dd>
 <dd><code>callback</code> - callback for update result</dd>
 </dl>
