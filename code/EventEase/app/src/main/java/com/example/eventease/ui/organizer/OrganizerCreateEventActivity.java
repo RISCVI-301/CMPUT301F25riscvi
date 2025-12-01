@@ -8,7 +8,12 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.ColorDrawable;
+import android.renderscript.Allocation;
+import android.renderscript.Element;
+import android.renderscript.RenderScript;
+import android.renderscript.ScriptIntrinsicBlur;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Build;
@@ -326,9 +331,9 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         }
         
         DatePickerDialog dp = new DatePickerDialog(
-                this, (view, y, m, d) -> {
+                this, R.style.EventEasePickerDialogTheme, (view, y, m, d) -> {
             TimePickerDialog tp = new TimePickerDialog(
-                    this, (vv, hh, mm) -> {
+                    this, R.style.EventEasePickerDialogTheme, (vv, hh, mm) -> {
                 Calendar chosen = Calendar.getInstance();
                 chosen.set(y, m, d, hh, mm, 0);
                 chosen.set(Calendar.MILLISECOND, 0);
@@ -373,13 +378,10 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
             minDateMs = Math.max(minDateMs, regEndEpochMs);
         }
         
-        Calendar minDate = Calendar.getInstance();
-        minDate.setTimeInMillis(minDateMs);
-        
         DatePickerDialog dp = new DatePickerDialog(
-                this, (view, y, m, d) -> {
+                this, R.style.EventEasePickerDialogTheme, (view, y, m, d) -> {
             TimePickerDialog tp = new TimePickerDialog(
-                    this, (vv, hh, mm) -> {
+                    this, R.style.EventEasePickerDialogTheme, (vv, hh, mm) -> {
                 Calendar chosen = Calendar.getInstance();
                 chosen.set(y, m, d, hh, mm, 0);
                 chosen.set(Calendar.MILLISECOND, 0);
@@ -424,9 +426,9 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         }
         
         DatePickerDialog dp = new DatePickerDialog(
-                this, (view, y, m, d) -> {
+                this, R.style.EventEasePickerDialogTheme, (view, y, m, d) -> {
             TimePickerDialog tp = new TimePickerDialog(
-                    this, (vv, hh, mm) -> {
+                    this, R.style.EventEasePickerDialogTheme, (vv, hh, mm) -> {
                 Calendar chosen = Calendar.getInstance();
                 chosen.set(y, m, d, hh, mm, 0);
                 chosen.set(Calendar.MILLISECOND, 0);
@@ -1199,10 +1201,43 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
             return;
         }
         
-        // Create a dialog with a larger crop view
-        android.app.Dialog cropDialog = new android.app.Dialog(this);
-        cropDialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        // Capture screenshot and blur it
+        Bitmap screenshot = captureScreenshot();
+        Bitmap blurredBitmap = blurBitmap(screenshot, 25f);
+        
+        // Create custom dialog with full screen to show blur background
+        android.app.Dialog cropDialog = new android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
         cropDialog.setContentView(R.layout.dialog_crop_poster);
+        
+        // Set window properties
+        Window window = cropDialog.getWindow();
+        if (window != null) {
+            window.setLayout(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT
+            );
+            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            
+            // Disable dim since we have our own blur background
+            android.view.WindowManager.LayoutParams layoutParams = window.getAttributes();
+            layoutParams.dimAmount = 0f;
+            window.setAttributes(layoutParams);
+            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+        }
+        
+        // Apply blurred background
+        android.view.View blurBackground = cropDialog.findViewById(R.id.dialogBlurBackground);
+        if (blurredBitmap != null && blurBackground != null) {
+            blurBackground.setBackground(new BitmapDrawable(getResources(), blurredBitmap));
+        }
+        
+        // Make the background clickable to dismiss
+        if (blurBackground != null) {
+            blurBackground.setOnClickListener(v -> cropDialog.dismiss());
+        }
+        
+        // Get the CardView for animation
+        androidx.cardview.widget.CardView cardView = cropDialog.findViewById(R.id.dialogCardView);
         
         ImageView cropImageView = cropDialog.findViewById(R.id.posterPreviewCrop);
         com.google.android.material.button.MaterialButton btnDone = cropDialog.findViewById(R.id.btnSaveCrop);
@@ -1213,10 +1248,10 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
             Glide.with(this)
                     .asBitmap()
                     .load(posterUri)
-                    .into(new com.bumptech.glide.request.target.CustomTarget<android.graphics.Bitmap>() {
+                    .into(new com.bumptech.glide.request.target.CustomTarget<Bitmap>() {
                         @Override
-                        public void onResourceReady(@NonNull android.graphics.Bitmap resource, 
-                                                    @Nullable com.bumptech.glide.request.transition.Transition<? super android.graphics.Bitmap> transition) {
+                        public void onResourceReady(@NonNull Bitmap resource, 
+                                                    @Nullable com.bumptech.glide.request.transition.Transition<? super Bitmap> transition) {
                             setupCropView(cropImageView, resource);
                         }
                         
@@ -1228,8 +1263,32 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         // Setup buttons
         if (btnDone != null) {
             btnDone.setOnClickListener(v -> {
-                applyCropToPreview(cropImageView);
-                cropDialog.dismiss();
+                // Extract cropped bitmap from crop view
+                android.graphics.Matrix cropMatrix = (android.graphics.Matrix) cropImageView.getTag();
+                if (cropMatrix != null && posterUri != null) {
+                    Glide.with(this)
+                            .asBitmap()
+                            .load(posterUri)
+                            .into(new com.bumptech.glide.request.target.CustomTarget<Bitmap>() {
+                                @Override
+                                public void onResourceReady(@NonNull Bitmap originalBitmap,
+                                                            @Nullable com.bumptech.glide.request.transition.Transition<? super Bitmap> transition) {
+                                    // Extract the visible region from the crop view
+                                    android.graphics.Bitmap croppedBitmap = extractCroppedBitmap(
+                                            originalBitmap, cropMatrix, cropImageView.getWidth(), cropImageView.getHeight());
+                                    if (croppedBitmap != null) {
+                                        // Save cropped bitmap and update preview
+                                        saveCroppedBitmapAndUpdatePreview(croppedBitmap);
+                                    }
+                                    cropDialog.dismiss();
+                                }
+                                
+                                @Override
+                                public void onLoadCleared(@Nullable android.graphics.drawable.Drawable placeholder) {}
+                            });
+                } else {
+                    cropDialog.dismiss();
+                }
             });
         }
         if (btnCancel != null) {
@@ -1240,6 +1299,118 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         setupPanAndZoom(cropImageView);
         
         cropDialog.show();
+        
+        // Apply animations after dialog is shown
+        android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_fade_in);
+        android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_zoom_in);
+        
+        if (blurBackground != null) {
+            blurBackground.startAnimation(fadeIn);
+        }
+        if (cardView != null) {
+            cardView.startAnimation(zoomIn);
+        }
+    }
+    
+    /**
+     * Extracts a cropped bitmap from the original bitmap based on the crop view's matrix
+     */
+    private android.graphics.Bitmap extractCroppedBitmap(android.graphics.Bitmap originalBitmap, 
+                                                         android.graphics.Matrix cropMatrix,
+                                                         int cropViewWidth, int cropViewHeight) {
+        if (originalBitmap == null || cropMatrix == null || cropViewWidth == 0 || cropViewHeight == 0) {
+            return null;
+        }
+        
+        try {
+            // Create inverse matrix to map from view coordinates to bitmap coordinates
+            android.graphics.Matrix inverseMatrix = new android.graphics.Matrix();
+            cropMatrix.invert(inverseMatrix);
+            
+            // Get the four corners of the crop view in view coordinates
+            float[] viewCorners = {
+                0, 0,                              // top-left
+                cropViewWidth, 0,                  // top-right
+                cropViewWidth, cropViewHeight,     // bottom-right
+                0, cropViewHeight                  // bottom-left
+            };
+            
+            // Map view corners to bitmap coordinates
+            float[] bitmapCorners = new float[8];
+            inverseMatrix.mapPoints(bitmapCorners, viewCorners);
+            
+            // Find the bounding box in bitmap coordinates
+            float minX = Math.min(Math.min(bitmapCorners[0], bitmapCorners[2]), 
+                                 Math.min(bitmapCorners[4], bitmapCorners[6]));
+            float minY = Math.min(Math.min(bitmapCorners[1], bitmapCorners[3]), 
+                                 Math.min(bitmapCorners[5], bitmapCorners[7]));
+            float maxX = Math.max(Math.max(bitmapCorners[0], bitmapCorners[2]), 
+                                 Math.max(bitmapCorners[4], bitmapCorners[6]));
+            float maxY = Math.max(Math.max(bitmapCorners[1], bitmapCorners[3]), 
+                                 Math.max(bitmapCorners[5], bitmapCorners[7]));
+            
+            // Clamp to bitmap bounds
+            int srcLeft = Math.max(0, (int)minX);
+            int srcTop = Math.max(0, (int)minY);
+            int srcRight = Math.min(originalBitmap.getWidth(), (int)maxX);
+            int srcBottom = Math.min(originalBitmap.getHeight(), (int)maxY);
+            
+            int srcWidth = srcRight - srcLeft;
+            int srcHeight = srcBottom - srcTop;
+            
+            if (srcWidth <= 0 || srcHeight <= 0) {
+                return originalBitmap; // Invalid crop, return original
+            }
+            
+            // Create cropped bitmap from the source rectangle
+            android.graphics.Bitmap croppedBitmap = android.graphics.Bitmap.createBitmap(
+                originalBitmap,
+                srcLeft,
+                srcTop,
+                srcWidth,
+                srcHeight
+            );
+            
+            return croppedBitmap;
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to extract cropped bitmap", e);
+            return originalBitmap;
+        }
+    }
+    
+    /**
+     * Saves the cropped bitmap to a file and updates the preview
+     */
+    private void saveCroppedBitmapAndUpdatePreview(android.graphics.Bitmap croppedBitmap) {
+        if (croppedBitmap == null || posterPreview == null) return;
+        
+        try {
+            // Save to a temporary file
+            File imageFile = new File(getCacheDir(), "cropped_poster_" + System.currentTimeMillis() + ".jpg");
+            FileOutputStream fos = new FileOutputStream(imageFile);
+            croppedBitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, fos);
+            fos.flush();
+            fos.close();
+            
+            // Update the poster URI to the cropped version using FileProvider
+            posterUri = androidx.core.content.FileProvider.getUriForFile(
+                this,
+                getPackageName() + ".fileprovider",
+                imageFile
+            );
+            
+            // Update preview with the cropped bitmap
+            // Use matrix to properly display it - scale to fill width while maintaining aspect ratio
+            posterPreview.post(() -> {
+                posterPreview.setScaleType(ImageView.ScaleType.MATRIX);
+                posterPreview.setImageBitmap(croppedBitmap);
+                applyInitialCrop(croppedBitmap);
+            });
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to save cropped bitmap", e);
+            toast("Failed to save cropped image");
+        }
     }
     
     /**
@@ -1472,6 +1643,50 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
                 return (float) Math.sqrt(x * x + y * y);
             }
         });
+    }
+
+    /**
+     * Captures a screenshot of the current activity
+     */
+    private Bitmap captureScreenshot() {
+        android.view.View rootView = getWindow().getDecorView().getRootView();
+        rootView.setDrawingCacheEnabled(true);
+        Bitmap bitmap = Bitmap.createBitmap(rootView.getDrawingCache());
+        rootView.setDrawingCacheEnabled(false);
+        return bitmap;
+    }
+    
+    /**
+     * Blurs a bitmap using RenderScript
+     */
+    private Bitmap blurBitmap(Bitmap bitmap, float radius) {
+        if (bitmap == null) return null;
+        
+        try {
+            // Scale down for better performance
+            int width = Math.round(bitmap.getWidth() * 0.4f);
+            int height = Math.round(bitmap.getHeight() * 0.4f);
+            Bitmap inputBitmap = Bitmap.createScaledBitmap(bitmap, width, height, false);
+            Bitmap outputBitmap = Bitmap.createBitmap(inputBitmap);
+            
+            RenderScript rs = RenderScript.create(this);
+            ScriptIntrinsicBlur blurScript = ScriptIntrinsicBlur.create(rs, Element.U8_4(rs));
+            Allocation tmpIn = Allocation.createFromBitmap(rs, inputBitmap);
+            Allocation tmpOut = Allocation.createFromBitmap(rs, outputBitmap);
+            
+            blurScript.setRadius(radius);
+            blurScript.setInput(tmpIn);
+            blurScript.forEach(tmpOut);
+            tmpOut.copyTo(outputBitmap);
+            
+            rs.destroy();
+            
+            // Scale back up
+            return Bitmap.createScaledBitmap(outputBitmap, bitmap.getWidth(), bitmap.getHeight(), true);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return bitmap;
+        }
     }
 
     private static String safe(CharSequence cs) { return cs == null ? "" : cs.toString().trim(); }

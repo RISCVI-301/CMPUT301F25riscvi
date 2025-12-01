@@ -53,7 +53,16 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.ColorDrawable;
+import android.renderscript.Allocation;
+import android.renderscript.Element;
+import android.renderscript.RenderScript;
+import android.renderscript.ScriptIntrinsicBlur;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.WindowManager;
+import androidx.cardview.widget.CardView;
 import android.os.Build;
 import android.os.Environment;
 import android.provider.MediaStore;
@@ -718,12 +727,127 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
 
         String eventTitle = eventNameTextView != null ? eventNameTextView.getText().toString() : "this event";
         
-        new MaterialAlertDialogBuilder(this)
-                .setTitle("Delete Event")
-                .setMessage("Are you sure you want to delete \"" + eventTitle + "\"? This action cannot be undone. All event data including waitlists, entrants, and invitations will be permanently deleted from the database.")
-                .setPositiveButton("Delete", (dialog, which) -> deleteEvent())
-                .setNegativeButton("Cancel", null)
-                .show();
+        // Capture screenshot and blur it
+        Bitmap screenshot = captureScreenshot();
+        Bitmap blurredBitmap = blurBitmap(screenshot, 25f);
+        
+        // Create custom dialog with full screen to show blur background
+        Dialog deleteDialog = new Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        deleteDialog.setContentView(R.layout.dialog_delete_event);
+        
+        // Set window properties
+        Window window = deleteDialog.getWindow();
+        if (window != null) {
+            window.setLayout(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            );
+            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            
+            // Disable dim since we have our own blur background
+            WindowManager.LayoutParams layoutParams = window.getAttributes();
+            layoutParams.dimAmount = 0f;
+            window.setAttributes(layoutParams);
+            window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+        }
+        
+        // Apply blurred background
+        View blurBackground = deleteDialog.findViewById(R.id.dialogBlurBackground);
+        if (blurredBitmap != null && blurBackground != null) {
+            blurBackground.setBackground(new BitmapDrawable(getResources(), blurredBitmap));
+        }
+        
+        // Make the background clickable to dismiss
+        if (blurBackground != null) {
+            blurBackground.setOnClickListener(v -> deleteDialog.dismiss());
+        }
+        
+        // Get the CardView for animation
+        CardView cardView = deleteDialog.findViewById(R.id.dialogCardView);
+        
+        // Set event title in message
+        TextView tvDeleteMessage = deleteDialog.findViewById(R.id.tvDeleteMessage);
+        if (tvDeleteMessage != null) {
+            String message = "Are you sure you want to delete \"" + eventTitle + "\"? This action cannot be undone. All event data including waitlists, entrants, and invitations will be permanently deleted from the database.";
+            tvDeleteMessage.setText(message);
+        }
+        
+        // Setup buttons
+        MaterialButton btnCancel = deleteDialog.findViewById(R.id.btnCancelDelete);
+        MaterialButton btnConfirm = deleteDialog.findViewById(R.id.btnConfirmDelete);
+        
+        if (btnCancel != null) {
+            btnCancel.setOnClickListener(v -> deleteDialog.dismiss());
+        }
+        
+        if (btnConfirm != null) {
+            btnConfirm.setOnClickListener(v -> {
+                deleteDialog.dismiss();
+                deleteEvent();
+            });
+        }
+        
+        deleteDialog.show();
+        
+        // Apply animations after dialog is shown
+        android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_fade_in);
+        android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_zoom_in);
+        
+        if (blurBackground != null) {
+            blurBackground.startAnimation(fadeIn);
+        }
+        if (cardView != null) {
+            cardView.startAnimation(zoomIn);
+        }
+    }
+    
+    /**
+     * Captures a screenshot of the current activity
+     */
+    private Bitmap captureScreenshot() {
+        try {
+            View rootView = getWindow().getDecorView().getRootView();
+            rootView.setDrawingCacheEnabled(true);
+            Bitmap bitmap = Bitmap.createBitmap(rootView.getDrawingCache());
+            rootView.setDrawingCacheEnabled(false);
+            return bitmap;
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to capture screenshot", e);
+            return null;
+        }
+    }
+    
+    /**
+     * Blurs a bitmap using RenderScript
+     */
+    private Bitmap blurBitmap(Bitmap bitmap, float radius) {
+        if (bitmap == null) return null;
+        
+        try {
+            // Scale down for better performance
+            int width = Math.round(bitmap.getWidth() * 0.4f);
+            int height = Math.round(bitmap.getHeight() * 0.4f);
+            Bitmap inputBitmap = Bitmap.createScaledBitmap(bitmap, width, height, false);
+            Bitmap outputBitmap = Bitmap.createBitmap(inputBitmap);
+            
+            RenderScript rs = RenderScript.create(this);
+            ScriptIntrinsicBlur blurScript = ScriptIntrinsicBlur.create(rs, Element.U8_4(rs));
+            Allocation tmpIn = Allocation.createFromBitmap(rs, inputBitmap);
+            Allocation tmpOut = Allocation.createFromBitmap(rs, outputBitmap);
+            
+            blurScript.setRadius(radius);
+            blurScript.setInput(tmpIn);
+            blurScript.forEach(tmpOut);
+            tmpOut.copyTo(outputBitmap);
+            
+            rs.destroy();
+            
+            // Scale back up
+            return Bitmap.createScaledBitmap(outputBitmap, bitmap.getWidth(), bitmap.getHeight(), true);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to blur bitmap", e);
+            return bitmap;
+        }
     }
 
     private void deleteEvent() {

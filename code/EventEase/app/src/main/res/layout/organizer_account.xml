@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#223C65"
-    android:fitsSystemWindows="true">
+    android:fitsSystemWindows="false">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -108,7 +108,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_margin="16dp"
-        android:layout_marginBottom="80dp"
+        android:layout_marginBottom="88dp"
         app:cardCornerRadius="16dp"
         app:cardBackgroundColor="#E57373"
         android:elevation="8dp"
@@ -129,85 +129,12 @@
 
     </LinearLayout>
 
-    <!-- Bottom bar with My Events (left), center FAB, Account (right) -->
-    <LinearLayout
-        android:id="@+id/bottomBar"
+    <!-- Bottom nav include -->
+    <include
+        android:id="@+id/include_bottom"
+        layout="@layout/organizer_include_bottom_nav"
         android:layout_width="match_parent"
-        android:layout_height="72dp"
-        android:layout_gravity="bottom"
-        android:background="#E8F5FF"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp">
-
-        <LinearLayout
-            android:id="@+id/btnMyEvents"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:clickable="true"
-            android:focusable="true"
-            android:foreground="?attr/selectableItemBackgroundBorderless"
-            android:gravity="center"
-            android:orientation="vertical">
-
-            <ImageView
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:scaleType="fitCenter"
-                android:src="@drawable/entrant_ic_my_events_circle_dark" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="My Events"
-                android:textColor="@color/ee_navy_dark"
-                android:textSize="12sp" />
-        </LinearLayout>
-
-        <Space
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1" />
-
-        <LinearLayout
-            android:id="@+id/btnAccount"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:clickable="true"
-            android:focusable="true"
-            android:foreground="?attr/selectableItemBackgroundBorderless"
-            android:gravity="center"
-            android:orientation="vertical">
-
-            <ImageView
-                android:id="@+id/imageView2"
-                android:layout_width="match_parent"
-                android:layout_height="36dp"
-                android:scaleType="fitCenter"
-                android:src="@drawable/entrant_ic_account_circle_dark" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Account"
-                android:textColor="@color/ee_navy_dark"
-                android:textSize="12sp" />
-        </LinearLayout>
-    </LinearLayout>
-
-    <!-- Center FAB for create event -->
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/fabAdd"
-        android:layout_width="64dp"
-        android:layout_height="64dp"
-        android:src="@android:drawable/ic_input_add"
-        app:tint="@color/ee_navy_dark"
-        app:backgroundTint="@color/toolbar_button"
-        app:fabCustomSize="64dp"
-        app:layout_anchor="@id/bottomBar"
-        app:layout_anchorGravity="top|center"/>
+        android:layout_height="88dp"
+        android:layout_gravity="bottom"/>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

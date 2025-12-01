@@ -178,34 +178,17 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"/>
 
-            <LinearLayout
+            <EditText
+                android:id="@+id/etDescription"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginBottom="16dp">
-
-                <EditText
-                    android:id="@+id/etDescription"
-                    android:layout_width="0dp"
-                    android:layout_height="56dp"
-                    android:layout_weight="1"
-                    android:minLines="3"
-                    android:background="@drawable/ee_card_bg"
-                    android:padding="18dp"
-                    android:hint="Add details"
-                    android:textColor="@color/ee_text_light"
-                    android:textColorHint="#B3FFFFFF"/>
-
-                <ImageButton
-                    android:id="@+id/btnEditDesc"
-                    android:layout_marginStart="8dp"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:background="@drawable/ee_card_bg"
-                    android:contentDescription="Edit"
-                    android:tint="@color/ee_text_light"
-                    android:src="@android:drawable/ic_menu_edit"/>
-            </LinearLayout>
+                android:layout_height="56dp"
+                android:layout_marginBottom="16dp"
+                android:minLines="3"
+                android:background="@drawable/ee_card_bg"
+                android:padding="18dp"
+                android:hint="Add details"
+                android:textColor="@color/ee_text_light"
+                android:textColorHint="#B3FFFFFF"/>
 
             <!-- Guidelines -->
             <TextView

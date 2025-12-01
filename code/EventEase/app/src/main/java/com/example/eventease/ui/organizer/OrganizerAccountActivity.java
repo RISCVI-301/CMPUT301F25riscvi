@@ -185,7 +185,7 @@ public class OrganizerAccountActivity extends AppCompatActivity {
             btnAccount.setOnClickListener(v -> recreate());
         }
 
-        com.google.android.material.floatingactionbutton.FloatingActionButton fabAdd = findViewById(R.id.fabAdd);
+        LinearLayout fabAdd = findViewById(R.id.fabAdd);
         if (fabAdd != null) {
             fabAdd.setOnClickListener(v -> {
                 android.content.Intent intent = new android.content.Intent(this, com.example.eventease.ui.organizer.OrganizerCreateEventActivity.class);
