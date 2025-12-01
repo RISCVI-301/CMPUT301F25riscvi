@@ -1,6 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/dialogBlurBackground"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/entrant_dialog_blur_background"
+    android:clickable="true"
+    android:focusable="true">
+
+<androidx.cardview.widget.CardView
+    android:id="@+id/dialogCardView"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_margin="24dp"
@@ -172,4 +181,6 @@
     </LinearLayout>
 
 </androidx.cardview.widget.CardView>
+
+</FrameLayout>
 

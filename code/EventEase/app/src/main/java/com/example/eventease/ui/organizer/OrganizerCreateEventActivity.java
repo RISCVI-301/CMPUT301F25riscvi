@@ -26,6 +26,7 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
+import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
 import android.widget.*;
 import android.provider.MediaStore;
@@ -884,7 +885,39 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
     }
 
     private void showQrPreparationDialog(String title, String qrPayload, String eventId) {
-        Dialog preparingDialog = createCardDialog(R.layout.dialog_event_created);
+        // Capture screenshot and blur it
+        Bitmap screenshot = captureScreenshot();
+        Bitmap blurredBitmap = blurBitmap(screenshot, 25f);
+        
+        // Create custom dialog with full screen to show blur background
+        Dialog preparingDialog = new Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        preparingDialog.setContentView(R.layout.dialog_event_created);
+        
+        // Set window properties
+        Window window = preparingDialog.getWindow();
+        if (window != null) {
+            window.setLayout(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            );
+            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            
+            // Disable dim since we have our own blur background
+            WindowManager.LayoutParams layoutParams = window.getAttributes();
+            layoutParams.dimAmount = 0f;
+            window.setAttributes(layoutParams);
+            window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+        }
+        
+        // Apply blurred background
+        View blurBackground = preparingDialog.findViewById(R.id.dialogBlurBackground);
+        if (blurredBitmap != null && blurBackground != null) {
+            blurBackground.setBackground(new BitmapDrawable(getResources(), blurredBitmap));
+        }
+        
+        // Get the CardView for animation
+        androidx.cardview.widget.CardView cardView = preparingDialog.findViewById(R.id.dialogCardView);
+        
         TextView subtitle = preparingDialog.findViewById(R.id.tvSubtitle);
         TextView header = preparingDialog.findViewById(R.id.tvTitle);
         if (header != null) {
@@ -893,7 +926,19 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         if (subtitle != null) {
             subtitle.setText("Generating QR code…");
         }
+        
         preparingDialog.show();
+        
+        // Apply animations after dialog is shown
+        android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_fade_in);
+        android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_zoom_in);
+        
+        if (blurBackground != null) {
+            blurBackground.startAnimation(fadeIn);
+        }
+        if (cardView != null) {
+            cardView.startAnimation(zoomIn);
+        }
 
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
             preparingDialog.dismiss();
@@ -903,7 +948,48 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
 
 
     private void showQrDialog(String title, String qrPayload, String eventId) {
-        Dialog dialog = createCardDialog(R.layout.dialog_qr_preview);
+        // Capture screenshot and blur it
+        Bitmap screenshot = captureScreenshot();
+        Bitmap blurredBitmap = blurBitmap(screenshot, 25f);
+        
+        // Create custom dialog with full screen to show blur background
+        Dialog dialog = new Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        dialog.setContentView(R.layout.dialog_qr_preview);
+        
+        // Set window properties
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setLayout(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            );
+            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            
+            // Disable dim since we have our own blur background
+            WindowManager.LayoutParams layoutParams = window.getAttributes();
+            layoutParams.dimAmount = 0f;
+            window.setAttributes(layoutParams);
+            window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+        }
+        
+        // Apply blurred background
+        View blurBackground = dialog.findViewById(R.id.dialogBlurBackground);
+        if (blurredBitmap != null && blurBackground != null) {
+            blurBackground.setBackground(new BitmapDrawable(getResources(), blurredBitmap));
+        }
+        
+        // Make the background clickable to dismiss
+        if (blurBackground != null) {
+            blurBackground.setOnClickListener(v -> {
+                dialog.dismiss();
+                // Navigate when background is clicked
+                navigateToEventAfterDialog(eventId);
+            });
+        }
+        
+        // Get the CardView for animation
+        androidx.cardview.widget.CardView cardView = dialog.findViewById(R.id.dialogCardView);
+        
         TextView titleView = dialog.findViewById(R.id.tvEventTitle);
         ImageView imgQr = dialog.findViewById(R.id.imgQr);
         MaterialButton btnShare = dialog.findViewById(R.id.btnShare);
@@ -931,10 +1017,7 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         Runnable navigateToEvent = () -> {
             if (hasNavigated[0]) return; // Prevent double navigation
             hasNavigated[0] = true;
-            Intent intent = new Intent(OrganizerCreateEventActivity.this, OrganizerWaitlistActivity.class);
-            intent.putExtra("eventId", eventId);
-            startActivity(intent);
-            finish(); // Close the create event activity
+            navigateToEventAfterDialog(eventId);
         };
 
         if (btnShare != null) {
@@ -982,6 +1065,27 @@ public class OrganizerCreateEventActivity extends AppCompatActivity {
         });
 
         dialog.show();
+        
+        // Apply animations after dialog is shown
+        android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_fade_in);
+        android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_zoom_in);
+        
+        if (blurBackground != null) {
+            blurBackground.startAnimation(fadeIn);
+        }
+        if (cardView != null) {
+            cardView.startAnimation(zoomIn);
+        }
+    }
+    
+    /**
+     * Helper method to navigate to event page after dialog dismissal
+     */
+    private void navigateToEventAfterDialog(String eventId) {
+        Intent intent = new Intent(OrganizerCreateEventActivity.this, OrganizerWaitlistActivity.class);
+        intent.putExtra("eventId", eventId);
+        startActivity(intent);
+        finish(); // Close the create event activity
     }
 
     private Dialog createCardDialog(@LayoutRes int layoutRes) {
