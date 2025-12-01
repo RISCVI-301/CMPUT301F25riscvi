@@ -1,11 +1,21 @@
 package com.example.eventease.ui.organizer;
 
 import android.annotation.SuppressLint;
+import android.app.Dialog;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.Color;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.ColorDrawable;
 import android.net.Uri;
 import android.os.Bundle;
+import android.renderscript.Allocation;
+import android.renderscript.Element;
+import android.renderscript.RenderScript;
+import android.renderscript.ScriptIntrinsicBlur;
 import android.util.Log;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -14,11 +24,11 @@ import android.widget.Toast;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.AppCompatButton;
 
 import com.bumptech.glide.Glide;
 import com.example.eventease.R;
 import com.example.eventease.ui.entrant.profile.ProfileDeletionHelper;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
@@ -210,14 +220,7 @@ public class OrganizerAccountActivity extends AppCompatActivity {
         View btnDeleteProfile = findViewById(R.id.btnDeleteProfile);
         if (btnDeleteProfile != null) {
             btnDeleteProfile.setOnClickListener(v -> {
-                new MaterialAlertDialogBuilder(this)
-                        .setTitle("Delete Profile")
-                        .setMessage("Are you sure you want to delete your profile? This action cannot be undone.")
-                        .setPositiveButton("Delete", (d, w) -> {
-                            deleteProfile();
-                        })
-                        .setNegativeButton("Cancel", null)
-                        .show();
+                showDeleteConfirmationDialog();
             });
         }
     }
@@ -570,6 +573,111 @@ public class OrganizerAccountActivity extends AppCompatActivity {
         }
     }
 
+    private void showDeleteConfirmationDialog() {
+        Dialog dialog = new Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
+        dialog.setContentView(R.layout.entrant_dialog_delete_profile_confirmation);
+        dialog.setCanceledOnTouchOutside(false);
+
+        // Set window properties for full screen blur
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
+            dialog.getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            WindowManager.LayoutParams layoutParams = dialog.getWindow().getAttributes();
+            layoutParams.dimAmount = 0f;
+            dialog.getWindow().setAttributes(layoutParams);
+            dialog.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+        }
+
+        // Capture screenshot and blur it for the background
+        Bitmap screenshot = captureScreenshot();
+        if (screenshot != null) {
+            Bitmap blurredBitmap = blurBitmap(screenshot, 25f);
+            if (blurredBitmap != null) {
+                android.view.View blurBackground = dialog.findViewById(R.id.dialogBlurBackground);
+                if (blurBackground != null) {
+                    blurBackground.setBackground(new BitmapDrawable(getResources(), blurredBitmap));
+                }
+            }
+        }
+
+        // Make the background clickable to dismiss
+        android.view.View blurBackground = dialog.findViewById(R.id.dialogBlurBackground);
+        if (blurBackground != null) {
+            blurBackground.setOnClickListener(v -> dialog.dismiss());
+        }
+
+        AppCompatButton btnNo = dialog.findViewById(R.id.btnNo);
+        AppCompatButton btnYes = dialog.findViewById(R.id.btnYes);
+
+        if (btnNo != null) {
+            btnNo.setOnClickListener(v -> dialog.dismiss());
+        }
+
+        if (btnYes != null) {
+            btnYes.setOnClickListener(v -> {
+                dialog.dismiss();
+                deleteProfile();
+            });
+        }
+
+        dialog.show();
+
+        // Apply animations after dialog is shown
+        View card = dialog.findViewById(R.id.dialogCard);
+        if (blurBackground != null && card != null) {
+            android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_fade_in);
+            android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_zoom_in);
+
+            blurBackground.startAnimation(fadeIn);
+            card.startAnimation(zoomIn);
+        }
+    }
+
+    private Bitmap captureScreenshot() {
+        try {
+            if (getWindow() == null) return null;
+            android.view.View rootView = getWindow().getDecorView().getRootView();
+            rootView.setDrawingCacheEnabled(true);
+            Bitmap bitmap = Bitmap.createBitmap(rootView.getDrawingCache());
+            rootView.setDrawingCacheEnabled(false);
+            return bitmap;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    private Bitmap blurBitmap(Bitmap bitmap, float radius) {
+        if (bitmap == null) return null;
+
+        try {
+            // Scale down for better performance
+            int width = Math.round(bitmap.getWidth() * 0.4f);
+            int height = Math.round(bitmap.getHeight() * 0.4f);
+            Bitmap inputBitmap = Bitmap.createScaledBitmap(bitmap, width, height, false);
+            Bitmap outputBitmap = Bitmap.createBitmap(inputBitmap);
+
+            RenderScript rs = RenderScript.create(this);
+            ScriptIntrinsicBlur blurScript = ScriptIntrinsicBlur.create(rs, Element.U8_4(rs));
+            Allocation tmpIn = Allocation.createFromBitmap(rs, inputBitmap);
+            Allocation tmpOut = Allocation.createFromBitmap(rs, outputBitmap);
+
+            blurScript.setRadius(radius);
+            blurScript.setInput(tmpIn);
+            blurScript.forEach(tmpOut);
+            tmpOut.copyTo(outputBitmap);
+
+            rs.destroy();
+
+            // Scale back up
+            return Bitmap.createScaledBitmap(outputBitmap, bitmap.getWidth(), bitmap.getHeight(), true);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return bitmap;
+        }
+    }
+
     private void deleteProfile() {
         String uid = com.example.eventease.auth.AuthHelper.getUid(this);
         if (uid == null || uid.isEmpty()) {
@@ -580,85 +688,125 @@ public class OrganizerAccountActivity extends AppCompatActivity {
         Toast.makeText(this, "Deleting profile...", Toast.LENGTH_SHORT).show();
 
         ProfileDeletionHelper deletionHelper = new ProfileDeletionHelper(this);
-        deletionHelper.deleteAllUserReferences(uid, new ProfileDeletionHelper.DeletionCallback() {
-            @Override
-            public void onDeletionComplete() {
-                deleteUserDocumentAndAuth(uid);
-            }
+        
+        // Check if user is an organizer and delete their events first
+        com.google.firebase.firestore.DocumentReference userRef = FirebaseFirestore.getInstance().collection("users").document(uid);
+        userRef.get()
+                .addOnSuccessListener(userDoc -> {
+                    if (userDoc != null && userDoc.exists()) {
+                        java.util.List<String> roles = (java.util.List<String>) userDoc.get("roles");
+                        boolean isOrganizer = roles != null && roles.contains("organizer");
+                        
+                        com.google.android.gms.tasks.Task<Void> organizerEventsTask = com.google.android.gms.tasks.Tasks.forResult(null);
+                        if (isOrganizer) {
+                            Log.d(TAG, "User is an organizer, deleting their events first");
+                            organizerEventsTask = deletionHelper.deleteOrganizerEvents(uid);
+                        }
+                        
+                        // Wait for organizer events deletion (if applicable), then proceed with user references
+                        organizerEventsTask
+                                .continueWithTask(task -> {
+                                    com.google.android.gms.tasks.TaskCompletionSource<Void> completionSource = new com.google.android.gms.tasks.TaskCompletionSource<>();
+                                    deletionHelper.deleteAllUserReferences(uid, new ProfileDeletionHelper.DeletionCallback() {
+                                        @Override
+                                        public void onDeletionComplete() {
+                                            completionSource.setResult(null);
+                                        }
 
-            @Override
-            public void onDeletionFailure(String error) {
-                Log.e(TAG, "Failed to delete user references: " + error);
-                deleteUserDocumentAndAuth(uid);
-            }
-        });
+                                        @Override
+                                        public void onDeletionFailure(String error) {
+                                            Log.e(TAG, "Failed to delete user references: " + error);
+                                            // Still proceed even if some references failed
+                                            completionSource.setResult(null);
+                                        }
+                                    });
+                                    return completionSource.getTask();
+                                })
+                                .addOnSuccessListener(aVoid -> {
+                                    deleteUserDocumentAndAuth(uid);
+                                })
+                                .addOnFailureListener(e -> {
+                                    Log.e(TAG, "Failed during profile deletion process", e);
+                                    // Still try to delete the user document
+                                    deleteUserDocumentAndAuth(uid);
+                                });
+                    } else {
+                        // User document not found, proceed with deletion anyway
+                        deletionHelper.deleteAllUserReferences(uid, new ProfileDeletionHelper.DeletionCallback() {
+                            @Override
+                            public void onDeletionComplete() {
+                                deleteUserDocumentAndAuth(uid);
+                            }
+
+                            @Override
+                            public void onDeletionFailure(String error) {
+                                Log.e(TAG, "Failed to delete user references: " + error);
+                                deleteUserDocumentAndAuth(uid);
+                            }
+                        });
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to check user roles, proceeding with deletion", e);
+                    // If we can't check roles, proceed with deletion anyway
+                    deletionHelper.deleteAllUserReferences(uid, new ProfileDeletionHelper.DeletionCallback() {
+                        @Override
+                        public void onDeletionComplete() {
+                            deleteUserDocumentAndAuth(uid);
+                        }
+
+                        @Override
+                        public void onDeletionFailure(String error) {
+                            Log.e(TAG, "Failed to delete user references: " + error);
+                            deleteUserDocumentAndAuth(uid);
+                        }
+                    });
+                });
     }
 
     private void deleteUserDocumentAndAuth(String uid) {
-        // First, read the document to get current deviceId
-        DocumentReference userRef = FirebaseFirestore.getInstance().collection("users").document(uid);
-        userRef.get()
-            .addOnSuccessListener(documentSnapshot -> {
-                if (!documentSnapshot.exists()) {
-                    Toast.makeText(this, "Profile not found", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-                
-                // Get current deviceId from document
-                String currentDeviceId = documentSnapshot.getString("deviceId");
-                Log.d(TAG, "Current deviceId in document: " + currentDeviceId);
-                Log.d(TAG, "UID to delete: " + uid);
-                
-                // Sign in anonymously to get Firebase Auth token for Firestore rules
-                FirebaseAuth.getInstance().signInAnonymously()
-                    .addOnSuccessListener(authResult -> {
-                        String anonymousUid = authResult.getUser().getUid();
-                        Log.d(TAG, "Signed in anonymously with UID: " + anonymousUid);
-                        
-                        // Use WriteBatch to atomically update deviceId and delete
-                        // This ensures both operations happen together
-                        com.google.firebase.firestore.WriteBatch batch = FirebaseFirestore.getInstance().batch();
-                        
-                        // Update deviceId to match anonymous UID
-                        Map<String, Object> updateData = new HashMap<>();
-                        updateData.put("deviceId", anonymousUid);
-                        batch.update(userRef, updateData);
-                        
-                        // Delete the document
-                        batch.delete(userRef);
-                        
-                        // Commit the batch
-                        batch.commit()
-                            .addOnSuccessListener(batchVoid -> {
-                                Log.d(TAG, "Successfully deleted user document via batch");
+        // Sign in anonymously to get Firebase Auth token for Firestore rules
+        FirebaseAuth.getInstance().signInAnonymously()
+                .addOnSuccessListener(authResult -> {
+                    // Now delete with authenticated context
+                    DocumentReference userRef = FirebaseFirestore.getInstance().collection("users").document(uid);
+                    userRef.delete()
+                            .addOnSuccessListener(aVoid -> {
                                 // Device auth - clear cache to trigger profile setup on next launch
-                                new com.example.eventease.auth.DeviceAuthManager(OrganizerAccountActivity.this).clearCache();
+                                com.example.eventease.auth.DeviceAuthManager authManager =
+                                        new com.example.eventease.auth.DeviceAuthManager(OrganizerAccountActivity.this);
+                                authManager.clearCache();
                                 Toast.makeText(this, "Profile deleted successfully", Toast.LENGTH_SHORT).show();
-                                finish();
+                                launchProfileSetupScreen();
                             })
-                            .addOnFailureListener(batchError -> {
-                                Log.e(TAG, "Batch delete failed, trying individual delete", batchError);
-                                // If batch fails, try just deleting (rules might allow if deviceId matches)
-                                userRef.delete()
-                                    .addOnSuccessListener(deleteVoid -> {
-                                        new com.example.eventease.auth.DeviceAuthManager(OrganizerAccountActivity.this).clearCache();
-                                        Toast.makeText(this, "Profile deleted successfully", Toast.LENGTH_SHORT).show();
-                                        finish();
-                                    })
-                                    .addOnFailureListener(deleteError -> {
-                                        Log.e(TAG, "Failed to delete user document", deleteError);
-                                        Toast.makeText(this, "Failed to delete profile: " + deleteError.getMessage() + ". Please check Firestore rules allow authenticated users to delete their own documents.", Toast.LENGTH_LONG).show();
-                                    });
+                            .addOnFailureListener(e -> {
+                                Log.e(TAG, "Failed to delete user document", e);
+                                Toast.makeText(this, "Failed to delete profile: " + e.getMessage(), Toast.LENGTH_LONG).show();
                             });
-                    })
-                    .addOnFailureListener(e -> {
-                        Log.e(TAG, "Failed to sign in anonymously", e);
-                        Toast.makeText(this, "Failed to authenticate for deletion: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                    });
-            })
-            .addOnFailureListener(e -> {
-                Log.e(TAG, "Failed to read user document", e);
-                Toast.makeText(this, "Failed to read profile: " + e.getMessage(), Toast.LENGTH_LONG).show();
-            });
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to sign in anonymously", e);
+                    // Try deleting anyway (might work if rules allow)
+                    DocumentReference userRef = FirebaseFirestore.getInstance().collection("users").document(uid);
+                    userRef.delete()
+                            .addOnSuccessListener(aVoid -> {
+                                com.example.eventease.auth.DeviceAuthManager authManager =
+                                        new com.example.eventease.auth.DeviceAuthManager(OrganizerAccountActivity.this);
+                                authManager.clearCache();
+                                Toast.makeText(this, "Profile deleted successfully", Toast.LENGTH_SHORT).show();
+                                launchProfileSetupScreen();
+                            })
+                            .addOnFailureListener(deleteError -> {
+                                Log.e(TAG, "Failed to delete user document", deleteError);
+                                Toast.makeText(this, "Failed to delete profile: " + deleteError.getMessage(), Toast.LENGTH_LONG).show();
+                            });
+                });
+    }
+
+    private void launchProfileSetupScreen() {
+        Intent intent = new Intent(this, com.example.eventease.auth.ProfileSetupActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        finish();
     }
 }

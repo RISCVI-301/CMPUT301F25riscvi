@@ -1008,18 +1008,80 @@ public class AccountFragment extends Fragment {
         ToastUtil.showShort(getContext(), "Deleting profile...");
 
         ProfileDeletionHelper deletionHelper = new ProfileDeletionHelper(getContext());
-        deletionHelper.deleteAllUserReferences(uid, new ProfileDeletionHelper.DeletionCallback() {
-            @Override
-            public void onDeletionComplete() {
-                deleteUserDocumentAndAuth(uid);
-            }
+        
+        // Check if user is an organizer and delete their events first
+        com.google.firebase.firestore.DocumentReference userRef = db.collection("users").document(uid);
+        userRef.get()
+                .addOnSuccessListener(userDoc -> {
+                    if (userDoc != null && userDoc.exists()) {
+                        java.util.List<String> roles = (java.util.List<String>) userDoc.get("roles");
+                        boolean isOrganizer = roles != null && roles.contains("organizer");
+                        
+                        com.google.android.gms.tasks.Task<Void> organizerEventsTask = com.google.android.gms.tasks.Tasks.forResult(null);
+                        if (isOrganizer) {
+                            android.util.Log.d("AccountFragment", "User is an organizer, deleting their events first");
+                            organizerEventsTask = deletionHelper.deleteOrganizerEvents(uid);
+                        }
+                        
+                        // Wait for organizer events deletion (if applicable), then proceed with user references
+                        organizerEventsTask
+                                .continueWithTask(task -> {
+                                    com.google.android.gms.tasks.TaskCompletionSource<Void> completionSource = new com.google.android.gms.tasks.TaskCompletionSource<>();
+                                    deletionHelper.deleteAllUserReferences(uid, new ProfileDeletionHelper.DeletionCallback() {
+                                        @Override
+                                        public void onDeletionComplete() {
+                                            completionSource.setResult(null);
+                                        }
 
-            @Override
-            public void onDeletionFailure(String error) {
-                android.util.Log.e("AccountFragment", "Failed to delete user references: " + error);
-                deleteUserDocumentAndAuth(uid);
-            }
-        });
+                                        @Override
+                                        public void onDeletionFailure(String error) {
+                                            android.util.Log.e("AccountFragment", "Failed to delete user references: " + error);
+                                            // Still proceed even if some references failed
+                                            completionSource.setResult(null);
+                                        }
+                                    });
+                                    return completionSource.getTask();
+                                })
+                                .addOnSuccessListener(aVoid -> {
+                                    deleteUserDocumentAndAuth(uid);
+                                })
+                                .addOnFailureListener(e -> {
+                                    android.util.Log.e("AccountFragment", "Failed during profile deletion process", e);
+                                    // Still try to delete the user document
+                                    deleteUserDocumentAndAuth(uid);
+                                });
+                    } else {
+                        // User document not found, proceed with deletion anyway
+                        deletionHelper.deleteAllUserReferences(uid, new ProfileDeletionHelper.DeletionCallback() {
+                            @Override
+                            public void onDeletionComplete() {
+                                deleteUserDocumentAndAuth(uid);
+                            }
+
+                            @Override
+                            public void onDeletionFailure(String error) {
+                                android.util.Log.e("AccountFragment", "Failed to delete user references: " + error);
+                                deleteUserDocumentAndAuth(uid);
+                            }
+                        });
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    android.util.Log.e("AccountFragment", "Failed to check user roles, proceeding with deletion", e);
+                    // If we can't check roles, proceed with deletion anyway
+                    deletionHelper.deleteAllUserReferences(uid, new ProfileDeletionHelper.DeletionCallback() {
+                        @Override
+                        public void onDeletionComplete() {
+                            deleteUserDocumentAndAuth(uid);
+                        }
+
+                        @Override
+                        public void onDeletionFailure(String error) {
+                            android.util.Log.e("AccountFragment", "Failed to delete user references: " + error);
+                            deleteUserDocumentAndAuth(uid);
+                        }
+                    });
+                });
     }
 
     private void deleteUserDocumentAndAuth(String uid) {

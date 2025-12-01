@@ -11,6 +11,9 @@ import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QuerySnapshot;
 import com.google.firebase.firestore.FieldValue;
+import com.google.android.gms.tasks.Task;
+import com.google.android.gms.tasks.Tasks;
+import com.google.android.gms.tasks.TaskCompletionSource;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -118,27 +121,42 @@ public class AdminProfileDatabaseController {
         removeUserFromEventLists(uid);
 
         // If the user is an organizer, delete all of their events first
+        Task<Void> organizerEventsTask = Tasks.forResult(null);
         if (profile.getRoles() != null && profile.getRoles().contains("organizer")) {
             Log.d(TAG, "deleteProfile: User is an organizer, deleting their events. uid=" + uid);
-            deleteOrganizerEvents(uid);
+            organizerEventsTask = deleteOrganizerEvents(uid);
         }
 
-        // Use ProfileDeletionHelper to delete all user references first
-        ProfileDeletionHelper deletionHelper = new ProfileDeletionHelper(context);
-        deletionHelper.deleteAllUserReferences(uid, new ProfileDeletionHelper.DeletionCallback() {
-            @Override
-            public void onDeletionComplete() {
-                // After cleaning up references, delete the user document
-                deleteUserDocument(uid, callback);
-            }
+        // Wait for organizer events to be deleted (if applicable), then proceed with user references
+        organizerEventsTask
+                .continueWithTask(task -> {
+                    // Use ProfileDeletionHelper to delete all user references
+                    ProfileDeletionHelper deletionHelper = new ProfileDeletionHelper(context);
+                    TaskCompletionSource<Void> completionSource = new TaskCompletionSource<>();
+                    deletionHelper.deleteAllUserReferences(uid, new ProfileDeletionHelper.DeletionCallback() {
+                        @Override
+                        public void onDeletionComplete() {
+                            completionSource.setResult(null);
+                        }
 
-            @Override
-            public void onDeletionFailure(String error) {
-                Log.w(TAG, "Failed to delete some user references: " + error + ", proceeding with document deletion");
-                // Still try to delete the user document even if some references failed
-                deleteUserDocument(uid, callback);
-            }
-        });
+                        @Override
+                        public void onDeletionFailure(String error) {
+                            Log.w(TAG, "Failed to delete some user references: " + error + ", proceeding with document deletion");
+                            // Still proceed even if some references failed
+                            completionSource.setResult(null);
+                        }
+                    });
+                    return completionSource.getTask();
+                })
+                .addOnSuccessListener(aVoid -> {
+                    // After cleaning up references, delete the user document
+                    deleteUserDocument(uid, callback);
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed during profile deletion process", e);
+                    // Still try to delete the user document
+                    deleteUserDocument(uid, callback);
+                });
     }
 
     private void deleteUserDocument(@NonNull String uid, @NonNull DeleteCallback callback) {
@@ -223,38 +241,56 @@ public class AdminProfileDatabaseController {
                 });
     }
 
-    private void deleteOrganizerEvents(@NonNull String uid) {
+    private Task<Void> deleteOrganizerEvents(@NonNull String uid) {
         if (uid == null || uid.trim().isEmpty()) {
             Log.w(TAG, "deleteOrganizerEvents: UID is null or empty, skipping delete");
-            return;
+            return Tasks.forResult(null);
         }
 
-        db.collection("events")
+        return db.collection("events")
                 .whereEqualTo("organizerId", uid)
                 .get()
-                .addOnSuccessListener((QuerySnapshot qs) -> {
-                    if (qs == null || qs.isEmpty()) {
-                        Log.d(TAG, "deleteOrganizerEvents: No events found for organizer: " + uid);
-                        return;
+                .continueWithTask(queryTask -> {
+                    if (!queryTask.isSuccessful() || queryTask.getResult() == null) {
+                        Log.e(TAG, "deleteOrganizerEvents: Failed to fetch events for organizer: " + uid, queryTask.getException());
+                        return Tasks.forResult(null);
                     }
 
+                    QuerySnapshot qs = queryTask.getResult();
+                    if (qs.isEmpty()) {
+                        Log.d(TAG, "deleteOrganizerEvents: No events found for organizer: " + uid);
+                        return Tasks.forResult(null);
+                    }
+
+                    Log.d(TAG, "deleteOrganizerEvents: Found " + qs.size() + " events to delete for organizer: " + uid);
+                    List<Task<Void>> deleteTasks = new ArrayList<>();
+                    
                     for (DocumentSnapshot d : qs.getDocuments()) {
                         final String eventId = d.getId();
-                        d.getReference()
-                                .delete()
+                        deleteTasks.add(d.getReference().delete()
                                 .addOnSuccessListener(aVoid ->
                                         Log.d(TAG, "deleteOrganizerEvents: Deleted event " + eventId +
                                                 " for organizer: " + uid))
                                 .addOnFailureListener(e ->
                                         Log.e(TAG, "deleteOrganizerEvents: Failed to delete event " +
-                                                eventId + " for organizer: " + uid, e));
+                                                eventId + " for organizer: " + uid, e))
+                                .continueWith(task -> null));
                     }
-                })
-                .addOnFailureListener(e ->
-                        Log.e(TAG, "deleteOrganizerEvents: Failed to fetch events for organizer: "
-                                + uid, e));
 
+                    if (deleteTasks.isEmpty()) {
+                        return Tasks.forResult(null);
+                    }
 
+                    return Tasks.whenAll(deleteTasks)
+                            .continueWith(allTasks -> {
+                                if (allTasks.isSuccessful()) {
+                                    Log.d(TAG, "deleteOrganizerEvents: Successfully deleted all " + qs.size() + " events for organizer: " + uid);
+                                } else {
+                                    Log.e(TAG, "deleteOrganizerEvents: Some events failed to delete for organizer: " + uid, allTasks.getException());
+                                }
+                                return null;
+                            });
+                });
     }
 
     private void removeUserFromEventLists(@NonNull String uid) {
