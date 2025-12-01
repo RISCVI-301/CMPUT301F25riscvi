@@ -22,7 +22,6 @@ import androidx.navigation.NavDestination;
 import androidx.navigation.fragment.NavHostFragment;
 
 import com.google.firebase.FirebaseApp;
-import com.google.firebase.auth.FirebaseAuth;
 import com.example.eventease.R;
 import com.example.eventease.auth.UserRoleChecker;
 import com.example.eventease.notifications.FCMTokenManager;
@@ -34,7 +33,7 @@ import com.example.eventease.ui.organizer.AutomaticEntrantSelectionService;
  * Handles authentication state, role-based navigation, and controls visibility of navigation bars.
  * This activity serves as the entry point for authenticated entrant users and manages navigation
  * between the Discover, My Events, and Account fragments.
- * 
+ *
  * <p>On startup, this activity checks if the user is an admin and redirects to AdminMainActivity if so.
  * Otherwise, it sets up the standard entrant navigation flow with bottom navigation.
  */
@@ -68,6 +67,15 @@ public class MainActivity extends AppCompatActivity {
         Log.d("FirebaseTest", "FirebaseApp initialized: " + (FirebaseApp.getApps(this).size() > 0));
 
         setContentView(R.layout.entrant_activity_mainfragments);
+
+        // NEW: force entrant flag
+        final boolean forceEntrant = getIntent().getBooleanExtra("force_entrant", false);
+
+        // Hide content initially until profile check completes
+        final View rootView = findViewById(R.id.main_root);
+        if (rootView != null) {
+            rootView.setVisibility(View.GONE);
+        }
 
         // Initialize notification permission launcher
         notificationPermissionLauncher = registerForActivityResult(
@@ -150,49 +158,57 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // Check if user is already logged in AND Remember Me is enabled (using UID for persistence)
-        FirebaseAuth auth = FirebaseAuth.getInstance();
-        android.content.SharedPreferences prefs = getSharedPreferences("EventEasePrefs", MODE_PRIVATE);
-        boolean rememberMe = prefs.getBoolean("rememberMe", false);
-        String savedUid = prefs.getString("savedUid", null);
-        com.google.firebase.auth.FirebaseUser currentUser = auth.getCurrentUser();
+        // === DEVICE ID AUTHENTICATION (NO PASSWORDS) ===
+        // Check if device has a profile
+        com.example.eventease.auth.DeviceAuthManager authManager = new com.example.eventease.auth.DeviceAuthManager(this);
 
-        // Check if Remember Me is enabled and UID matches (this persists even if email/password changes)
-        boolean isLoggedIn = rememberMe && savedUid != null && currentUser != null && savedUid.equals(currentUser.getUid());
+        authManager.hasProfile().addOnCompleteListener(task -> {
+            if (task.isSuccessful() && Boolean.TRUE.equals(task.getResult())) {
+                // Profile exists - user is "logged in"
+                Log.d("MainActivity", "Device has profile, proceeding to main app");
 
-        // If user is logged in but Remember Me is off or UID doesn't match, sign them out
-        if (currentUser != null && (!rememberMe || savedUid == null || !savedUid.equals(currentUser.getUid()))) {
-            auth.signOut();
-            // Clear Remember Me if UID doesn't match
-            if (savedUid != null && !savedUid.equals(currentUser.getUid())) {
-                prefs.edit().putBoolean("rememberMe", false).remove("savedUid").apply();
-            }
-        }
-
-        // Setup custom navigation button click listeners
-        setupCustomNavigation();
-        
-        // Setup navigation listener (always needed for entrant flow)
-        setupEntrantNavigation();
-        
-        // If logged in, check if user is admin and redirect accordingly
-        if (isLoggedIn && currentUser != null) {
-            UserRoleChecker.isAdmin().addOnCompleteListener(task -> {
-                if (task.isSuccessful() && Boolean.TRUE.equals(task.getResult())) {
-                    // User is admin - redirect to admin flow
-                    Intent adminIntent = new Intent(MainActivity.this, com.example.eventease.admin.AdminMainActivity.class);
-                    startActivity(adminIntent);
-                    finish();
-                    return;
+                // Show content now that profile check passed
+                if (rootView != null) {
+                    rootView.setVisibility(View.VISIBLE);
                 }
-                // User is not admin - navigate to discover
-                navigateToDiscover();
-            });
-        } else {
-            // User not logged in - hide bars initially
-            bottomNav.setVisibility(View.GONE);
-            topBar.setVisibility(View.GONE);
-        }
+
+                // Update last seen
+                authManager.updateLastSeen();
+
+                // Setup navigation
+                setupCustomNavigation();
+                setupEntrantNavigation();
+
+                // Check if user is admin and redirect accordingly
+                if (forceEntrant) {
+                    Log.d("MainActivity", "forceEntrant=true, skipping admin redirect and staying in entrant view");
+                    Log.d("MainActivity", "User is entrant/organizer, showing main app");
+                    navigateToDiscover();
+                } else {
+                    authManager.isAdmin().addOnCompleteListener(adminTask -> {
+                        if (adminTask.isSuccessful() && Boolean.TRUE.equals(adminTask.getResult())) {
+                            // User is admin - redirect to admin flow
+                            Log.d("MainActivity", "User is admin, redirecting to AdminMainActivity");
+                            Intent adminIntent = new Intent(MainActivity.this, com.example.eventease.admin.AdminMainActivity.class);
+                            startActivity(adminIntent);
+                            finish();
+                            return;
+                        }
+
+                        // User is not admin - navigate to discover (entrant/organizer flow)
+                        Log.d("MainActivity", "User is entrant/organizer, showing main app");
+                        navigateToDiscover();
+                    });
+                }
+
+            } else {
+                // No profile exists - first time user, redirect to profile setup
+                Log.d("MainActivity", "No profile found, redirecting to ProfileSetupActivity");
+                Intent setupIntent = new Intent(MainActivity.this, com.example.eventease.auth.ProfileSetupActivity.class);
+                startActivity(setupIntent);
+                finish();
+            }
+        });
 
         // Handle external navigation intents (from detail activities)
         handleExternalNav(getIntent());
@@ -205,15 +221,13 @@ public class MainActivity extends AppCompatActivity {
 
             int id = destination.getId();
 
-            // Check if user is authenticated - simply check if Firebase Auth has a current user
-            // "Remember Me" only affects persistence across app restarts, not current authentication state
-            FirebaseAuth authCheck = FirebaseAuth.getInstance();
-            com.google.firebase.auth.FirebaseUser currentUserCheck = authCheck.getCurrentUser();
-            boolean isAuthenticated = currentUserCheck != null;
+            // Check if user is authenticated - check if device has profile
+            com.example.eventease.auth.DeviceAuthManager authCheck = new com.example.eventease.auth.DeviceAuthManager(MainActivity.this);
+            boolean isAuthenticated = authCheck.hasCachedProfile();
 
             // Main app screens (discover, my events, account) - show bars if authenticated
             if (id == R.id.discoverFragment || id == R.id.myEventsFragment || id == R.id.accountFragment
-                || id == R.id.eventsSelectionFragment || id == R.id.previousEventsFragment || id == R.id.upcomingEventsFragment) {
+                    || id == R.id.eventsSelectionFragment || id == R.id.previousEventsFragment || id == R.id.upcomingEventsFragment) {
                 if (isAuthenticated) {
                     // User is authenticated, show top bar and bottom nav
                     bottomNav.setVisibility(View.VISIBLE);
@@ -224,24 +238,29 @@ public class MainActivity extends AppCompatActivity {
                     if (!listenersInitialized) {
                         // Initialize FCM token manager
                         FCMTokenManager.getInstance().initialize();
-                        
-                        // Initialize InvitationNotificationListener for local notifications
-                        // (Cloud Functions may also send notifications, but local listener ensures
-                        // notifications work even if Cloud Functions fail, and has cooldown to prevent duplicates)
-                        if (invitationListener == null) {
-                            invitationListener = new InvitationNotificationListener(this);
-                            invitationListener.startListening();
-                        }
-                        
-                        // Setup automatic entrant selection listener (only once)
-                        AutomaticEntrantSelectionService.setupAutomaticSelectionListener();
-                        
+
+                        // DISABLED: InvitationNotificationListener
+                        // Cloud Functions already send personalized FCM notifications when invitations are created.
+                        // Local notifications from InvitationNotificationListener were causing duplicates.
+                        // We rely exclusively on Cloud Functions for notifications to ensure consistency.
+                        // if (invitationListener == null) {
+                        //     FCMTokenManager.getInstance().initialize(MainActivity.this);
+                        //     invitationListener = new InvitationNotificationListener(this);
+                        //     invitationListener.startListening();
+                        // }
+
+                        // DISABLED: Automatic entrant selection listener
+                        // We rely on Cloud Function (processAutomaticEntrantSelection) instead
+                        // to avoid race conditions and ensure reliability even when app is closed.
+                        // Cloud Function runs every 1 minute via Cloud Scheduler.
+                        // AutomaticEntrantSelectionService.setupAutomaticSelectionListener();
+
                         // Setup automatic deadline processor service (only once)
                         com.example.eventease.ui.organizer.AutomaticDeadlineProcessorService.setupDeadlineProcessorListener();
-                        
+
                         // Setup automatic sorry notification service (only once)
                         com.example.eventease.ui.organizer.SorryNotificationService.setupSorryNotificationListener();
-                        
+
                         listenersInitialized = true;
                         Log.d("MainActivity", "Listeners initialized once");
                     }
@@ -255,8 +274,8 @@ public class MainActivity extends AppCompatActivity {
                     getSupportActionBar().hide();
                 }
             } else if (id == R.id.welcomeFragment || id == R.id.signupFragment
-                       || id == R.id.loginFragment || id == R.id.uploadProfilePictureFragment
-                       || id == R.id.forgotPasswordFragment || id == R.id.locationPermissionFragment) {
+                    || id == R.id.loginFragment || id == R.id.uploadProfilePictureFragment
+                    || id == R.id.forgotPasswordFragment || id == R.id.locationPermissionFragment) {
                 // On auth screens, hide all bars
                 bottomNav.setVisibility(View.GONE);
                 topBar.setVisibility(View.GONE);
@@ -287,7 +306,7 @@ public class MainActivity extends AppCompatActivity {
         // Initialize notifications (permission already requested in onCreate)
         initializeNotifications();
     }
-    
+
     /**
      * Requests notification permission for Android 13+ (API 33+).
      * On older versions, permission is granted automatically via manifest.
@@ -295,7 +314,7 @@ public class MainActivity extends AppCompatActivity {
     private void requestNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             // Android 13+ requires runtime permission
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) 
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
                     != PackageManager.PERMISSION_GRANTED) {
                 Log.d("MainActivity", "Requesting notification permission");
                 notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS);
@@ -309,23 +328,132 @@ public class MainActivity extends AppCompatActivity {
             initializeNotifications();
         }
     }
-    
+
     /**
      * Initializes FCM token manager.
      * Should be called after notification permission is granted (or on older Android versions).
      * Note: Notifications are sent via Cloud Functions, not local listeners, to avoid duplicates.
      */
     private void initializeNotifications() {
-        FCMTokenManager.getInstance().initialize();
-        // Note: InvitationNotificationListener is disabled - notifications are sent via Cloud Functions
+        // TEMPORARY FIX: Force recreate notification channel with HIGH importance
+        // This fixes the issue where old channel was created with DEFAULT importance
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            android.app.NotificationManager nm = getSystemService(android.app.NotificationManager.class);
+            if (nm != null) {
+                android.app.NotificationChannel existingChannel = nm.getNotificationChannel("event_invitations");
+                if (existingChannel != null && existingChannel.getImportance() < android.app.NotificationManager.IMPORTANCE_HIGH) {
+                    Log.d("MainActivity", "Deleting old notification channel with low importance");
+                    nm.deleteNotificationChannel("event_invitations");
+                    Log.d("MainActivity", "Old channel deleted, will be recreated with HIGH importance");
+                }
+            }
+        }
+
+        // This will create the channel with HIGH importance (after our fix)
+        com.example.eventease.notifications.NotificationChannelManager.createNotificationChannel(this);
+
+        // Verify notification channel is properly set up
+        verifyNotificationSetup();
+
+        FCMTokenManager.getInstance().initialize(this);
+
+        // DISABLED: InvitationNotificationListener
+        // Cloud Functions already send personalized FCM notifications when invitations are created.
+        // Local notifications from InvitationNotificationListener were causing duplicates.
+        // We rely exclusively on Cloud Functions for notifications to ensure consistency.
+        // if (invitationListener == null) {
+        //     invitationListener = new InvitationNotificationListener(this);
+        //     invitationListener.startListening();
+        // }
+    }
+
+    /**
+     * Verifies that notification setup is correct and logs diagnostic information.
+     * This helps debug notification issues, especially on emulators.
+     */
+    private void verifyNotificationSetup() {
+        Log.d("MainActivity", "=== Verifying Notification Setup ===");
+
+        // Check notification permission
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            boolean hasPermission = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                    == PackageManager.PERMISSION_GRANTED;
+            Log.d("MainActivity", "POST_NOTIFICATIONS permission: " + (hasPermission ? "GRANTED" : "DENIED"));
+        } else {
+            Log.d("MainActivity", "Android < 13, permission granted via manifest");
+        }
+
+        // Check notification manager
+        android.app.NotificationManager nm = getSystemService(android.app.NotificationManager.class);
+        if (nm == null) {
+            Log.e("MainActivity", "NotificationManager is NULL - notifications will not work!");
+            return;
+        }
+
+        // Check if notifications are enabled for the app
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            boolean appNotificationsEnabled = nm.areNotificationsEnabled();
+            Log.d("MainActivity", "App notifications enabled: " + appNotificationsEnabled);
+            if (!appNotificationsEnabled) {
+                Log.w("MainActivity", "⚠ WARNING: Notifications are disabled for this app!");
+                Log.w("MainActivity", "  User needs to enable in: Settings → Apps → EventEase → Notifications");
+            }
+        }
+
+        // Check notification channel (Android O+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            android.app.NotificationChannel channel = nm.getNotificationChannel("event_invitations");
+            if (channel == null) {
+                Log.e("MainActivity", "⚠ WARNING: Notification channel 'event_invitations' does not exist!");
+                Log.e("MainActivity", "  Attempting to create it now...");
+                com.example.eventease.notifications.NotificationChannelManager.createNotificationChannel(this);
+                // Re-check after creation
+                channel = nm.getNotificationChannel("event_invitations");
+            }
+
+            if (channel != null) {
+                int importance = channel.getImportance();
+                Log.d("MainActivity", "Notification channel 'event_invitations':");
+                Log.d("MainActivity", "  - Importance: " + importance + " (0=NONE, 1=MIN, 2=LOW, 3=DEFAULT, 4=HIGH)");
+                Log.d("MainActivity", "  - Enabled: " + (importance != android.app.NotificationManager.IMPORTANCE_NONE));
+                Log.d("MainActivity", "  - Sound: " + (channel.getSound() != null ? channel.getSound().toString() : "none"));
+                Log.d("MainActivity", "  - Vibration: " + channel.shouldVibrate());
+                Log.d("MainActivity", "  - Lights: " + channel.shouldShowLights());
+
+                if (importance == android.app.NotificationManager.IMPORTANCE_NONE) {
+                    Log.e("MainActivity", "⚠ CRITICAL: Notification channel is BLOCKED (importance = NONE)!");
+                    Log.e("MainActivity", "  Notifications will NOT be displayed!");
+                    Log.e("MainActivity", "  Solution: Settings → Apps → EventEase → Notifications → Event Invitations");
+                } else if (importance < android.app.NotificationManager.IMPORTANCE_HIGH) {
+                    Log.w("MainActivity", "⚠ WARNING: Notification channel has low importance (" + importance + ")");
+                    Log.w("MainActivity", "  Notifications may not show as heads-up notifications");
+                }
+            }
+        }
+
+        // Check FCM token
+        com.google.firebase.messaging.FirebaseMessaging.getInstance().getToken()
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful()) {
+                        String token = task.getResult();
+                        Log.d("MainActivity", "FCM Token: " + (token != null ? token.substring(0, Math.min(20, token.length())) + "..." : "NULL"));
+                        Log.d("MainActivity", "FCM Token length: " + (token != null ? token.length() : 0));
+                    } else {
+                        Log.e("MainActivity", "Failed to get FCM token: " + (task.getException() != null ? task.getException().getMessage() : "Unknown error"));
+                        Log.e("MainActivity", "  This may indicate Google Play Services is not available (common on emulators)");
+                    }
+                });
+
+        Log.d("MainActivity", "=== Notification Setup Verification Complete ===");
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (invitationListener != null) {
-            invitationListener.stopListening();
-        }
+        // DISABLED: InvitationNotificationListener is no longer used
+        // if (invitationListener != null) {
+        //     invitationListener.stopListening();
+        // }
     }
 
     @Override
@@ -336,18 +464,83 @@ public class MainActivity extends AppCompatActivity {
 
     private void handleExternalNav(android.content.Intent intent) {
         if (intent == null) return;
-        
-        // Check if notification contains eventId - open event detail page
+
+        // Handle deep link from QR code (https://eventease.app/event/{eventId} or eventease://event/{eventId})
+        android.net.Uri data = intent.getData();
+        if (data != null) {
+            String eventId = null;
+            String scheme = data.getScheme();
+            String host = data.getHost();
+            String path = data.getPath();
+            String fullUri = data.toString();
+
+            Log.d("MainActivity", "Deep link received - Scheme: " + scheme + ", Host: " + host + ", Path: " + path + ", Full URI: " + fullUri);
+
+            // Handle HTTP URL format: https://eventease.app/event/{eventId}
+            if ("https".equals(scheme) && "eventease.app".equals(host)) {
+                if (path != null) {
+                    if (path.startsWith("/event/")) {
+                        eventId = path.substring(7); // Remove leading "/event/"
+                    } else if (path.startsWith("/event")) {
+                        eventId = path.substring(6); // Remove leading "/event"
+                        if (eventId.startsWith("/")) {
+                            eventId = eventId.substring(1); // Remove any remaining "/"
+                        }
+                    }
+                }
+            }
+            // Handle custom scheme format: eventease://event/{eventId}
+            else if ("eventease".equals(scheme) && "event".equals(host)) {
+                if (path != null) {
+                    // Remove leading "/" if present
+                    if (path.startsWith("/")) {
+                        eventId = path.substring(1);
+                    } else {
+                        eventId = path;
+                    }
+                } else {
+                    // If no path, try to get from query or use the full URI
+                    // Some QR scanners might encode it differently
+                    String query = data.getQuery();
+                    if (query != null && query.startsWith("id=")) {
+                        eventId = query.substring(3);
+                    }
+                }
+            }
+
+            // Clean up eventId - remove any trailing slashes or whitespace
+            if (eventId != null) {
+                eventId = eventId.trim();
+                if (eventId.endsWith("/")) {
+                    eventId = eventId.substring(0, eventId.length() - 1);
+                }
+            }
+
+            Log.d("MainActivity", "Extracted eventId: " + eventId);
+
+            if (eventId != null && !eventId.isEmpty()) {
+                Log.d("MainActivity", "Opening EventDetailActivity from QR code - eventId: " + eventId);
+                // Open EventDetailActivity directly
+                Intent detailIntent = new Intent(this, com.example.eventease.ui.entrant.eventdetail.EventDetailActivity.class);
+                detailIntent.putExtra("eventId", eventId);
+                startActivity(detailIntent);
+                return;
+            } else {
+                Log.w("MainActivity", "Could not extract eventId from deep link: " + fullUri);
+            }
+        }
+
+        // Check if notification contains eventId - open EventDetailActivity directly
         String eventId = intent.getStringExtra("eventId");
         if (eventId != null && !eventId.isEmpty()) {
-            Log.d("MainActivity", "Opening event detail page for eventId: " + eventId);
-            Intent eventDetailIntent = new Intent(this, com.example.eventease.ui.entrant.discover.EventDetailsDiscoverActivity.class);
-            eventDetailIntent.putExtra(com.example.eventease.ui.entrant.discover.EventDetailsDiscoverActivity.EXTRA_EVENT_ID, eventId);
-            eventDetailIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK);
-            startActivity(eventDetailIntent);
+            Log.d("MainActivity", "Opening EventDetailActivity for invitation - eventId: " + eventId);
+            // Open EventDetailActivity directly where user can accept/decline
+            Intent detailIntent = new Intent(this, com.example.eventease.ui.entrant.eventdetail.EventDetailActivity.class);
+            detailIntent.putExtra("eventId", eventId);
+            startActivity(detailIntent);
             return;
         }
-        
+
         String target = intent.getStringExtra("nav_target");
         if (target == null) return;
         bottomNav.post(() -> {
@@ -398,7 +591,7 @@ public class MainActivity extends AppCompatActivity {
 
         // Set selected (light circle and blue text) based on destination
         if (destinationId == R.id.eventsSelectionFragment || destinationId == R.id.myEventsFragment
-            || destinationId == R.id.previousEventsFragment || destinationId == R.id.upcomingEventsFragment) {
+                || destinationId == R.id.previousEventsFragment || destinationId == R.id.upcomingEventsFragment) {
             navIconMyEvents.setImageResource(R.drawable.entrant_ic_my_events_circle_light);
             navLabelMyEvents.setTextColor(selectedColor);
         } else if (destinationId == R.id.discoverFragment) {

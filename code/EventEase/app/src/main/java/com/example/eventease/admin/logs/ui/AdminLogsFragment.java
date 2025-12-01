@@ -4,43 +4,85 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.eventease.R;
+import com.example.eventease.admin.logs.data.AdminNotificationLogDatabaseController;
+import com.example.eventease.admin.logs.data.Notification;
+import android.util.Log;
+
+import android.content.Intent;
+import android.widget.Button;
+
+import com.example.eventease.MainActivity;
+
+import java.util.List;
 
 public class AdminLogsFragment extends Fragment {
 
+    private AdminLogsAdapter adapter;
+    private AdminNotificationLogDatabaseController controller;
+
     @Nullable
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        View view = inflater.inflate(R.layout.admin_logs_management, container, false);
-        return view;
+    public View onCreateView(@NonNull LayoutInflater inflater,
+                             @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
+        return inflater.inflate(R.layout.admin_logs_management, container, false);
     }
 
     @Override
-    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+    public void onViewCreated(@NonNull View view,
+                              @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        // Setup logout button
-        setupLogoutButton(view);
-
-        TextView tvMessage = view.findViewById(R.id.tvNotImplemented);
-        if (tvMessage != null) {
-            tvMessage.setText("Logs feature is not yet implemented. This will show notification logs when the feature is ready.");
-        }
-    }
-
-    private void setupLogoutButton(View view) {
-        View logoutButton = view.findViewById(R.id.adminLogoutButton);
-        if (logoutButton != null && getActivity() instanceof com.example.eventease.admin.AdminMainActivity) {
-            logoutButton.setOnClickListener(v -> {
-                ((com.example.eventease.admin.AdminMainActivity) getActivity()).performLogout();
+        Button switchButton = view.findViewById(R.id.btnSwitchToEntrantView);
+        if (switchButton != null) {
+            switchButton.setOnClickListener(v -> {
+                android.util.Log.d("AdminToEntrant", "Admin to Entrant Clicked");
+                Intent intent = new Intent(requireContext(), com.example.eventease.MainActivity.class);
+                intent.putExtra("force_entrant", true);
+                startActivity(intent);
+                requireActivity().finish();
             });
         }
+
+        setupRecyclerView(view);
+
+        controller = new AdminNotificationLogDatabaseController();
+        loadNotifications();
+
+    }
+
+    private void setupRecyclerView(@NonNull View view) {
+        RecyclerView rv = view.findViewById(R.id.rvNotificationLogs);
+        adapter = new AdminLogsAdapter();
+        rv.setLayoutManager(new LinearLayoutManager(requireContext()));
+        rv.setAdapter(adapter);
+    }
+
+    private void loadNotifications() {
+        controller.fetchNotifications(new AdminNotificationLogDatabaseController.NotificationsCallback() {
+            @Override
+            public void onLoaded(@NonNull List<Notification> notifications) {
+                if (!isAdded()) return; // Fragment might be detached
+                adapter.setItems(notifications);
+            }
+
+            @Override
+            public void onError(@NonNull Exception e) {
+                if (!isAdded()) return;
+                Toast.makeText(requireContext(),
+                        "Failed to load notification logs",
+                        Toast.LENGTH_SHORT
+                ).show();
+            }
+        });
     }
 }
-

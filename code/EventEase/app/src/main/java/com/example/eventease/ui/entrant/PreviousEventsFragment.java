@@ -26,7 +26,6 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.bumptech.glide.Glide;
 import com.example.eventease.App;
 import com.example.eventease.R;
-import com.example.eventease.auth.AuthManager;
 import com.example.eventease.data.AdmittedRepository;
 import com.example.eventease.model.Event;
 import com.example.eventease.ui.entrant.eventdetail.EventDetailActivity;
@@ -49,7 +48,6 @@ public class PreviousEventsFragment extends Fragment {
     private TextView emptyView;
     private PreviousEventsAdapter adapter;
     private AdmittedRepository admittedRepo;
-    private AuthManager authManager;
 
     @Nullable
     @Override
@@ -64,7 +62,6 @@ public class PreviousEventsFragment extends Fragment {
 
         // Initialize repositories
         admittedRepo = App.graph().admitted;
-        authManager = App.graph().auth;
 
         // Set up back button
         View btnBack = root.findViewById(R.id.btnBackPrevious);
@@ -99,9 +96,6 @@ public class PreviousEventsFragment extends Fragment {
         if (admittedRepo == null) {
             admittedRepo = App.graph().admitted;
         }
-        if (authManager == null) {
-            authManager = App.graph().auth;
-        }
         loadPreviousEvents();
     }
 
@@ -109,19 +103,19 @@ public class PreviousEventsFragment extends Fragment {
     public void onResume() {
         super.onResume();
         // Refresh events when fragment becomes visible
-        if (admittedRepo != null && authManager != null) {
+        if (admittedRepo != null) {
             loadPreviousEvents();
         }
     }
 
     private void loadPreviousEvents() {
-        if (admittedRepo == null || authManager == null) {
-            android.util.Log.w("PreviousEventsFragment", "Repositories not initialized - admittedRepo: " + admittedRepo + ", authManager: " + authManager);
+        if (admittedRepo == null) {
+            android.util.Log.w("PreviousEventsFragment", "Repositories not initialized - admittedRepo is null");
             return;
         }
         
         setLoading(true);
-        String uid = authManager.getUid();
+        String uid = com.example.eventease.auth.AuthHelper.getUid(requireContext());
         if (uid == null || uid.isEmpty()) {
             android.util.Log.e("PreviousEventsFragment", "User UID is null or empty");
             setLoading(false);
@@ -226,7 +220,7 @@ public class PreviousEventsFragment extends Fragment {
                     int pos = getAdapterPosition();
                     if (pos != RecyclerView.NO_POSITION) {
                         Event event = events.get(pos);
-                        Intent intent = new Intent(requireContext(), EventDetailActivity.class);
+                        Intent intent = new Intent(itemView.getContext(), EventDetailActivity.class);
                         intent.putExtra("eventId", event.getId());
                         intent.putExtra("eventTitle", event.getTitle());
                         intent.putExtra("eventLocation", event.getLocation());
@@ -239,7 +233,7 @@ public class PreviousEventsFragment extends Fragment {
                         intent.putExtra("eventWaitlistCount", event.getWaitlistCount());
                         intent.putExtra("hasInvitation", false); // Previous event
                         intent.putExtra("isPreviousEvent", true); // Mark as previous event - no buttons should be shown
-                        startActivity(intent);
+                        itemView.getContext().startActivity(intent);
                     }
                 });
             }
@@ -288,4 +282,3 @@ public class PreviousEventsFragment extends Fragment {
         }
     }
 }
-

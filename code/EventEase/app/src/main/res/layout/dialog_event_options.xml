@@ -6,7 +6,7 @@
     android:layout_height="wrap_content"
     android:layout_margin="24dp"
     android:padding="24dp"
-    app:cardBackgroundColor="@color/ee_mint_aqua"
+    app:cardBackgroundColor="@color/ee_topbar_bg"
     app:cardCornerRadius="24dp">
 
     <LinearLayout

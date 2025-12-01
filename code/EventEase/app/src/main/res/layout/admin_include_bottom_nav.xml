@@ -3,7 +3,7 @@
     android:id="@+id/bottom_nav"
     android:layout_width="match_parent"
     android:layout_height="88dp"
-    android:background="@drawable/entrant_bg_bottom_nav_glass"
+    android:background="@drawable/admin_bg_bottom_nav_floating"
     android:orientation="horizontal"
     android:paddingTop="12dp"
     android:paddingBottom="16dp"
@@ -36,10 +36,9 @@
             android:text="Events"
             android:textSize="10sp"
             android:textColor="#223C65"
-            android:fontFamily="@font/entrant_fredoka_one"
+            android:textStyle="bold"
             android:alpha="0.9"
             android:layout_marginTop="4dp"/>
-
     </LinearLayout>
 
     <!-- Profiles Button -->
@@ -68,10 +67,9 @@
             android:text="Profiles"
             android:textSize="10sp"
             android:textColor="#223C65"
-            android:fontFamily="@font/entrant_fredoka_one"
+            android:textStyle="bold"
             android:alpha="0.9"
             android:layout_marginTop="4dp"/>
-
     </LinearLayout>
 
     <!-- Images Button -->
@@ -100,10 +98,9 @@
             android:text="Images"
             android:textSize="10sp"
             android:textColor="#223C65"
-            android:fontFamily="@font/entrant_fredoka_one"
+            android:textStyle="bold"
             android:alpha="0.9"
             android:layout_marginTop="4dp"/>
-
     </LinearLayout>
 
     <!-- Logs Button -->
@@ -132,11 +129,9 @@
             android:text="Logs"
             android:textSize="10sp"
             android:textColor="#223C65"
-            android:fontFamily="@font/entrant_fredoka_one"
+            android:textStyle="bold"
             android:alpha="0.9"
             android:layout_marginTop="4dp"/>
-
     </LinearLayout>
 
 </LinearLayout>
-

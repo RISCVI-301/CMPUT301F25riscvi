@@ -34,7 +34,6 @@
             android:textColor="#223C65"
             android:padding="28dp"
             android:paddingBottom="20dp"
-            android:fontFamily="@font/entrant_fredoka_one"
             android:background="#FFFFFF"
             android:shadowColor="#80000000"
             android:shadowDx="0"
@@ -65,7 +64,7 @@
                 android:textSize="16sp"
                 android:textColor="#223C65"
                 android:lineSpacingExtra="8dp"
-                android:fontFamily="@font/entrant_fredoka_one"/>
+                android:textStyle="bold"/>
 
         </ScrollView>
 
@@ -87,7 +86,6 @@
             android:background="@drawable/entrant_button_guidelines_ok"
             android:layout_margin="28dp"
             android:layout_marginTop="20dp"
-            android:fontFamily="@font/entrant_fredoka_one"
             android:elevation="8dp"
             style="@style/Widget.AppCompat.Button.Borderless"/>
 

@@ -43,5 +43,35 @@
         <item name="android:windowTranslucentNavigation">true</item>
     </style>
 
+    <!-- Date and Time Picker Dialog Theme -->
+    <style name="EventEasePickerDialogTheme" parent="ThemeOverlay.MaterialComponents.Dialog.Alert">
+        <item name="android:windowBackground">@drawable/ee_dialog_background</item>
+        <item name="colorAccent">@color/ee_topbar_bg</item>
+        <item name="android:textColorPrimary">@color/ee_navy_dark</item>
+        <item name="android:textColorSecondary">#757575</item>
+        <item name="dialogCornerRadius">20dp</item>
+        <item name="android:datePickerStyle">@style/EventEaseDatePickerStyle</item>
+        <item name="android:timePickerStyle">@style/EventEaseTimePickerStyle</item>
+        <item name="clockFaceBackgroundColor">@color/beige</item>
+        <item name="clockNumberTextColor">@color/beige</item>
+    </style>
+
+    <!-- DatePicker widget styling -->
+    <style name="EventEaseDatePickerStyle" parent="@android:style/Widget.Material.DatePicker">
+        <item name="android:headerBackground">@color/ee_topbar_bg</item>
+        <item name="android:calendarViewShown">false</item>
+        <item name="android:spinnersShown">true</item>
+    </style>
+
+    <!-- TimePicker widget styling -->
+    <style name="EventEaseTimePickerStyle" parent="@android:style/Widget.Material.TimePicker">
+        <item name="android:headerBackground">@color/ee_topbar_bg</item>
+        <item name="android:colorBackground">@color/beige</item>
+        <item name="android:colorControlNormal">@color/beige</item>
+        <item name="android:colorControlActivated">@color/beige</item>
+        <item name="android:textColorPrimary">@color/beige</item>
+        <item name="android:textColor">@color/beige</item>
+    </style>
+
 </resources>
 

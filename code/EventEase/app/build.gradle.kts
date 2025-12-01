@@ -1,7 +1,20 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     alias(libs.plugins.android.application)
     id("com.google.gms.google-services")
 }
+
+// Load API key from local.properties
+val localPropertiesFile = rootProject.file("local.properties")
+val localProperties = Properties()
+if (localPropertiesFile.exists()) {
+    FileInputStream(localPropertiesFile).use { stream ->
+        localProperties.load(stream)
+    }
+}
+val googleMapsApiKey = localProperties.getProperty("google.maps.api.key") ?: ""
 
 android {
     namespace = "com.example.eventease"
@@ -18,6 +31,9 @@ android {
         
         renderscriptTargetApi = 26
         renderscriptSupportModeEnabled = true
+        
+        // Add Google Maps API key as a resource value (loaded from local.properties)
+        resValue("string", "google_maps_api_key", googleMapsApiKey)
     }
 
     buildTypes {
@@ -32,6 +48,19 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+    }
+    
+    testOptions {
+        unitTests {
+            isReturnDefaultValues = true
+            isIncludeAndroidResources = false
+        }
+    }
+    
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
 }
 
@@ -54,6 +83,7 @@ dependencies {
     implementation("com.google.firebase:firebase-storage")
     implementation("com.google.firebase:firebase-messaging")
     implementation("com.google.android.gms:play-services-location:21.1.0")
+    implementation("com.google.android.gms:play-services-maps:18.2.0")
 
     implementation("com.google.zxing:core:3.5.3")
 

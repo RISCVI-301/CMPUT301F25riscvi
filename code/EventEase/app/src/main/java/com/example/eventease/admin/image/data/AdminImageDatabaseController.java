@@ -16,12 +16,19 @@ public class AdminImageDatabaseController {
 
     private final StorageReference postersRef =
             FirebaseStorage.getInstance().getReference().child("posters/");
+    private final StorageReference profilePicturesRef =
+            FirebaseStorage.getInstance().getReference().child("profile_pictures");
 
     public List<String> getImageLinks() {
         try {
             ListResult res = Tasks.await(postersRef.listAll());
+            ListResult profiles = Tasks.await(profilePicturesRef.listAll());
+
             List<Task<Uri>> urlTasks = new ArrayList<>();
+
             for (StorageReference item : res.getItems()) urlTasks.add(item.getDownloadUrl());
+            for (StorageReference r : profiles.getItems()) urlTasks.add(r.getDownloadUrl());
+
             List<?> uris = Tasks.await(Tasks.whenAllSuccess(urlTasks));
             List<String> urls = new ArrayList<>(uris.size());
             for (Object o : uris) urls.add(((Uri) o).toString());

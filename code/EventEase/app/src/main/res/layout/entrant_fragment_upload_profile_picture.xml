@@ -63,7 +63,6 @@
                 android:background="@drawable/entrant_btn_upload_picture"
                 android:paddingTop="20dp"
                 android:paddingBottom="20dp"
-                android:fontFamily="@font/entrant_fredoka_one"
                 android:elevation="8dp"
                 android:layout_marginBottom="32dp"/>
 
@@ -80,7 +79,6 @@
                 android:background="@drawable/entrant_btn_upload_picture"
                 android:paddingTop="20dp"
                 android:paddingBottom="20dp"
-                android:fontFamily="@font/entrant_fredoka_one"
                 android:elevation="8dp"/>
 
         </LinearLayout>

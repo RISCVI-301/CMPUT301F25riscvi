@@ -15,6 +15,9 @@ import java.util.Date;
 import java.util.List;
 import java.util.NoSuchElementException;
 
+/**
+ * Legacy Firestore repository. Prefer {@link FirebaseEventRepository}.
+ */
 public class FirestoreEventRepository implements EventRepository {
 
     private static final String TAG = "FirestoreEventRepo";
@@ -27,40 +30,9 @@ public class FirestoreEventRepository implements EventRepository {
 
     @Override
     public Task<List<Event>> getOpenEvents(Date now) {
-        return db.collection("events")
-                .get()
-                .continueWith(task -> {
-                    if (!task.isSuccessful()) {
-                        throw task.getException() != null ? task.getException() :
-                                new IllegalStateException("Failed to load events");
-                    }
-
-                    QuerySnapshot snapshot = task.getResult();
-                    List<Event> events = new ArrayList<>();
-                    
-                    if (snapshot != null) {
-                        for (DocumentSnapshot doc : snapshot.getDocuments()) {
-                            try {
-                                Event event = Event.fromMap(doc.getData());
-                                if (event == null) continue;
-                                if (event.id == null) {
-                                    event.id = doc.getId();
-                                }
-                                
-                                // Filter: only include events that haven't started yet or have no start time
-                                if (event.getStartAt() == null || event.getStartAt().after(now)) {
-                                    events.add(event);
-                                }
-                            } catch (Exception e) {
-                                Log.e(TAG, "Error processing event document " + doc.getId(), e);
-                            }
-                        }
-                    }
-
-                    events.sort(Comparator.comparing(Event::getStartAt,
-                            Comparator.nullsLast(Comparator.naturalOrder())));
-                    return Collections.unmodifiableList(events);
-                });
+        // Deprecated: use FirebaseEventRepository#getOpenEvents instead.
+        Log.w(TAG, "Deprecated getOpenEvents called. Returning empty list.");
+        return com.google.android.gms.tasks.Tasks.forResult(Collections.emptyList());
     }
 
     @Override

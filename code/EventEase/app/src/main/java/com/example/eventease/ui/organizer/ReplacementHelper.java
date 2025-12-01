@@ -27,76 +27,41 @@ public class ReplacementHelper {
     }
 
     /**
-     * Automatically replaces cancelled entrants with waitlisted entrants.
-     * This is called when someone declines an invitation or when the View Entrants screen loads.
+     * AUTOMATIC REPLACEMENT IS DISABLED - Only manual replacement is allowed.
+     * Organizer must use the "Replace Cancelled Entrants" button to manually select replacements.
+     * 
+     * This method is kept for backward compatibility but does nothing.
      *
      * @param eventId The event ID
      * @param eventTitle The event title (for notifications)
      */
     public void autoReplaceCancelledEntrants(String eventId, String eventTitle) {
-        if (eventId == null || eventId.isEmpty()) {
-            return;
-        }
-
-        // Check if we're still before the deadline to accept/decline
-        db.collection("events").document(eventId).get()
-                .addOnSuccessListener(eventDoc -> {
-                    if (eventDoc == null || !eventDoc.exists()) {
-                        return;
-                    }
-
-                    Long deadlineEpochMs = eventDoc.getLong("deadlineEpochMs");
-                    long currentTime = System.currentTimeMillis();
-                    
-                    // Only auto-replace if we're still before the deadline
-                    if (deadlineEpochMs != null && currentTime >= deadlineEpochMs) {
-                        Log.d(TAG, "Deadline has passed, skipping auto-replacement");
-                        return;
-                    }
-
-                    // Count cancelled and waitlisted entrants
-                    db.collection("events").document(eventId).collection("CancelledEntrants").get()
-                            .addOnSuccessListener(cancelledSnapshot -> {
-                                int cancelledCount = cancelledSnapshot != null ? cancelledSnapshot.size() : 0;
-
-                                if (cancelledCount == 0) {
-                                    return; // No cancellations, nothing to replace
-                                }
-
-                                db.collection("events").document(eventId).collection("WaitlistedEntrants").get()
-                                        .addOnSuccessListener(waitlistSnapshot -> {
-                                            int waitlistCount = waitlistSnapshot != null ? waitlistSnapshot.size() : 0;
-
-                                            if (waitlistCount == 0) {
-                                                Log.d(TAG, "No waitlisted entrants available for replacement");
-                                                return; // No waitlisted entrants available
-                                            }
-
-                                            // Auto-replace: move from waitlisted to selected
-                                            int toReplace = Math.min(cancelledCount, waitlistCount);
-                                            Log.d(TAG, "Auto-replacing " + toReplace + " cancelled entrant(s)");
-                                            performReplacement(eventId, eventTitle, toReplace);
-                                        })
-                                        .addOnFailureListener(e -> {
-                                            Log.e(TAG, "Failed to check waitlisted entrants for auto-replace", e);
-                                        });
-                            })
-                            .addOnFailureListener(e -> {
-                                Log.e(TAG, "Failed to check cancelled entrants for auto-replace", e);
-                            });
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Failed to load event for auto-replace check", e);
-                });
+        // AUTOMATIC REPLACEMENT DISABLED - Organizer must manually replace via button
+        Log.d(TAG, "Auto-replacement is disabled. Organizer must manually replace cancelled entrants via the Replace button.");
+        return;
     }
 
     private void performReplacement(String eventId, String eventTitle, int count) {
-        // Get event details for deadline calculation
-        db.collection("events").document(eventId).get()
+        // Get event details for deadline calculation and sample size
+        DocumentReference eventRef = db.collection("events").document(eventId);
+        eventRef.get()
                 .addOnSuccessListener(eventDoc -> {
-                    // Use correct Firestore field names
-                    Long eventDeadline = eventDoc != null ? eventDoc.getLong("deadlineEpochMs") : null;
-                    Long eventStart = eventDoc != null ? eventDoc.getLong("eventStart") : null;
+                    if (eventDoc == null || !eventDoc.exists()) {
+                        Log.e(TAG, "Event not found: " + eventId);
+                        return;
+                    }
+                    
+                    // Get sample size
+                    int sampleSize = 0;
+                    Long sampleSizeObj = eventDoc.getLong("sampleSize");
+                    if (sampleSizeObj != null) {
+                        sampleSize = sampleSizeObj.intValue();
+                    }
+                    final int finalSampleSize = sampleSize;
+                    
+                    // Use correct Firestore field names for deadline
+                    Long eventDeadline = eventDoc.getLong("deadlineEpochMs");
+                    Long eventStart = eventDoc.getLong("eventStart");
                     
                     // Calculate deadline for replacement invitations
                     long currentTime = System.currentTimeMillis();
@@ -114,8 +79,23 @@ public class ReplacementHelper {
                     
                     final long deadlineToAccept = calculatedDeadline;
 
+                    // CRITICAL: Check current selected count before proceeding
+                    eventRef.collection("SelectedEntrants").get()
+                                .addOnSuccessListener(selectedSnapshot -> {
+                                    int currentSelectedCount = selectedSnapshot != null ? selectedSnapshot.size() : 0;
+                                    int availableSpots = finalSampleSize > 0 ? (finalSampleSize - currentSelectedCount) : count;
+                                    
+                                    Log.d(TAG, "Replacement check: currentSelected=" + currentSelectedCount + ", sampleSize=" + finalSampleSize + ", availableSpots=" + availableSpots + ", requested=" + count);
+                                    
+                                    if (finalSampleSize > 0 && availableSpots <= 0) {
+                                        Log.w(TAG, "Cannot replace: Already at sample size limit (" + currentSelectedCount + "/" + finalSampleSize + ")");
+                                        return;
+                                    }
+                                    
+                                    int actualCount = finalSampleSize > 0 ? Math.min(availableSpots, count) : count;
+
                     // Fetch waitlisted entrants
-                    db.collection("events").document(eventId).collection("WaitlistedEntrants").get()
+                                    eventRef.collection("WaitlistedEntrants").get()
                             .addOnSuccessListener(waitlistSnapshot -> {
                                 if (waitlistSnapshot == null || waitlistSnapshot.isEmpty()) {
                                     Log.d(TAG, "No waitlisted entrants available");
@@ -123,15 +103,14 @@ public class ReplacementHelper {
                                 }
 
                                 List<DocumentSnapshot> waitlistDocs = waitlistSnapshot.getDocuments();
-                                if (waitlistDocs.size() < count) {
-                                    Log.d(TAG, "Not enough waitlisted entrants available");
+                                                if (waitlistDocs.size() < actualCount) {
+                                                    Log.d(TAG, "Not enough waitlisted entrants available (need " + actualCount + ", have " + waitlistDocs.size() + ")");
                                     return;
                                 }
 
-                                // Randomly select entrants
-                                List<DocumentSnapshot> selectedForReplacement = randomlySelect(waitlistDocs, count);
+                                                // Randomly select entrants (limited to availableSpots)
+                                                List<DocumentSnapshot> selectedForReplacement = randomlySelect(waitlistDocs, actualCount);
                                 
-                                DocumentReference eventRef = db.collection("events").document(eventId);
                                 WriteBatch batch = db.batch();
                                 List<String> userIds = new ArrayList<>();
 
@@ -160,20 +139,32 @@ public class ReplacementHelper {
                                         invitation.put("expiresAt", deadlineToAccept);
                                         invitation.put("isReplacement", true);
                                         
-                                        // Get organizer ID for consistency
-                                        com.google.firebase.auth.FirebaseAuth auth = com.google.firebase.auth.FirebaseAuth.getInstance();
-                                        com.google.firebase.auth.FirebaseUser currentUser = auth.getCurrentUser();
-                                        if (currentUser != null) {
-                                            invitation.put("organizerId", currentUser.getUid());
-                                        }
+                                        // Get organizer ID from event document (should already be there)
                                         
                                         batch.set(db.collection("invitations").document(invitationId), invitation);
                                     }
                                 }
 
+                                                // CRITICAL: Final verification before commit
+                                                int finalTotal = currentSelectedCount + selectedForReplacement.size();
+                                                if (finalSampleSize > 0 && finalTotal > finalSampleSize) {
+                                                    Log.e(TAG, "CRITICAL: Final count (" + finalTotal + ") would exceed sampleSize (" + finalSampleSize + ")! Truncating.");
+                                                    int maxToAdd = finalSampleSize - currentSelectedCount;
+                                                    if (maxToAdd > 0) {
+                                                        selectedForReplacement = selectedForReplacement.subList(0, maxToAdd);
+                                                        userIds.clear();
+                                                        for (DocumentSnapshot doc : selectedForReplacement) {
+                                                            userIds.add(doc.getId());
+                                                        }
+                                                    } else {
+                                                        Log.e(TAG, "Cannot add any more - already at sample size!");
+                                                        return;
+                                    }
+                                }
+
                                 batch.commit()
                                         .addOnSuccessListener(v -> {
-                                            Log.d(TAG, "Successfully auto-replaced " + count + " entrant(s)");
+                                                            Log.d(TAG, "Successfully auto-replaced " + userIds.size() + " entrant(s) (sampleSize: " + finalSampleSize + ", total selected: " + (currentSelectedCount + userIds.size()) + ")");
                                             
                                             // Send notifications
                                             String eventTitleStr = eventTitle != null ? eventTitle : "the event";
@@ -185,6 +176,10 @@ public class ReplacementHelper {
                             })
                             .addOnFailureListener(e -> {
                                 Log.e(TAG, "Failed to load waitlisted entrants for replacement", e);
+                                            });
+                                    })
+                                    .addOnFailureListener(e -> {
+                                        Log.e(TAG, "Failed to load selected entrants count", e);
                             });
                 })
                 .addOnFailureListener(e -> {

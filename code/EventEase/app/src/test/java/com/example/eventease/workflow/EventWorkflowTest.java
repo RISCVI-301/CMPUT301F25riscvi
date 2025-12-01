@@ -62,7 +62,7 @@ public class EventWorkflowTest {
         assertTrue("Registration should have ended", currentTime >= registrationEnd);
         assertFalse("Selection should not be processed yet", (Boolean) eventData.get("selectionProcessed"));
         
-        System.out.println("✓ Test 1 passed: Selection should happen at registration end");
+        System.out.println("Test 1 passed: Selection should happen at registration end");
     }
     
     /**
@@ -76,7 +76,7 @@ public class EventWorkflowTest {
         // Verify registration hasn't ended
         assertTrue("Registration should not have ended yet", currentTime < futureRegistrationEnd);
         
-        System.out.println("✓ Test 2 passed: Selection doesn't happen before registration end");
+        System.out.println("Test 2 passed: Selection doesn't happen before registration end");
     }
     
     /**
@@ -89,7 +89,7 @@ public class EventWorkflowTest {
         // Verify selection is already processed
         assertTrue("Selection should be marked as processed", (Boolean) eventData.get("selectionProcessed"));
         
-        System.out.println("✓ Test 3 passed: Selection doesn't happen if already processed");
+        System.out.println("Test 3 passed: Selection doesn't happen if already processed");
     }
     
     /**
@@ -104,7 +104,7 @@ public class EventWorkflowTest {
         assertTrue("Should have enough entrants", waitlistedCount >= sampleSize);
         assertTrue("Sample size should be positive", sampleSize > 0);
         
-        System.out.println("✓ Test 4 passed: Random selection logic verified");
+        System.out.println("Test 4 passed: Random selection logic verified");
     }
     
     /**
@@ -118,7 +118,7 @@ public class EventWorkflowTest {
         // Verify event start is in the past
         assertTrue("Event start should be in the past", currentTime >= pastEventStart);
         
-        System.out.println("✓ Test 5 passed: Selection doesn't happen for past events");
+        System.out.println("Test 5 passed: Selection doesn't happen for past events");
     }
     
     /**
@@ -134,7 +134,7 @@ public class EventWorkflowTest {
         
         assertTrue("Should respect capacity limit", expectedSelected <= capacity);
         
-        System.out.println("✓ Test 6 passed: Capacity limit enforced");
+        System.out.println("Test 6 passed: Capacity limit enforced");
     }
     
     /**
@@ -148,7 +148,7 @@ public class EventWorkflowTest {
         // Verify flag is set
         assertTrue("Notification flag should be set", (Boolean) eventData.get("selectionNotificationSent"));
         
-        System.out.println("✓ Test 7 passed: Notification flags prevent duplicates");
+        System.out.println("Test 7 passed: Notification flags prevent duplicates");
     }
     
     /**
@@ -161,7 +161,7 @@ public class EventWorkflowTest {
         // Verify empty waitlist
         assertTrue("Waitlist should be empty", emptyWaitlist.isEmpty());
         
-        System.out.println("✓ Test 8 passed: Workflow handles empty waitlist");
+        System.out.println("Test 8 passed: Workflow handles empty waitlist");
     }
     
     /**
@@ -178,7 +178,7 @@ public class EventWorkflowTest {
         assertEquals("Should select exactly sample size", sampleSize, expectedSelected);
         assertTrue("Should not select all entrants", expectedSelected < waitlistedCount);
         
-        System.out.println("✓ Test 9 passed: Sample size is respected");
+        System.out.println("Test 9 passed: Sample size is respected");
     }
     
     /**
@@ -192,7 +192,7 @@ public class EventWorkflowTest {
         assertNotNull("Event should have sampleSize", eventData.get("sampleSize"));
         assertNotNull("Event should have capacity", eventData.get("capacity"));
         
-        System.out.println("✓ Test 10 passed: Event data validation works");
+        System.out.println("Test 10 passed: Event data validation works");
     }
     
     /**
@@ -217,11 +217,11 @@ public class EventWorkflowTest {
             testEventDataValidation();
             
             System.out.println("\n========================================");
-            System.out.println("✓ All 10 tests passed!");
+            System.out.println("All 10 tests passed!");
             System.out.println("========================================\n");
         } catch (Exception e) {
             System.err.println("\n========================================");
-            System.err.println("✗ Some tests failed!");
+            System.err.println("Some tests failed!");
             System.err.println("Error: " + e.getMessage());
             System.err.println("========================================\n");
             e.printStackTrace();
