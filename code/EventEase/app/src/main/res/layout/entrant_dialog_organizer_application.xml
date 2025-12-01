@@ -130,7 +130,7 @@
                     android:layout_weight="1"
                     android:maxLines="1"
                     android:ellipsize="end"
-                    android:text="Submit Application"
+                    android:text="Submit"
                     android:textSize="16sp"
                     android:textStyle="bold"
                     android:textColor="#FFFFFF"
