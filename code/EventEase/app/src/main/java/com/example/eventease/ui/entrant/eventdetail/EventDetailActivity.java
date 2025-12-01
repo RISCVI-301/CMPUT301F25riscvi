@@ -15,7 +15,6 @@ import com.example.eventease.data.InvitationRepository;
 import com.example.eventease.data.WaitlistRepository;
 import com.example.eventease.App;
 import com.example.eventease.R;
-import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions;
 import android.graphics.Bitmap;
@@ -77,10 +76,6 @@ public class EventDetailActivity extends AppCompatActivity {
     private ImageButton btnShare;
     private ImageView ivEventImage;
     // Custom nav include controls
-    private android.widget.LinearLayout navButtonMyEvents;
-    private android.widget.LinearLayout navButtonDiscover;
-    private android.widget.LinearLayout navButtonAccount;
-    private BottomNavigationView bottomNavigation;
     // Card views for visibility control
     private android.view.View waitlistCountCard;
     private android.view.View leaveWaitlistCard;
@@ -148,10 +143,6 @@ public class EventDetailActivity extends AppCompatActivity {
         btnBack = findViewById(R.id.btnBack);
         btnShare = findViewById(R.id.btnShare);
         ivEventImage = findViewById(R.id.ivEventImage);
-        // Find custom nav include buttons
-        navButtonMyEvents = findViewById(R.id.nav_button_my_events);
-        navButtonDiscover = findViewById(R.id.nav_button_discover);
-        navButtonAccount = findViewById(R.id.nav_button_account);
         // Find card views
         waitlistCountCard = findViewById(R.id.waitlistCountCard);
         leaveWaitlistCard = findViewById(R.id.leaveWaitlistCard);
@@ -215,17 +206,6 @@ public class EventDetailActivity extends AppCompatActivity {
         
         // Listen to waitlist count updates from Firebase
         setupWaitlistCountListener();
-
-        // Wire bottom nav navigation to MainActivity destinations
-        if (navButtonDiscover != null) {
-            navButtonDiscover.setOnClickListener(v -> navigateToMain("discover"));
-        }
-        if (navButtonMyEvents != null) {
-            navButtonMyEvents.setOnClickListener(v -> navigateToMain("myEvents"));
-        }
-        if (navButtonAccount != null) {
-            navButtonAccount.setOnClickListener(v -> navigateToMain("account"));
-        }
     }
 
     private void loadEventData() {
@@ -326,24 +306,6 @@ public class EventDetailActivity extends AppCompatActivity {
                 }
             });
         }
-    }
-
-    private void setupBottomNavigation() {
-        bottomNavigation.setSelectedItemId(R.id.myEventsFragment);
-        bottomNavigation.setOnItemSelectedListener(item -> {
-            int itemId = item.getItemId();
-            if (itemId == R.id.discoverFragment) {
-                finish(); // Go back to main activity which will show discover
-                return true;
-            } else if (itemId == R.id.myEventsFragment) {
-                finish(); // Go back to main activity which will show my events
-                return true;
-            } else if (itemId == R.id.accountFragment) {
-                finish(); // Go back to main activity which will show account
-                return true;
-            }
-            return false;
-        });
     }
 
     private void showGuidelinesDialog() {

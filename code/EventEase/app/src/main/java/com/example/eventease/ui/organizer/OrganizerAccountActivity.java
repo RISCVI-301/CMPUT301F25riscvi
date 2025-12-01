@@ -56,6 +56,10 @@ public class OrganizerAccountActivity extends AppCompatActivity {
     private boolean isResolvingOrganizerId;
     private String userEmail;
     private com.google.firebase.firestore.ListenerRegistration profileListener;
+    
+    // Bottom nav icon and label views
+    private ImageView navIconMyEvents, navIconCreate, navIconAccount;
+    private TextView navLabelMyEvents, navLabelCreate, navLabelAccount;
     /**
      * Initializes the activity, view components, and loads the organizer's profile data.
      * @param savedInstanceState If the activity is being re-initialized, this Bundle contains the most recent data.
@@ -69,6 +73,14 @@ public class OrganizerAccountActivity extends AppCompatActivity {
         ivAvatar = findViewById(R.id.ivAvatar);
         tvFullName = findViewById(R.id.tvFullName);
         btnEditProfile = findViewById(R.id.btnEditProfile);
+        
+        // Get bottom nav icon and label views
+        navIconMyEvents = findViewById(R.id.nav_icon_my_events);
+        navIconCreate = findViewById(R.id.nav_icon_create);
+        navIconAccount = findViewById(R.id.nav_icon_account);
+        navLabelMyEvents = findViewById(R.id.nav_label_my_events);
+        navLabelCreate = findViewById(R.id.nav_label_create);
+        navLabelAccount = findViewById(R.id.nav_label_account);
 
         organizerId = getIntent().getStringExtra(OrganizerMyEventActivity.EXTRA_ORGANIZER_ID);
 
@@ -104,6 +116,9 @@ public class OrganizerAccountActivity extends AppCompatActivity {
         }
 
         setupBottomNavigation();
+        
+        // Set icon states - Account is selected (light), others are dark
+        updateNavigationSelection("account");
     }
     
     @Override
@@ -186,7 +201,8 @@ public class OrganizerAccountActivity extends AppCompatActivity {
                     intent.putExtra(OrganizerMyEventActivity.EXTRA_ORGANIZER_ID, organizerId);
                 }
                 startActivity(intent);
-                finish();
+                overridePendingTransition(0, 0); // Remove slide animation
+                finish(); // Close this activity to show new one instantly
             });
         }
 
@@ -203,6 +219,7 @@ public class OrganizerAccountActivity extends AppCompatActivity {
                     intent.putExtra(OrganizerMyEventActivity.EXTRA_ORGANIZER_ID, organizerId);
                 }
                 startActivity(intent);
+                overridePendingTransition(0, 0); // Remove slide animation
             });
         }
 
@@ -808,5 +825,60 @@ public class OrganizerAccountActivity extends AppCompatActivity {
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
         finish();
+    }
+
+    /**
+     * Updates the bottom navigation icons and labels based on the selected page.
+     * Selected icons are light, unselected are dark.
+     */
+    private void updateNavigationSelection(String selectedPage) {
+        // Dark blue for unselected items (brand color)
+        int unselectedColor = android.graphics.Color.parseColor("#223C65");
+        // iOS blue color for selected items
+        int selectedColor = android.graphics.Color.parseColor("#446EAF");
+
+        // Reset all to unselected (dark circles and dark text)
+        if (navIconMyEvents != null) {
+            navIconMyEvents.setImageResource(R.drawable.entrant_ic_my_events_circle_dark);
+        }
+        if (navIconCreate != null) {
+            navIconCreate.setImageResource(R.drawable.organizer_ic_add_circle_dark);
+        }
+        if (navIconAccount != null) {
+            navIconAccount.setImageResource(R.drawable.entrant_ic_account_circle_dark);
+        }
+        if (navLabelMyEvents != null) {
+            navLabelMyEvents.setTextColor(unselectedColor);
+        }
+        if (navLabelCreate != null) {
+            navLabelCreate.setTextColor(unselectedColor);
+        }
+        if (navLabelAccount != null) {
+            navLabelAccount.setTextColor(unselectedColor);
+        }
+
+        // Set selected (light circle and blue text) based on page
+        if ("myEvents".equals(selectedPage)) {
+            if (navIconMyEvents != null) {
+                navIconMyEvents.setImageResource(R.drawable.entrant_ic_my_events_circle_light);
+            }
+            if (navLabelMyEvents != null) {
+                navLabelMyEvents.setTextColor(selectedColor);
+            }
+        } else if ("create".equals(selectedPage)) {
+            if (navIconCreate != null) {
+                navIconCreate.setImageResource(R.drawable.organizer_ic_add_circle_light);
+            }
+            if (navLabelCreate != null) {
+                navLabelCreate.setTextColor(selectedColor);
+            }
+        } else if ("account".equals(selectedPage)) {
+            if (navIconAccount != null) {
+                navIconAccount.setImageResource(R.drawable.entrant_ic_account_circle_light);
+            }
+            if (navLabelAccount != null) {
+                navLabelAccount.setTextColor(selectedColor);
+            }
+        }
     }
 }

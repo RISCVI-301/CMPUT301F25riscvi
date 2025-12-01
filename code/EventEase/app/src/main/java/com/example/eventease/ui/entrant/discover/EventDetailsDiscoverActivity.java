@@ -143,20 +143,6 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
         shareButton.setOnClickListener(v -> showEventQRDialog());
         waitlistButton.setOnClickListener(v -> handleJoinWaitlist());
         guidelinesButton.setOnClickListener(v -> showGuidelinesDialog());
-        
-        // Wire bottom nav include buttons
-        android.widget.LinearLayout navButtonMyEvents = findViewById(R.id.nav_button_my_events);
-        android.widget.LinearLayout navButtonDiscover = findViewById(R.id.nav_button_discover);
-        android.widget.LinearLayout navButtonAccount = findViewById(R.id.nav_button_account);
-        if (navButtonDiscover != null) {
-            navButtonDiscover.setOnClickListener(v -> navigateToMain("discover"));
-        }
-        if (navButtonMyEvents != null) {
-            navButtonMyEvents.setOnClickListener(v -> navigateToMain("myEvents"));
-        }
-        if (navButtonAccount != null) {
-            navButtonAccount.setOnClickListener(v -> navigateToMain("account"));
-        }
     }
 
     private void showGuidelinesDialog() {

@@ -871,6 +871,83 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
         }
     }
 
+    private void showNotificationConfirmationDialog(String title, String message, Runnable onConfirm) {
+        // Capture screenshot and blur it
+        android.graphics.Bitmap screenshot = captureScreenshot();
+        android.graphics.Bitmap blurredBitmap = blurBitmap(screenshot, 25f);
+        
+        // Create custom dialog with full screen to show blur background
+        Dialog dialog = new Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        dialog.setContentView(R.layout.organizer_dialog_notification_confirmation);
+        
+        // Set window properties
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setLayout(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT
+            );
+            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            
+            // Disable dim since we have our own blur background
+            WindowManager.LayoutParams layoutParams = window.getAttributes();
+            layoutParams.dimAmount = 0f;
+            window.setAttributes(layoutParams);
+            window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+        }
+        
+        // Apply blurred background
+        android.view.View blurBackground = dialog.findViewById(R.id.dialogBlurBackground);
+        if (blurredBitmap != null) {
+            blurBackground.setBackground(new BitmapDrawable(getResources(), blurredBitmap));
+        }
+        
+        // Make the background clickable to dismiss
+        blurBackground.setOnClickListener(v -> dialog.dismiss());
+        
+        // Get the CardView for animation
+        androidx.cardview.widget.CardView cardView = dialog.findViewById(R.id.dialogCardView);
+        
+        // Set up dialog views
+        TextView tvTitle = dialog.findViewById(R.id.tvDialogTitle);
+        TextView tvMessage = dialog.findViewById(R.id.tvDialogMessage);
+        android.widget.Button btnCancel = dialog.findViewById(R.id.btnDialogCancel);
+        android.widget.Button btnSend = dialog.findViewById(R.id.btnDialogSend);
+        
+        // Set content
+        if (tvTitle != null) {
+            tvTitle.setText(title);
+        }
+        if (tvMessage != null) {
+            tvMessage.setText(message);
+        }
+        
+        // Set button click listeners
+        if (btnCancel != null) {
+            btnCancel.setOnClickListener(v -> dialog.dismiss());
+        }
+        
+        if (btnSend != null && onConfirm != null) {
+            btnSend.setOnClickListener(v -> {
+                dialog.dismiss();
+                onConfirm.run();
+            });
+        }
+        
+        dialog.show();
+        
+        // Apply animations after dialog is shown
+        android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_fade_in);
+        android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_zoom_in);
+        
+        if (blurBackground != null) {
+            blurBackground.startAnimation(fadeIn);
+        }
+        if (cardView != null) {
+            cardView.startAnimation(zoomIn);
+        }
+    }
+
     private void deleteEvent() {
         if (currentEventId == null || currentEventId.isEmpty()) {
             Toast.makeText(this, "Event ID not found", Toast.LENGTH_SHORT).show();
@@ -1048,12 +1125,7 @@ public class OrganizerWaitlistActivity extends AppCompatActivity {
         int count = entrantNamesList.size();
         String message = "Send notifications to " + count + " waitlisted entrant" + (count > 1 ? "s" : "") + "? They will receive push notifications even when the app is closed.";
 
-        new MaterialAlertDialogBuilder(this)
-                .setTitle("Send Notifications")
-                .setMessage(message)
-                .setPositiveButton("Send", (dialog, which) -> sendNotificationsToWaitlisted())
-                .setNegativeButton("Cancel", null)
-                .show();
+        showNotificationConfirmationDialog("Send Notifications", message, () -> sendNotificationsToWaitlisted());
     }
 
     private void sendNotificationsToWaitlisted() {

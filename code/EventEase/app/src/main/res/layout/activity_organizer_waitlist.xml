@@ -63,6 +63,7 @@
                 android:contentDescription="Share QR"
                 android:clickable="true"
                 android:focusable="true" />
+
         </LinearLayout>
 
         <TextView

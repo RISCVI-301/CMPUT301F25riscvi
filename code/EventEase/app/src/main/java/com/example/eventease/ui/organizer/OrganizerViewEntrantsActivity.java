@@ -191,12 +191,7 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
         int count = selectedList.size();
         String message = "Send notifications to " + count + " selected entrant" + (count > 1 ? "s" : "") + "? They will receive push notifications even when the app is closed.";
 
-        new MaterialAlertDialogBuilder(this)
-                .setTitle("Send Notifications")
-                .setMessage(message)
-                .setPositiveButton("Send", (dialog, which) -> sendNotificationsToSelected())
-                .setNegativeButton("Cancel", null)
-                .show();
+        showNotificationConfirmationDialog("Send Notifications", message, () -> sendNotificationsToSelected());
     }
 
     private void sendNotificationsToSelected() {
@@ -245,12 +240,7 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
         int count = notSelectedList.size();
         String message = "Send notifications to " + count + " not selected entrant" + (count > 1 ? "s" : "") + "? They will receive push notifications even when the app is closed.";
 
-        new MaterialAlertDialogBuilder(this)
-                .setTitle("Send Notifications")
-                .setMessage(message)
-                .setPositiveButton("Send", (dialog, which) -> sendNotificationsToNotSelected())
-                .setNegativeButton("Cancel", null)
-                .show();
+        showNotificationConfirmationDialog("Send Notifications", message, () -> sendNotificationsToNotSelected());
     }
 
     private void sendNotificationsToNotSelected() {
@@ -297,12 +287,7 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
         int count = cancelledList.size();
         String message = "Send notifications to " + count + " cancelled entrant" + (count > 1 ? "s" : "") + "? They will receive push notifications even when the app is closed.";
 
-        new MaterialAlertDialogBuilder(this)
-                .setTitle("Send Notifications")
-                .setMessage(message)
-                .setPositiveButton("Send", (dialog, which) -> sendNotificationsToCancelled())
-                .setNegativeButton("Cancel", null)
-                .show();
+        showNotificationConfirmationDialog("Send Notifications", message, () -> sendNotificationsToCancelled());
     }
 
     private void sendNotificationsToCancelled() {
@@ -866,6 +851,83 @@ public class OrganizerViewEntrantsActivity extends AppCompatActivity {
         } catch (Exception e) {
             Log.e(TAG, "Failed to blur bitmap", e);
             return bitmap;
+        }
+    }
+
+    private void showNotificationConfirmationDialog(String title, String message, Runnable onConfirm) {
+        // Capture screenshot and blur it
+        Bitmap screenshot = captureScreenshot();
+        Bitmap blurredBitmap = blurBitmap(screenshot, 25f);
+        
+        // Create custom dialog with full screen to show blur background
+        android.app.Dialog dialog = new android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen);
+        dialog.setContentView(R.layout.organizer_dialog_notification_confirmation);
+        
+        // Set window properties
+        android.view.Window window = dialog.getWindow();
+        if (window != null) {
+            window.setLayout(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT
+            );
+            window.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+            
+            // Disable dim since we have our own blur background
+            android.view.WindowManager.LayoutParams layoutParams = window.getAttributes();
+            layoutParams.dimAmount = 0f;
+            window.setAttributes(layoutParams);
+            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+        }
+        
+        // Apply blurred background
+        android.view.View blurBackground = dialog.findViewById(R.id.dialogBlurBackground);
+        if (blurredBitmap != null) {
+            blurBackground.setBackground(new BitmapDrawable(getResources(), blurredBitmap));
+        }
+        
+        // Make the background clickable to dismiss
+        blurBackground.setOnClickListener(v -> dialog.dismiss());
+        
+        // Get the CardView for animation
+        androidx.cardview.widget.CardView cardView = dialog.findViewById(R.id.dialogCardView);
+        
+        // Set up dialog views
+        TextView tvTitle = dialog.findViewById(R.id.tvDialogTitle);
+        TextView tvMessage = dialog.findViewById(R.id.tvDialogMessage);
+        android.widget.Button btnCancel = dialog.findViewById(R.id.btnDialogCancel);
+        android.widget.Button btnSend = dialog.findViewById(R.id.btnDialogSend);
+        
+        // Set content
+        if (tvTitle != null) {
+            tvTitle.setText(title);
+        }
+        if (tvMessage != null) {
+            tvMessage.setText(message);
+        }
+        
+        // Set button click listeners
+        if (btnCancel != null) {
+            btnCancel.setOnClickListener(v -> dialog.dismiss());
+        }
+        
+        if (btnSend != null && onConfirm != null) {
+            btnSend.setOnClickListener(v -> {
+                dialog.dismiss();
+                onConfirm.run();
+            });
+        }
+        
+        dialog.show();
+        
+        // Apply animations after dialog is shown
+        android.view.animation.Animation fadeIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_fade_in);
+        android.view.animation.Animation zoomIn = android.view.animation.AnimationUtils.loadAnimation(this, R.anim.entrant_dialog_zoom_in);
+        
+        if (blurBackground != null) {
+            blurBackground.startAnimation(fadeIn);
+        }
+        if (cardView != null) {
+            cardView.startAnimation(zoomIn);
         }
     }
 
