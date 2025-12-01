@@ -237,7 +237,10 @@ public class ReplacementHelperTest {
     }
 
     private int calculateReplacementCount(int currentSelected, int cancelledCount) {
-        return cancelledCount;
+        if (cancelledCount <= 0 || currentSelected <= 0) {
+            return 0;
+        }
+        return Math.min(cancelledCount, currentSelected);
     }
 
     private List<Map<String, Object>> randomlySelect(List<Map<String, Object>> allDocs, int count) {

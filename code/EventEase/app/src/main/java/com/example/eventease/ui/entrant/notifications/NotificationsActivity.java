@@ -9,8 +9,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import com.example.eventease.R;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
+import com.example.eventease.auth.DeviceAuthManager;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.ListenerRegistration;
@@ -34,7 +33,7 @@ public class NotificationsActivity extends AppCompatActivity {
     private View emptyView;
     private NotificationsAdapter adapter;
     private FirebaseFirestore db;
-    private FirebaseAuth mAuth;
+    private DeviceAuthManager authManager;
     private ListenerRegistration notificationListener;
     private Set<String> loadedNotificationIds = new HashSet<>();
     private boolean isFirstLoad = true;
@@ -47,7 +46,7 @@ public class NotificationsActivity extends AppCompatActivity {
         setContentView(R.layout.entrant_activity_notifications);
 
         db = FirebaseFirestore.getInstance();
-        mAuth = FirebaseAuth.getInstance();
+        authManager = new DeviceAuthManager(this);
         
         SharedPreferences prefs = getSharedPreferences("EventEasePrefs", Context.MODE_PRIVATE);
         lastSeenTime = prefs.getLong("lastNotificationSeenTime", 0);
@@ -57,7 +56,15 @@ public class NotificationsActivity extends AppCompatActivity {
 
         ImageButton btnBack = findViewById(R.id.btnBack);
         if (btnBack != null) {
-            btnBack.setOnClickListener(v -> finish());
+            btnBack.setOnClickListener(v -> {
+                android.util.Log.d(TAG, "Back button clicked");
+                finish();
+            });
+            // Ensure the button is clickable
+            btnBack.setClickable(true);
+            btnBack.setFocusable(true);
+        } else {
+            android.util.Log.e(TAG, "Back button not found in layout");
         }
 
         recyclerView = findViewById(R.id.notificationsRecyclerView);
@@ -91,18 +98,22 @@ public class NotificationsActivity extends AppCompatActivity {
             notificationListener = null;
         }
     }
+    
+    @Override
+    public void onBackPressed() {
+        super.onBackPressed();
+        finish();
+    }
 
     private void setupRealtimeListener() {
         if (notificationListener != null) {
             return;
         }
 
-        FirebaseUser currentUser = mAuth.getCurrentUser();
-        if (currentUser == null) {
+        String uid = authManager.getUid();
+        if (uid == null || uid.isEmpty()) {
             return;
         }
-
-        String uid = currentUser.getUid();
 
         notificationListener = db.collection("notificationRequests")
                 .addSnapshotListener((querySnapshot, e) -> {
@@ -165,13 +176,12 @@ public class NotificationsActivity extends AppCompatActivity {
     }
 
     private void loadNotifications() {
-        FirebaseUser currentUser = mAuth.getCurrentUser();
-        if (currentUser == null) {
+        String uid = authManager.getUid();
+        if (uid == null || uid.isEmpty()) {
             showEmpty();
             return;
         }
 
-        String uid = currentUser.getUid();
         setLoading(true);
 
         loadNotificationRequests(uid, new ArrayList<>());
@@ -179,11 +189,16 @@ public class NotificationsActivity extends AppCompatActivity {
 
     private void loadNotificationRequests(String uid, List<NotificationItem> existingNotifications) {
         android.util.Log.d(TAG, "Loading notification requests for user: " + uid);
+        android.util.Log.d(TAG, "Current existingNotifications size: " + existingNotifications.size());
+        
         db.collection("notificationRequests")
                 .orderBy("createdAt", Query.Direction.DESCENDING)
                 .limit(100)
                 .get()
                 .addOnSuccessListener(querySnapshot -> {
+                    android.util.Log.d(TAG, "Query success! Found " + querySnapshot.size() + " total notificationRequests documents");
+                    
+                    int matchedCount = 0;
                     for (QueryDocumentSnapshot doc : querySnapshot) {
                         String docId = doc.getId();
                         Object userIdsObj = doc.get("userIds");
@@ -191,6 +206,7 @@ public class NotificationsActivity extends AppCompatActivity {
                         if (userIdsObj instanceof List) {
                             userIds = (List<String>) userIdsObj;
                         } else if (userIdsObj != null) {
+                            android.util.Log.w(TAG, "userIds is not a List for doc " + docId);
                             continue;
                         }
                         
@@ -198,6 +214,7 @@ public class NotificationsActivity extends AppCompatActivity {
                             continue;
                         }
                         
+                        matchedCount++;
                         NotificationItem item = new NotificationItem();
                         item.id = docId;
                         item.title = doc.getString("title");
@@ -209,13 +226,19 @@ public class NotificationsActivity extends AppCompatActivity {
                         item.groupType = doc.getString("groupType");
                         existingNotifications.add(item);
                         loadedNotificationIds.add(item.id);
+                        
+                        android.util.Log.d(TAG, "Added notification: " + item.title + " (created: " + item.createdAt + ")");
                     }
+                    
+                    android.util.Log.d(TAG, "Matched " + matchedCount + " notifications for user " + uid);
+                    android.util.Log.d(TAG, "Total existingNotifications after matching: " + existingNotifications.size());
                     
                     loadInvitationsAsNotifications(uid, existingNotifications);
                 })
                 .addOnFailureListener(e -> {
                     android.util.Log.e(TAG, "Failed to load notifications with orderBy", e);
                     if (e.getMessage() != null && e.getMessage().contains("index")) {
+                        android.util.Log.d(TAG, "Index error detected, falling back to query without orderBy");
                         loadNotificationsWithoutOrderBy(uid, existingNotifications);
                     } else {
                         loadInvitationsAsNotifications(uid, existingNotifications);

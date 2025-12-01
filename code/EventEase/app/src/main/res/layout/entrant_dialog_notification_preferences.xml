@@ -34,7 +34,6 @@
             android:textColor="#223C65"
             android:padding="28dp"
             android:paddingBottom="20dp"
-            android:fontFamily="@font/entrant_fredoka_one"
             android:background="#FFFFFF"
             android:shadowColor="#80000000"
             android:shadowDx="0"
@@ -62,7 +61,7 @@
                 android:text="Choose which notifications you want to receive:"
                 android:textSize="18sp"
                 android:textColor="#223C65"
-                android:fontFamily="@font/entrant_fredoka_one"
+                android:textStyle="bold"
                 android:layout_marginBottom="24dp"/>
 
             <!-- Invited Notifications Option -->
@@ -88,7 +87,6 @@
                         android:textSize="20sp"
                         android:textStyle="bold"
                         android:textColor="#223C65"
-                        android:fontFamily="@font/entrant_fredoka_one"
                         android:layout_marginBottom="4dp"/>
 
                     <TextView
@@ -97,7 +95,7 @@
                         android:text="Receive notifications when you're chosen from the waiting list"
                         android:textSize="14sp"
                         android:textColor="#446EAF"
-                        android:fontFamily="@font/entrant_fredoka_one"/>
+                        android:textStyle="bold"/>
                 </LinearLayout>
 
                 <com.google.android.material.switchmaterial.SwitchMaterial
@@ -131,7 +129,6 @@
                         android:textSize="20sp"
                         android:textStyle="bold"
                         android:textColor="#223C65"
-                        android:fontFamily="@font/entrant_fredoka_one"
                         android:layout_marginBottom="4dp"/>
 
                     <TextView
@@ -140,7 +137,7 @@
                         android:text="Receive notifications when you're not chosen from the waiting list"
                         android:textSize="14sp"
                         android:textColor="#446EAF"
-                        android:fontFamily="@font/entrant_fredoka_one"/>
+                        android:textStyle="bold"/>
                 </LinearLayout>
 
                 <com.google.android.material.switchmaterial.SwitchMaterial
@@ -171,7 +168,6 @@
             android:background="@drawable/entrant_button_guidelines_ok"
             android:layout_margin="28dp"
             android:layout_marginTop="20dp"
-            android:fontFamily="@font/entrant_fredoka_one"
             android:elevation="8dp"
             style="@style/Widget.AppCompat.Button.Borderless"/>
 

@@ -4,6 +4,7 @@ import com.example.eventease.model.Event;
 import com.example.eventease.testdata.TestDataHelper;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
+import com.example.eventease.TestTasks;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -60,7 +61,7 @@ public class EventRepositoryTest {
         
         // Get open events
         Task<List<Event>> openEventsTask = eventRepo.getOpenEvents(new Date(now));
-        List<Event> openEvents = Tasks.await(openEventsTask);
+        List<Event> openEvents = TestTasks.await(openEventsTask);
         
         assertTrue("Task should succeed", openEventsTask.isSuccessful());
         assertNotNull("Open events list should not be null", openEvents);
@@ -81,7 +82,7 @@ public class EventRepositoryTest {
     public void testGetOpenEvents_emptyWhenNoEvents() throws Exception {
         // Get open events when no events exist
         Task<List<Event>> openEventsTask = eventRepo.getOpenEvents(new Date());
-        List<Event> openEvents = Tasks.await(openEventsTask);
+        List<Event> openEvents = TestTasks.await(openEventsTask);
         
         assertTrue("Task should succeed", openEventsTask.isSuccessful());
         assertNotNull("Open events list should not be null", openEvents);
@@ -98,7 +99,7 @@ public class EventRepositoryTest {
         
         // Get event by ID
         Task<Event> eventTask = eventRepo.getEvent("testEvent");
-        Event retrievedEvent = Tasks.await(eventTask);
+        Event retrievedEvent = TestTasks.await(eventTask);
         
         assertTrue("Task should succeed", eventTask.isSuccessful());
         assertNotNull("Event should not be null", retrievedEvent);
@@ -110,7 +111,6 @@ public class EventRepositoryTest {
     public void testGetEvent_notFound() throws Exception {
         // Try to get non-existent event
         Task<Event> eventTask = eventRepo.getEvent("nonexistent");
-        Tasks.await(eventTask);
         
         assertFalse("Task should fail for non-existent event", eventTask.isSuccessful());
         assertNotNull("Should have exception", eventTask.getException());
@@ -126,7 +126,7 @@ public class EventRepositoryTest {
         
         // Get event and check waitlist count
         Task<Event> eventTask = eventRepo.getEvent("testEvent");
-        Event event = Tasks.await(eventTask);
+        Event event = TestTasks.await(eventTask);
         
         assertTrue("Task should succeed", eventTask.isSuccessful());
         assertNotNull("Event should not be null", event);
@@ -144,7 +144,7 @@ public class EventRepositoryTest {
         
         // Get event and verify waitlist count
         Task<Event> eventTask = eventRepo.getEvent("testEvent");
-        Event event = Tasks.await(eventTask);
+        Event event = TestTasks.await(eventTask);
         
         assertTrue("Task should succeed", eventTask.isSuccessful());
         assertEquals("Waitlist count should match waitlist size", 3, event.getWaitlistCount());
@@ -179,7 +179,7 @@ public class EventRepositoryTest {
         
         // Get open events
         Task<List<Event>> openEventsTask = eventRepo.getOpenEvents(new Date(now));
-        List<Event> openEvents = Tasks.await(openEventsTask);
+        List<Event> openEvents = TestTasks.await(openEventsTask);
         
         assertTrue("Task should succeed", openEventsTask.isSuccessful());
         assertEquals("Should return 3 events", 3, openEvents.size());
@@ -200,7 +200,7 @@ public class EventRepositoryTest {
         
         // Get event and check guidelines
         Task<Event> eventTask = eventRepo.getEvent("testEvent");
-        Event event = Tasks.await(eventTask);
+        Event event = TestTasks.await(eventTask);
         
         assertTrue("Task should succeed", eventTask.isSuccessful());
         assertNotNull("Event should not be null", event);

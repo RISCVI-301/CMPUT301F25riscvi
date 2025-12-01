@@ -3,251 +3,141 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/ee_navy_dark">
+    android:background="#223C65"
+    android:fitsSystemWindows="true">
 
-    <!-- Header -->
     <LinearLayout
         android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:paddingBottom="88dp">
+
+    <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/appBarLayout"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@color/ee_mint_aqua"
-        android:padding="16dp"
-        android:orientation="horizontal"
-        android:gravity="center_vertical">
+        android:background="@color/ee_topbar_bg"
+        app:elevation="0dp">
 
         <TextView
-            android:text="EventEase"
-            android:textStyle="bold"
-            android:textSize="28sp"
-            android:textColor="@color/ee_navy_dark"
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"/>
-    </LinearLayout>
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:textStyle="bold"
+            android:text="EventEase"
+            android:textColor="@color/ee_topbar_text"
+            android:textSize="36sp"
+            android:paddingTop="12dp"
+            android:paddingBottom="12dp"/>
 
-    <ScrollView
+    </com.google.android.material.appbar.AppBarLayout>
+
+    <androidx.cardview.widget.CardView
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_marginTop="64dp"
-        android:clipToPadding="false"
-        android:paddingBottom="160dp">
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        app:cardCornerRadius="20dp"
+        app:cardBackgroundColor="#536C8C"
+        android:elevation="8dp">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
+            android:orientation="horizontal"
             android:padding="20dp">
 
-            <!-- Profile card -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="@drawable/ee_card_bg"
-                android:orientation="horizontal"
-                android:padding="16dp"
-                android:gravity="center_vertical">
-
-                <ImageView
-                    android:id="@+id/ivAvatar"
-                    android:layout_width="72dp"
-                    android:layout_height="72dp"
-                    android:src="@android:drawable/ic_menu_myplaces"
-                    android:tint="@color/ee_mint_aqua"/>
-
-                <TextView
-                    android:id="@+id/tvFullName"
-                    android:layout_marginStart="16dp"
-                    android:text="Full Name"
-                    android:textStyle="bold"
-                    android:textSize="22sp"
-                    android:textColor="@color/ee_text_light"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"/>
-
-                <ImageButton
-                    android:id="@+id/btnEditProfile"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:background="@drawable/ee_card_bg"
-                    android:contentDescription="Edit profile"
-                    android:src="@android:drawable/ic_menu_manage"
-                    android:tint="@color/ee_text_light"/>
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_marginTop="16dp"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="@drawable/ee_card_bg"
-                android:orientation="vertical"
-                android:padding="16dp">
-
-                <TextView
-                    android:text="Authentication Info"
-                    android:textStyle="bold"
-                    android:textSize="16sp"
-                    android:textColor="@color/ee_text_light"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"/>
-
-                <TextView
-                    android:id="@+id/tvUserId"
-                    android:layout_marginTop="8dp"
-                    android:text="Loading..."
-                    android:textSize="12sp"
-                    android:textColor="@color/ee_text_light"
-                    android:fontFamily="monospace"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"/>
-            </LinearLayout>
-
-            <!-- Notifications row -->
-            <LinearLayout
-                android:id="@+id/rowNotifications"
-                android:layout_marginTop="16dp"
-                android:layout_width="match_parent"
+            <com.google.android.material.imageview.ShapeableImageView
+                android:id="@+id/ivAvatar"
+                android:layout_width="64dp"
                 android:layout_height="64dp"
-                android:background="@drawable/ee_card_bg"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:padding="16dp"
-                android:clickable="true"
-                android:focusable="true"
-                android:foreground="?attr/selectableItemBackgroundBorderless">
-
-                <TextView
-                    android:text="Notifications"
-                    android:textStyle="bold"
-                    android:textSize="20sp"
-                    android:textColor="@color/ee_text_light"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"/>
-
-                <ImageView
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:tint="@color/ee_text_light"
-                    android:src="@android:drawable/ic_media_next" />
-            </LinearLayout>
-
-        </LinearLayout>
-    </ScrollView>
-
-    <!-- Fixed footer with actions above the bottom bar -->
-    <LinearLayout
-        android:id="@+id/actionFooter"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom"
-        android:orientation="vertical"
-        android:padding="16dp"
-        android:background="@color/ee_navy_dark"
-        android:layout_marginBottom="112dp">
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnSwitchRole"
-            style="@style/Widget.MaterialComponents.Button"
-            android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:text="Switch to entrant view"
-            android:textStyle="bold"
-            android:textSize="16sp"
-            android:textColor="@color/ee_navy_dark"
-            app:backgroundTint="@color/ee_mint_aqua"
-            app:cornerRadius="12dp"/>
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnDeleteProfile"
-            style="@style/Widget.MaterialComponents.Button"
-            android:layout_marginTop="12dp"
-            android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:text="Delete Profile"
-            android:textStyle="bold"
-            android:textSize="16sp"
-            android:textColor="@android:color/white"
-            app:backgroundTint="#C97777"
-            app:cornerRadius="12dp"/>
-    </LinearLayout>
-
-    <!-- Bottom bar with My Events (left), center FAB, Account (right) -->
-    <LinearLayout
-        android:id="@+id/bottomBar"
-        android:layout_width="match_parent"
-        android:layout_height="72dp"
-        android:layout_gravity="bottom"
-        android:background="@color/toolbar_button"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
-
-        <LinearLayout
-            android:id="@+id/btnMyEvents"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:clickable="true"
-            android:focusable="true"
-            android:foreground="?attr/selectableItemBackgroundBorderless">
-
-            <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:tint="@color/ee_navy_dark"
-                android:src="@android:drawable/ic_menu_agenda" />
+                android:scaleType="centerCrop"
+                app:shapeAppearanceOverlay="@style/CircularImageView"
+                android:src="@drawable/entrant_icon"/>
 
             <TextView
-                android:text="My Events"
-                android:textColor="@color/ee_navy_dark"
-                android:textSize="12sp"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content" />
-        </LinearLayout>
+                android:id="@+id/tvFullName"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Full Name"
+                android:textSize="28sp"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold"
+                android:layout_gravity="center_vertical"
+                android:layout_marginStart="16dp"/>
 
+            <ImageView
+                android:id="@+id/btnEditProfile"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:src="@drawable/entrant_ic_settings"
+                android:layout_gravity="center_vertical"
+                app:tint="#FFFFFF"/>
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
+        <!-- Flexible spacer to push action buttons towards the bottom,
+             so they sit just above the bottom navigation bar -->
         <Space
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
             android:layout_weight="1" />
 
-        <LinearLayout
-            android:id="@+id/btnAccount"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
+    <androidx.cardview.widget.CardView
+        android:id="@+id/btnSwitchRole"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginVertical="8dp"
+        app:cardCornerRadius="16dp"
+        app:cardBackgroundColor="#B8E2D7"
+        android:elevation="8dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:foreground="?attr/selectableItemBackgroundBorderless">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Switch to entrant view"
+            android:textSize="24sp"
+            android:textColor="#223C65"
+            android:textStyle="bold"
             android:gravity="center"
-            android:orientation="vertical"
+            android:padding="16dp"/>
+    </androidx.cardview.widget.CardView>
+
+        <androidx.cardview.widget.CardView
+            android:id="@+id/btnDeleteProfile"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_margin="16dp"
+            app:cardCornerRadius="16dp"
+            app:cardBackgroundColor="#E57373"
+            android:elevation="8dp"
             android:clickable="true"
             android:focusable="true"
             android:foreground="?attr/selectableItemBackgroundBorderless">
 
-            <ImageView
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:tint="@color/ee_navy_dark"
-                android:src="@android:drawable/ic_menu_myplaces" />
-
             <TextView
-                android:text="Account"
-                android:textColor="@color/ee_navy_dark"
-                android:textSize="12sp"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content" />
-        </LinearLayout>
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Delete Profile"
+                android:textSize="24sp"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:padding="16dp" />
+        </androidx.cardview.widget.CardView>
+
     </LinearLayout>
 
-    <!-- Center FAB for create event -->
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/fabAdd"
-        android:layout_width="64dp"
-        android:layout_height="64dp"
-        android:src="@android:drawable/ic_input_add"
-        app:tint="@color/ee_navy_dark"
-        app:backgroundTint="@color/toolbar_button"
-        app:fabCustomSize="64dp"
-        app:layout_anchor="@id/bottomBar"
-        app:layout_anchorGravity="top|center"/>
+    <!-- Bottom nav include pinned to the bottom of the screen -->
+    <include
+        android:id="@+id/include_bottom"
+        layout="@layout/organizer_include_bottom_nav"
+        android:layout_width="match_parent"
+        android:layout_height="88dp"
+        android:layout_gravity="bottom" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

@@ -5,6 +5,7 @@ import com.example.eventease.model.Invitation;
 import com.example.eventease.testdata.TestDataHelper;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
+import com.example.eventease.TestTasks;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -46,7 +47,7 @@ public class InvitationRepositoryTest {
         
         // Accept invitation
         Task<Void> acceptTask = invitationRepo.accept(testInvitationId, testEventId, testUserId);
-        Tasks.await(acceptTask);
+        TestTasks.await(acceptTask);
         
         assertTrue("Accept task should succeed", acceptTask.isSuccessful());
         
@@ -58,7 +59,7 @@ public class InvitationRepositoryTest {
         
         // Verify user is admitted
         Task<Boolean> isAdmittedTask = admittedRepo.isAdmitted(testEventId, testUserId);
-        Boolean isAdmitted = Tasks.await(isAdmittedTask);
+        Boolean isAdmitted = TestTasks.await(isAdmittedTask);
         assertTrue("User should be admitted after accepting invitation", isAdmitted);
     }
     
@@ -71,7 +72,7 @@ public class InvitationRepositoryTest {
         
         // Decline invitation
         Task<Void> declineTask = invitationRepo.decline(testInvitationId, testEventId, testUserId);
-        Tasks.await(declineTask);
+        TestTasks.await(declineTask);
         
         assertTrue("Decline task should succeed", declineTask.isSuccessful());
         
@@ -83,7 +84,7 @@ public class InvitationRepositoryTest {
         
         // Verify user is NOT admitted
         Task<Boolean> isAdmittedTask = admittedRepo.isAdmitted(testEventId, testUserId);
-        Boolean isAdmitted = Tasks.await(isAdmittedTask);
+        Boolean isAdmitted = TestTasks.await(isAdmittedTask);
         assertFalse("User should not be admitted after declining invitation", isAdmitted);
     }
     
@@ -91,7 +92,6 @@ public class InvitationRepositoryTest {
     public void testAcceptInvitation_notFound() throws Exception {
         // Try to accept non-existent invitation
         Task<Void> acceptTask = invitationRepo.accept("nonexistent", testEventId, testUserId);
-        Tasks.await(acceptTask);
         
         assertFalse("Accept should fail for non-existent invitation", acceptTask.isSuccessful());
         assertNotNull("Should have exception", acceptTask.getException());
@@ -101,7 +101,6 @@ public class InvitationRepositoryTest {
     public void testDeclineInvitation_notFound() throws Exception {
         // Try to decline non-existent invitation
         Task<Void> declineTask = invitationRepo.decline("nonexistent", testEventId, testUserId);
-        Tasks.await(declineTask);
         
         assertFalse("Decline should fail for non-existent invitation", declineTask.isSuccessful());
         assertNotNull("Should have exception", declineTask.getException());
@@ -154,7 +153,7 @@ public class InvitationRepositoryTest {
         receivedInvitations.clear();
         
         // Accept invitation
-        Tasks.await(invitationRepo.accept(testInvitationId, testEventId, testUserId));
+        TestTasks.await(invitationRepo.accept(testInvitationId, testEventId, testUserId));
         
         Thread.sleep(50);
         
@@ -240,11 +239,23 @@ public class InvitationRepositoryTest {
             
             inv.setStatus(Invitation.Status.ACCEPTED);
             
-            // Admit user to event
-            return admittedRepo.admit(eventId, uid).continueWithTask(task -> {
+            Task<Void> admitTask = admittedRepo.admit(eventId, uid);
+            if (!admitTask.isComplete()) {
+                return admitTask.continueWithTask(task -> {
+                    if (task.isSuccessful()) {
+                        notifyListeners(uid);
+                        return Tasks.forResult(null);
+                    }
+                    return Tasks.forException(task.getException());
+                });
+            }
+            
+            if (admitTask.isSuccessful()) {
                 notifyListeners(uid);
-                return task.isSuccessful() ? Tasks.forResult(null) : Tasks.forException(task.getException());
-            });
+                return Tasks.forResult(null);
+            } else {
+                return Tasks.forException(admitTask.getException());
+            }
         }
         
         @Override

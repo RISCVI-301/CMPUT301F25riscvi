@@ -3,8 +3,6 @@ package com.example.eventease.ui.entrant.profile;
 import android.content.Context;
 import android.net.Uri;
 import com.example.eventease.util.ToastUtil;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -24,7 +22,6 @@ public class ProfileUpdateHelper {
     
     private final FirebaseFirestore db;
     private final FirebaseStorage storage;
-    private final FirebaseAuth auth;
     private final Context context;
     
     /**
@@ -44,31 +41,26 @@ public class ProfileUpdateHelper {
         this.context = context;
         this.db = FirebaseFirestore.getInstance();
         this.storage = FirebaseStorage.getInstance();
-        this.auth = FirebaseAuth.getInstance();
     }
     
     /**
-     * Saves profile changes (name, phone, and optionally profile picture).
+     * Saves profile changes (name, phone, email, and optionally profile picture).
      * 
      * @param name the new name (or empty to keep current)
      * @param phone the new phone (or empty to keep current)
+     * @param email the new email (or empty to keep current)
      * @param imageUri the new image URI (or null to keep current)
      * @param callback callback for update result
      */
-    public void saveChanges(String name, String phone, Uri imageUri, UpdateCallback callback) {
-        FirebaseUser currentUser = auth.getCurrentUser();
-        if (currentUser == null) {
-            if (callback != null) callback.onUpdateFailure("Not signed in");
+    public void saveChanges(String name, String phone, String email, Uri imageUri, UpdateCallback callback) {
+        com.example.eventease.auth.DeviceAuthManager authManager = 
+            new com.example.eventease.auth.DeviceAuthManager(context);
+        String uid = authManager.getUid();
+        if (uid == null || uid.isEmpty()) {
+            if (callback != null) callback.onUpdateFailure("No device ID found");
             return;
         }
         
-        if (currentUser.isAnonymous()) {
-            ToastUtil.showLong(context, "Cannot change email for guest accounts");
-            if (callback != null) callback.onUpdateFailure("Guest account");
-            return;
-        }
-        
-        String uid = currentUser.getUid();
         DocumentReference userRef = db.collection("users").document(uid);
         
         // First, load current values from Firestore to use if text boxes are empty
@@ -78,10 +70,12 @@ public class ProfileUpdateHelper {
             // Get current values from Firestore
             String currentName = documentSnapshot.exists() ? documentSnapshot.getString("name") : null;
             String currentPhone = documentSnapshot.exists() ? documentSnapshot.getString("phoneNumber") : null;
+            String currentEmail = documentSnapshot.exists() ? documentSnapshot.getString("email") : null;
             
             // Get new values from parameters
             String newName = name != null ? name.trim() : "";
             String newPhone = phone != null ? phone.trim() : "";
+            String newEmail = email != null ? email.trim() : "";
             
             // If text box is empty, use current value from Firestore (or null if it was null)
             if (newName.isEmpty()) {
@@ -105,6 +99,18 @@ public class ProfileUpdateHelper {
             } else {
                 // Use new value from text box
                 updates.put("phoneNumber", newPhone);
+            }
+
+            // If email text box is empty, use current value from Firestore (or null if it was null)
+            if (newEmail.isEmpty()) {
+                // Use current email if it exists, otherwise keep it as null/empty
+                if (currentEmail != null && !currentEmail.isEmpty()) {
+                    updates.put("email", currentEmail);
+                }
+                // Keep as null/empty - don't update
+            } else {
+                // Use new value from text box
+                updates.put("email", newEmail);
             }
 
             Runnable continueProfileUpdate = () -> {
@@ -377,45 +383,10 @@ public class ProfileUpdateHelper {
     /**
      * Syncs email from Firebase Auth to Firestore.
      * Called after email verification to keep them in sync.
+     * NOTE: With device auth, no email syncing needed.
      */
     public void syncEmailToFirestore() {
-        FirebaseUser currentUser = auth.getCurrentUser();
-        if (currentUser == null) return;
-
-        currentUser.reload()
-            .addOnSuccessListener(unused -> {
-                String uid = currentUser.getUid();
-                String authEmail = currentUser.getEmail();
-                if (authEmail == null || authEmail.trim().isEmpty()) return;
-
-                DocumentReference userRef = db.collection("users").document(uid);
-                userRef.get().addOnSuccessListener(snap -> {
-                    if (snap != null && snap.exists()) {
-                        String dbEmail = snap.getString("email");
-                        if (dbEmail == null || !authEmail.equalsIgnoreCase(dbEmail)) {
-                            Map<String, Object> updates = new HashMap<>();
-                            updates.put("email", authEmail);
-                            updates.put("updatedAt", System.currentTimeMillis());
-                            userRef.update(updates)
-                                .addOnSuccessListener(aVoid -> {
-                                    // After successfully updating email, update event subcollections
-                                    updateEventSubcollections(uid);
-                                });
-                        }
-                    } else {
-                        // If doc missing, set minimal fields to avoid NPE elsewhere
-                        Map<String, Object> create = new HashMap<>();
-                        create.put("uid", uid);
-                        create.put("email", authEmail);
-                        create.put("updatedAt", System.currentTimeMillis());
-                        userRef.set(create, com.google.firebase.firestore.SetOptions.merge())
-                            .addOnSuccessListener(aVoid -> {
-                                // After successfully creating/updating email, update event subcollections
-                                updateEventSubcollections(uid);
-                            });
-                    }
-                });
-            });
+        // Device auth - no email syncing needed
     }
 }
 

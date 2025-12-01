@@ -22,7 +22,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
-import com.example.eventease.auth.AuthManager;
 import com.example.eventease.data.WaitlistRepository;
 import com.example.eventease.model.Event;
 import com.bumptech.glide.Glide;
@@ -63,6 +62,7 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
     private ProgressBar progressBar;
     private ImageButton shareButton;
     private Button waitlistButton;
+    private androidx.cardview.widget.CardView waitlistCard;
     private String guidelinesBody;
 
     private ListenerRegistration eventRegistration;
@@ -70,7 +70,6 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
     private FirebaseFirestore firestore;
     
     private WaitlistRepository waitlistRepo;
-    private AuthManager authManager;
 
     private Event currentEvent;
     private String eventId;
@@ -87,7 +86,6 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
 
         // Initialize repositories
         waitlistRepo = App.graph().waitlists;
-        authManager = App.graph().auth;
 
         bindViews();
 
@@ -132,6 +130,7 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
         contentContainer = findViewById(R.id.eventDetailContent);
         shareButton = findViewById(R.id.btnShare);
         waitlistButton = findViewById(R.id.waitlist_join);
+        waitlistCard = findViewById(R.id.waitlistCard);
         Button guidelinesButton = findViewById(R.id.btnGuidelines);
         ImageButton backButton = findViewById(R.id.btnBack);
 
@@ -465,11 +464,11 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
      * Check if the current user is already in the waitlist
      */
     private void checkWaitlistStatus() {
-        if (authManager == null || waitlistRepo == null || TextUtils.isEmpty(eventId)) {
+        if (waitlistRepo == null || TextUtils.isEmpty(eventId)) {
             return;
         }
 
-        String uid = authManager.getUid();
+        String uid = com.example.eventease.auth.AuthHelper.getUid(this);
         waitlistRepo.isJoined(eventId, uid)
                 .addOnSuccessListener(joined -> {
                     isUserInWaitlist = joined != null && joined;
@@ -494,8 +493,8 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
             return;
         }
 
-        if (authManager == null || waitlistRepo == null || TextUtils.isEmpty(eventId)) {
-            android.util.Log.e("EventDetailsDiscover", "Cannot join: authManager=" + authManager + ", waitlistRepo=" + waitlistRepo + ", eventId=" + eventId);
+        if (waitlistRepo == null || TextUtils.isEmpty(eventId)) {
+            android.util.Log.e("EventDetailsDiscover", "Cannot join: waitlistRepo=" + waitlistRepo + ", eventId=" + eventId);
             Toast.makeText(this, "Unable to join waitlist. Please try again.", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -520,9 +519,10 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
 
         // Disable button to prevent multiple clicks
         waitlistButton.setEnabled(false);
-        android.util.Log.d("EventDetailsDiscover", "Calling waitlistRepo.join for eventId=" + eventId + ", uid=" + authManager.getUid());
+        String currentUid = com.example.eventease.auth.AuthHelper.getUid(this);
+        android.util.Log.d("EventDetailsDiscover", "Calling waitlistRepo.join for eventId=" + eventId + ", uid=" + currentUid);
 
-        String uid = authManager.getUid();
+        String uid = com.example.eventease.auth.AuthHelper.getUid(this);
         waitlistRepo.join(eventId, uid)
                 .addOnSuccessListener(aVoid -> {
                     android.util.Log.d("EventDetailsDiscover", "Successfully joined waitlist");
@@ -548,7 +548,7 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
      * Handle opt out from waitlist
      */
     private void handleOptOut() {
-        if (authManager == null || waitlistRepo == null || TextUtils.isEmpty(eventId)) {
+        if (waitlistRepo == null || TextUtils.isEmpty(eventId)) {
             Toast.makeText(this, "Unable to leave waitlist. Please try again.", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -556,7 +556,7 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
         // Disable button to prevent multiple clicks
         waitlistButton.setEnabled(false);
 
-        String uid = authManager.getUid();
+        String uid = com.example.eventease.auth.AuthHelper.getUid(this);
         waitlistRepo.leave(eventId, uid)
                 .addOnSuccessListener(aVoid -> {
                     isUserInWaitlist = false;
@@ -584,17 +584,32 @@ public class EventDetailsDiscoverActivity extends AppCompatActivity {
         if (isUserInWaitlist) {
             waitlistButton.setText("Opt Out");
             waitlistButton.setEnabled(true);
+            // Change CardView background to red and text to white for Opt Out
+            if (waitlistCard != null) {
+                waitlistCard.setCardBackgroundColor(android.graphics.Color.parseColor("#E57373"));
+            }
+            waitlistButton.setTextColor(android.graphics.Color.WHITE);
         } else {
             // Check if capacity is full
             boolean isCapacityFull = isCapacityFull();
             if (isCapacityFull) {
                 waitlistButton.setText("Capacity Full");
                 waitlistButton.setEnabled(false);
+                // Keep blue color for disabled state
+                if (waitlistCard != null) {
+                    waitlistCard.setCardBackgroundColor(android.graphics.Color.parseColor("#7FDBDA"));
+                }
+                waitlistButton.setTextColor(android.graphics.Color.parseColor("#2C4A6E"));
             } else {
                 // Check if registration period has ended or other restrictions
                 boolean canJoin = canJoinWaitlist();
                 waitlistButton.setText("Join Waitlist");
                 waitlistButton.setEnabled(canJoin);
+                // Change CardView background to blue for Join Waitlist
+                if (waitlistCard != null) {
+                    waitlistCard.setCardBackgroundColor(android.graphics.Color.parseColor("#7FDBDA"));
+                }
+                waitlistButton.setTextColor(android.graphics.Color.parseColor("#2C4A6E"));
             }
         }
     }

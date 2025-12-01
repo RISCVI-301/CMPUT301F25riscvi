@@ -30,6 +30,63 @@ public class ProfileDeletionHelper {
         this.db = FirebaseFirestore.getInstance();
     }
     
+    /**
+     * Deletes all events created by an organizer.
+     * @param uid the organizer's user ID
+     * @return a Task that completes when all events are deleted
+     */
+    public com.google.android.gms.tasks.Task<Void> deleteOrganizerEvents(String uid) {
+        if (uid == null || uid.trim().isEmpty()) {
+            Log.w(TAG, "deleteOrganizerEvents: UID is null or empty, skipping delete");
+            return com.google.android.gms.tasks.Tasks.forResult(null);
+        }
+
+        return db.collection("events")
+                .whereEqualTo("organizerId", uid)
+                .get()
+                .continueWithTask(queryTask -> {
+                    if (!queryTask.isSuccessful() || queryTask.getResult() == null) {
+                        Log.e(TAG, "deleteOrganizerEvents: Failed to fetch events for organizer: " + uid, queryTask.getException());
+                        return com.google.android.gms.tasks.Tasks.forResult(null);
+                    }
+
+                    QuerySnapshot qs = queryTask.getResult();
+                    if (qs.isEmpty()) {
+                        Log.d(TAG, "deleteOrganizerEvents: No events found for organizer: " + uid);
+                        return com.google.android.gms.tasks.Tasks.forResult(null);
+                    }
+
+                    Log.d(TAG, "deleteOrganizerEvents: Found " + qs.size() + " events to delete for organizer: " + uid);
+                    List<com.google.android.gms.tasks.Task<Void>> deleteTasks = new ArrayList<>();
+                    
+                    for (DocumentSnapshot d : qs.getDocuments()) {
+                        final String eventId = d.getId();
+                        deleteTasks.add(d.getReference().delete()
+                                .addOnSuccessListener(aVoid ->
+                                        Log.d(TAG, "deleteOrganizerEvents: Deleted event " + eventId +
+                                                " for organizer: " + uid))
+                                .addOnFailureListener(e ->
+                                        Log.e(TAG, "deleteOrganizerEvents: Failed to delete event " +
+                                                eventId + " for organizer: " + uid, e))
+                                .continueWith(task -> null));
+                    }
+
+                    if (deleteTasks.isEmpty()) {
+                        return com.google.android.gms.tasks.Tasks.forResult(null);
+                    }
+
+                    return com.google.android.gms.tasks.Tasks.whenAll(deleteTasks)
+                            .continueWith(allTasks -> {
+                                if (allTasks.isSuccessful()) {
+                                    Log.d(TAG, "deleteOrganizerEvents: Successfully deleted all " + qs.size() + " events for organizer: " + uid);
+                                } else {
+                                    Log.e(TAG, "deleteOrganizerEvents: Some events failed to delete for organizer: " + uid, allTasks.getException());
+                                }
+                                return null;
+                            });
+                });
+    }
+
     public void deleteAllUserReferences(String uid, DeletionCallback callback) {
         Log.d(TAG, "Starting deletion of all references for user: " + uid);
         
@@ -51,7 +108,8 @@ public class ProfileDeletionHelper {
                     "WaitlistedEntrants",
                     "SelectedEntrants",
                     "NonSelectedEntrants",
-                    "CancelledEntrants"
+                    "CancelledEntrants",
+                    "AdmittedEntrants"
                 };
                 
                 for (DocumentSnapshot eventDoc : eventsSnapshot.getDocuments()) {

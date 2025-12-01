@@ -12,13 +12,14 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@color/ee_topbar_bg"
-        app:elevation="0dp">
+        app:elevation="0dp"
+        app:liftOnScroll="false">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
-            android:fontFamily="@font/entrant_fredoka_one"
+            android:textStyle="bold"
             android:text="@string/app_name"
             android:textColor="@color/ee_topbar_text"
             android:textSize="36sp"
@@ -49,7 +50,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_centerInParent="true"
-                android:fontFamily="@font/entrant_fredoka_one"
+                android:textStyle="bold"
                 android:text="Event Name"
                 android:textColor="@android:color/white"
                 android:textSize="28sp"/>
@@ -113,7 +114,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:fontFamily="@font/entrant_fredoka_one"
+                    android:textStyle="bold"
                     android:text="Overview"
                     android:textColor="@android:color/white"
                     android:textSize="28sp"
@@ -163,7 +164,7 @@
                         android:layout_height="wrap_content"
                         android:layout_alignParentStart="true"
                         android:layout_centerVertical="true"
-                        android:fontFamily="@font/entrant_fredoka_one"
+                        android:textStyle="bold"
                         android:text="Number of entrants\non wait-list"
                         android:textColor="@android:color/white"
                         android:textSize="18sp"
@@ -175,7 +176,7 @@
                         android:layout_height="wrap_content"
                         android:layout_alignParentEnd="true"
                         android:layout_centerVertical="true"
-                        android:fontFamily="@font/entrant_fredoka_one"
+                        android:textStyle="bold"
                         android:text="12"
                         android:textColor="@android:color/white"
                         android:textSize="32sp"/>

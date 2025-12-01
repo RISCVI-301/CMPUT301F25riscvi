@@ -11,7 +11,6 @@ import android.widget.Toast;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
-import com.example.eventease.auth.AuthManager;
 import com.example.eventease.data.InvitationRepository;
 import com.example.eventease.data.WaitlistRepository;
 import com.example.eventease.App;
@@ -98,10 +97,12 @@ public class EventDetailActivity extends AppCompatActivity {
     private boolean hasInvitation;
     private String invitationId;
     private String eventQrPayload;
+    private boolean isPreviousEvent;  // Flag to indicate if viewing from Previous Events
+    private boolean isUpcomingEvent;  // Flag to indicate if viewing from Upcoming Events (already accepted)
+    private boolean isWaitlistedEvent;  // Flag to indicate if viewing from Waitlisted Events
     
     private InvitationRepository invitationRepo;
     private WaitlistRepository waitlistRepo;
-    private AuthManager authManager;
     private com.example.eventease.data.EventRepository eventRepo;
     private com.example.eventease.data.ListenerRegistration waitlistCountReg;
 
@@ -122,11 +123,17 @@ public class EventDetailActivity extends AppCompatActivity {
         eventWaitlistCount = getIntent().getIntExtra("eventWaitlistCount", 0);
         hasInvitation = getIntent().getBooleanExtra("hasInvitation", false);
         invitationId = getIntent().getStringExtra("invitationId");
+        isPreviousEvent = getIntent().getBooleanExtra("isPreviousEvent", false);
+        isWaitlistedEvent = getIntent().getBooleanExtra("isWaitlistedEvent", false);
+        
+        // Check if viewing from Upcoming Events (already accepted - not waitlisted, not previous, no invitation)
+        isUpcomingEvent = !hasInvitation && !isPreviousEvent && !isWaitlistedEvent;
+        
+        android.util.Log.d("EventDetailActivity", "Event flags: isPreviousEvent=" + isPreviousEvent + ", isUpcomingEvent=" + isUpcomingEvent + ", isWaitlistedEvent=" + isWaitlistedEvent + ", hasInvitation=" + hasInvitation);
         
         // Initialize repositories
         invitationRepo = App.graph().invitations;
         waitlistRepo = App.graph().waitlists;
-        authManager = App.graph().auth;
         eventRepo = App.graph().events;
 
         // Initialize views
@@ -148,6 +155,21 @@ public class EventDetailActivity extends AppCompatActivity {
         // Find card views
         waitlistCountCard = findViewById(R.id.waitlistCountCard);
         leaveWaitlistCard = findViewById(R.id.leaveWaitlistCard);
+
+        // CRITICAL: Hide ALL action buttons immediately for Previous/Upcoming events (read-only views)
+        // This prevents any flash of buttons before they're hidden
+        if (isPreviousEvent || isUpcomingEvent) {
+            android.util.Log.d("EventDetailActivity", "📖 READ-ONLY MODE - Hiding all action buttons immediately");
+            btnRegister.setVisibility(View.GONE);
+            btnDecline.setVisibility(View.GONE);
+            if (btnOptOut != null) {
+                btnOptOut.setVisibility(View.GONE);
+            }
+            if (btnLeaveWaitlist != null && leaveWaitlistCard != null) {
+                btnLeaveWaitlist.setVisibility(View.GONE);
+                leaveWaitlistCard.setVisibility(View.GONE);
+            }
+        }
 
         // Set up back button
         btnBack.setOnClickListener(v -> finish());
@@ -172,18 +194,17 @@ public class EventDetailActivity extends AppCompatActivity {
             declineInvitation();
         });
 
-        // Set up opt-out button
+        // Set up opt-out button (leave waitlist button removed - using only opt-out)
         if (btnOptOut != null) {
             btnOptOut.setOnClickListener(v -> {
                 showOptOutDialog();
             });
         }
 
-        // Set up leave waitlist button
-        if (btnLeaveWaitlist != null) {
-            btnLeaveWaitlist.setOnClickListener(v -> {
-                performOptOut(); // Reuse the opt-out functionality
-            });
+        // Hide leave waitlist button - using only opt-out button
+        if (btnLeaveWaitlist != null && leaveWaitlistCard != null) {
+            btnLeaveWaitlist.setVisibility(View.GONE);
+            leaveWaitlistCard.setVisibility(View.GONE);
         }
 
         // Check for invitation in real-time (in case it wasn't passed in Intent)
@@ -546,7 +567,7 @@ public class EventDetailActivity extends AppCompatActivity {
             return;
         }
         
-        String uid = authManager.getUid();
+        String uid = com.example.eventease.auth.AuthHelper.getUid(this);
         android.util.Log.d("EventDetailActivity", "Accepting invitation: " + invitationId + " for event: " + eventId + " by user: " + uid);
         
         // Show loading state
@@ -591,7 +612,13 @@ public class EventDetailActivity extends AppCompatActivity {
      * Checks for pending invitations for this event and updates UI accordingly.
      */
     private void checkForPendingInvitation() {
-        String uid = authManager.getUid();
+        // Skip invitation check for Previous/Upcoming events (read-only views)
+        if (isPreviousEvent || isUpcomingEvent) {
+            android.util.Log.d("EventDetailActivity", "Skipping invitation check - read-only view");
+            return;
+        }
+        
+        String uid = com.example.eventease.auth.AuthHelper.getUid(this);
         if (uid == null || eventId == null) {
             android.util.Log.w("EventDetailActivity", "Cannot check invitation - uid or eventId is null");
             updateButtonVisibility(false, null);
@@ -651,7 +678,26 @@ public class EventDetailActivity extends AppCompatActivity {
         android.util.Log.d("EventDetailActivity", "═══ Updating Button Visibility ═══");
         android.util.Log.d("EventDetailActivity", "Has Invite: " + hasInvite);
         android.util.Log.d("EventDetailActivity", "Invite ID: " + inviteId);
+        android.util.Log.d("EventDetailActivity", "Is Previous Event: " + isPreviousEvent);
+        android.util.Log.d("EventDetailActivity", "Is Upcoming Event: " + isUpcomingEvent);
+        android.util.Log.d("EventDetailActivity", "Is Waitlisted Event: " + isWaitlistedEvent);
         
+        // CRITICAL: Hide ALL action buttons for Previous and Upcoming events (read-only views)
+        if (isPreviousEvent || isUpcomingEvent) {
+            android.util.Log.d("EventDetailActivity", "📖 READ-ONLY MODE - Hiding all action buttons");
+            btnRegister.setVisibility(View.GONE);
+            btnDecline.setVisibility(View.GONE);
+            if (btnOptOut != null) {
+                btnOptOut.setVisibility(View.GONE);
+            }
+            if (btnLeaveWaitlist != null && leaveWaitlistCard != null) {
+                btnLeaveWaitlist.setVisibility(View.GONE);
+                leaveWaitlistCard.setVisibility(View.GONE);
+            }
+            return;
+        }
+        
+        // For waitlisted events: show accept/decline if invited, show opt-out if not invited
         if (hasInvite && inviteId != null) {
             // Has invitation - show accept/decline, hide opt-out
             android.util.Log.d("EventDetailActivity", "✅ SHOWING ACCEPT/DECLINE BUTTONS");
@@ -666,6 +712,7 @@ public class EventDetailActivity extends AppCompatActivity {
             if (btnOptOut != null) {
                 btnOptOut.setVisibility(View.GONE);
             }
+            // Leave waitlist button is always hidden (removed duplicate)
             if (btnLeaveWaitlist != null && leaveWaitlistCard != null) {
                 btnLeaveWaitlist.setVisibility(View.GONE);
                 leaveWaitlistCard.setVisibility(View.GONE);
@@ -686,9 +733,10 @@ public class EventDetailActivity extends AppCompatActivity {
             if (btnOptOut != null) {
                 btnOptOut.setVisibility(View.VISIBLE);
             }
+            // Leave waitlist button is always hidden (removed duplicate - using only opt-out)
             if (btnLeaveWaitlist != null && leaveWaitlistCard != null) {
-                btnLeaveWaitlist.setVisibility(View.VISIBLE);
-                leaveWaitlistCard.setVisibility(View.VISIBLE);
+                btnLeaveWaitlist.setVisibility(View.GONE);
+                leaveWaitlistCard.setVisibility(View.GONE);
             }
             
             this.invitationId = null;
@@ -711,7 +759,7 @@ public class EventDetailActivity extends AppCompatActivity {
             return;
         }
         
-        String uid = authManager.getUid();
+        String uid = com.example.eventease.auth.AuthHelper.getUid(this);
         android.util.Log.d("EventDetailActivity", "Declining invitation: " + invitationId + " for event: " + eventId + " by user: " + uid);
         
         // Show loading state
@@ -825,7 +873,7 @@ public class EventDetailActivity extends AppCompatActivity {
             return;
         }
         
-        String uid = authManager.getUid();
+        String uid = com.example.eventease.auth.AuthHelper.getUid(this);
         android.util.Log.d("EventDetailActivity", "Opting out from event: " + eventId + " by user: " + uid);
         
         // Show loading state

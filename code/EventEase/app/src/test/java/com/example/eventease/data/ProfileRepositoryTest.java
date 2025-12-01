@@ -4,6 +4,7 @@ import com.example.eventease.model.Profile;
 import com.example.eventease.testdata.TestDataHelper;
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
+import com.example.eventease.TestTasks;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -41,13 +42,13 @@ public class ProfileRepositoryTest {
         );
         
         Task<Void> createTask = profileRepo.createProfile(profile);
-        Tasks.await(createTask);
+        TestTasks.await(createTask);
         
         assertTrue("Create profile task should succeed", createTask.isSuccessful());
         
         // Verify profile was created
         Task<Profile> getTask = profileRepo.getProfile(testUserId);
-        Profile retrieved = Tasks.await(getTask);
+        Profile retrieved = TestTasks.await(getTask);
         
         assertTrue("Get profile task should succeed", getTask.isSuccessful());
         assertNotNull("Profile should not be null", retrieved);
@@ -62,13 +63,13 @@ public class ProfileRepositoryTest {
         Profile profile = TestDataHelper.createTestProfileWithPhone(testUserId);
         
         Task<Void> createTask = profileRepo.createProfile(profile);
-        Tasks.await(createTask);
+        TestTasks.await(createTask);
         
         assertTrue("Create profile task should succeed", createTask.isSuccessful());
         
         // Verify phone number was saved
         Task<Profile> getTask = profileRepo.getProfile(testUserId);
-        Profile retrieved = Tasks.await(getTask);
+        Profile retrieved = TestTasks.await(getTask);
         
         assertNotNull("Profile should not be null", retrieved);
         assertNotNull("Phone number should not be null", retrieved.getPhoneNumber());
@@ -82,13 +83,13 @@ public class ProfileRepositoryTest {
         // Phone number not set
         
         Task<Void> createTask = profileRepo.createProfile(profile);
-        Tasks.await(createTask);
+        TestTasks.await(createTask);
         
         assertTrue("Create profile task should succeed", createTask.isSuccessful());
         
         // Verify profile exists without phone number
         Task<Profile> getTask = profileRepo.getProfile(testUserId);
-        Profile retrieved = Tasks.await(getTask);
+        Profile retrieved = TestTasks.await(getTask);
         
         assertNotNull("Profile should not be null", retrieved);
         assertNull("Phone number should be null when not provided", retrieved.getPhoneNumber());
@@ -99,7 +100,7 @@ public class ProfileRepositoryTest {
         // US 01.02.02: Update information such as name, email and contact information
         // Create initial profile
         Profile initialProfile = TestDataHelper.createTestProfile(testUserId);
-        Tasks.await(profileRepo.createProfile(initialProfile));
+        TestTasks.await(profileRepo.createProfile(initialProfile));
         
         // Update name
         Profile update = new Profile();
@@ -107,13 +108,13 @@ public class ProfileRepositoryTest {
         update.setDisplayName("Jane Doe");
         
         Task<Void> updateTask = profileRepo.updateProfile(update);
-        Tasks.await(updateTask);
+        TestTasks.await(updateTask);
         
         assertTrue("Update profile task should succeed", updateTask.isSuccessful());
         
         // Verify name was updated
         Task<Profile> getTask = profileRepo.getProfile(testUserId);
-        Profile retrieved = Tasks.await(getTask);
+        Profile retrieved = TestTasks.await(getTask);
         
         assertEquals("Name should be updated", "Jane Doe", retrieved.getDisplayName());
         assertEquals("Email should remain unchanged", "john.doe@example.com", retrieved.getEmail());
@@ -123,7 +124,7 @@ public class ProfileRepositoryTest {
     public void testUpdateProfile_email() throws Exception {
         // US 01.02.02: Update email
         Profile initialProfile = TestDataHelper.createTestProfile(testUserId);
-        Tasks.await(profileRepo.createProfile(initialProfile));
+        TestTasks.await(profileRepo.createProfile(initialProfile));
         
         // Update email
         Profile update = new Profile();
@@ -131,13 +132,13 @@ public class ProfileRepositoryTest {
         update.setEmail("jane.doe@example.com");
         
         Task<Void> updateTask = profileRepo.updateProfile(update);
-        Tasks.await(updateTask);
+        TestTasks.await(updateTask);
         
         assertTrue("Update profile task should succeed", updateTask.isSuccessful());
         
         // Verify email was updated
         Task<Profile> getTask = profileRepo.getProfile(testUserId);
-        Profile retrieved = Tasks.await(getTask);
+        Profile retrieved = TestTasks.await(getTask);
         
         assertEquals("Email should be updated", "jane.doe@example.com", retrieved.getEmail());
         assertEquals("Name should remain unchanged", "John Doe", retrieved.getDisplayName());
@@ -147,7 +148,7 @@ public class ProfileRepositoryTest {
     public void testUpdateProfile_phoneNumber() throws Exception {
         // US 01.02.02: Update phone number
         Profile initialProfile = TestDataHelper.createTestProfile(testUserId);
-        Tasks.await(profileRepo.createProfile(initialProfile));
+        TestTasks.await(profileRepo.createProfile(initialProfile));
         
         // Update phone number
         Profile update = new Profile();
@@ -155,13 +156,13 @@ public class ProfileRepositoryTest {
         update.setPhoneNumber("+1-555-999-8888");
         
         Task<Void> updateTask = profileRepo.updateProfile(update);
-        Tasks.await(updateTask);
+        TestTasks.await(updateTask);
         
         assertTrue("Update profile task should succeed", updateTask.isSuccessful());
         
         // Verify phone number was updated
         Task<Profile> getTask = profileRepo.getProfile(testUserId);
-        Profile retrieved = Tasks.await(getTask);
+        Profile retrieved = TestTasks.await(getTask);
         
         assertEquals("Phone number should be updated", "+1-555-999-8888", retrieved.getPhoneNumber());
     }
@@ -170,7 +171,7 @@ public class ProfileRepositoryTest {
     public void testUpdateProfile_multipleFields() throws Exception {
         // US 01.02.02: Update multiple fields at once
         Profile initialProfile = TestDataHelper.createTestProfile(testUserId);
-        Tasks.await(profileRepo.createProfile(initialProfile));
+        TestTasks.await(profileRepo.createProfile(initialProfile));
         
         // Update multiple fields
         Profile update = new Profile();
@@ -181,13 +182,13 @@ public class ProfileRepositoryTest {
         update.setPhotoUrl("https://example.com/new-photo.jpg");
         
         Task<Void> updateTask = profileRepo.updateProfile(update);
-        Tasks.await(updateTask);
+        TestTasks.await(updateTask);
         
         assertTrue("Update profile task should succeed", updateTask.isSuccessful());
         
         // Verify all fields were updated
         Task<Profile> getTask = profileRepo.getProfile(testUserId);
-        Profile retrieved = Tasks.await(getTask);
+        Profile retrieved = TestTasks.await(getTask);
         
         assertEquals("Name should be updated", "Jane Smith", retrieved.getDisplayName());
         assertEquals("Email should be updated", "jane.smith@example.com", retrieved.getEmail());
@@ -200,22 +201,21 @@ public class ProfileRepositoryTest {
         // US 01.02.04: Delete profile if no longer wish to use the app
         // Create profile
         Profile profile = TestDataHelper.createTestProfile(testUserId);
-        Tasks.await(profileRepo.createProfile(profile));
+        TestTasks.await(profileRepo.createProfile(profile));
         
         // Verify profile exists
         Task<Profile> getBeforeTask = profileRepo.getProfile(testUserId);
-        Profile before = Tasks.await(getBeforeTask);
+        Profile before = TestTasks.await(getBeforeTask);
         assertNotNull("Profile should exist before deletion", before);
         
         // Delete profile
         Task<Void> deleteTask = profileRepo.deleteProfile(testUserId);
-        Tasks.await(deleteTask);
+        TestTasks.await(deleteTask);
         
         assertTrue("Delete profile task should succeed", deleteTask.isSuccessful());
         
         // Verify profile no longer exists
         Task<Profile> getAfterTask = profileRepo.getProfile(testUserId);
-        Tasks.await(getAfterTask);
         assertFalse("Get profile should fail after deletion", getAfterTask.isSuccessful());
     }
     
@@ -223,7 +223,7 @@ public class ProfileRepositoryTest {
     public void testDeleteProfile_notFound() throws Exception {
         // Try to delete non-existent profile - should succeed (idempotent)
         Task<Void> deleteTask = profileRepo.deleteProfile("nonexistent");
-        Tasks.await(deleteTask);
+        TestTasks.await(deleteTask);
         
         // Should succeed even if profile doesn't exist (idempotent operation)
         assertTrue("Delete should succeed even if profile doesn't exist", deleteTask.isSuccessful());
@@ -233,7 +233,6 @@ public class ProfileRepositoryTest {
     public void testGetProfile_notFound() throws Exception {
         // Try to get non-existent profile
         Task<Profile> getTask = profileRepo.getProfile("nonexistent");
-        Tasks.await(getTask);
         
         assertFalse("Get profile should fail for non-existent profile", getTask.isSuccessful());
         assertNotNull("Should have exception", getTask.getException());

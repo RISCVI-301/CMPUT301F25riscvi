@@ -4,8 +4,6 @@ import android.util.Log;
 
 import com.google.android.gms.tasks.Task;
 import com.google.android.gms.tasks.Tasks;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -157,11 +155,27 @@ public class EventSelectionHelper {
     
     /**
      * Processes the selection: randomly selects entrants and sends invitations.
+     * CRITICAL: Checks current selected count to prevent exceeding sampleSize.
      */
     private void processSelection(DocumentReference eventRef, String eventId, int sampleSize, 
                                   String eventTitle, Long deadlineEpochMs, SelectionCallback callback) {
         Log.d(TAG, "=== Processing selection for event " + eventId + " with sample size " + sampleSize + " ===");
         
+        // CRITICAL FIX: First check how many are already selected to prevent race conditions
+        eventRef.collection("SelectedEntrants").get()
+                .addOnSuccessListener(selectedSnapshot -> {
+                    int currentSelectedCount = selectedSnapshot != null ? selectedSnapshot.size() : 0;
+                    int availableSpots = sampleSize - currentSelectedCount;
+                    
+                    Log.d(TAG, "Current selected count: " + currentSelectedCount + ", Sample size: " + sampleSize + ", Available spots: " + availableSpots);
+                    
+                    if (availableSpots <= 0) {
+                        Log.w(TAG, "Already at or above sample size limit (selected: " + currentSelectedCount + ", sampleSize: " + sampleSize + "). Skipping selection.");
+                        markAsProcessed(eventRef, callback);
+                        return;
+                    }
+                    
+                    // Now get waitlist and select only availableSpots
         eventRef.collection("WaitlistedEntrants").get()
                 .addOnSuccessListener(waitlistSnapshot -> {
                     if (waitlistSnapshot == null || waitlistSnapshot.isEmpty()) {
@@ -172,61 +186,48 @@ public class EventSelectionHelper {
                     
                     List<DocumentSnapshot> waitlistedDocs = waitlistSnapshot.getDocuments();
                     int availableCount = waitlistedDocs.size();
-                    int toSelect = Math.min(sampleSize, availableCount);
+                                // CRITICAL: Select only availableSpots (not sampleSize!)
+                                int toSelect = Math.min(availableSpots, availableCount);
                     
                     if (toSelect == 0) {
-                        Log.d(TAG, "No entrants to select (sample size: " + sampleSize + ", available: " + availableCount + ")");
+                                    Log.d(TAG, "No entrants to select (available spots: " + availableSpots + ", available waitlist: " + availableCount + ")");
                         markAsProcessed(eventRef, callback);
                         return;
                     }
                     
-                    Log.d(TAG, "Randomly selecting " + toSelect + " out of " + availableCount + " waitlisted entrants");
+                                Log.d(TAG, "Randomly selecting EXACTLY " + toSelect + " out of " + availableCount + " waitlisted entrants (availableSpots: " + availableSpots + ", sampleSize: " + sampleSize + ", currentSelected: " + currentSelectedCount + ")");
                     
+                                // CRITICAL: Use toSelect (which is already capped at availableSpots) instead of sampleSize
                     List<DocumentSnapshot> selectedDocs = randomlySelect(waitlistedDocs, toSelect);
                     List<String> selectedUserIds = new ArrayList<>();
                     for (DocumentSnapshot doc : selectedDocs) {
                         selectedUserIds.add(doc.getId());
                     }
                     
-                    Log.d(TAG, "Selected " + selectedUserIds.size() + " user IDs: " + selectedUserIds);
-                    Log.d(TAG, "Total waitlisted: " + availableCount + ", Sample size: " + sampleSize + ", Selected: " + selectedUserIds.size());
-                    
-                    // CRITICAL FIX: Verify we're not selecting more than sampleSize
-                    // If somehow more were selected, truncate BOTH lists to match sampleSize
-                    // This ensures we don't move more entrants to SelectedEntrants than sampleSize
-                    if (selectedUserIds.size() > sampleSize) {
-                        Log.e(TAG, "ERROR: Selected more users than sample size! Selected: " + selectedUserIds.size() + ", Sample size: " + sampleSize);
-                        selectedUserIds = selectedUserIds.subList(0, sampleSize);
-                        selectedDocs = selectedDocs.subList(0, sampleSize); // FIX: Also truncate selectedDocs
-                        Log.d(TAG, "Truncated to sample size: " + selectedUserIds.size() + " users");
+                                // CRITICAL: Double-check that we never exceed availableSpots
+                                if (selectedDocs.size() > availableSpots) {
+                                    Log.e(TAG, "CRITICAL ERROR: Selected " + selectedDocs.size() + " but availableSpots is " + availableSpots + ". Truncating immediately.");
+                                    selectedDocs = new ArrayList<>(selectedDocs.subList(0, availableSpots));
+                                    selectedUserIds = new ArrayList<>(selectedUserIds.subList(0, availableSpots));
                     }
                     
-                    // Additional safety check: ensure selectedDocs never exceeds sampleSize
-                    if (selectedDocs.size() > sampleSize) {
-                        Log.e(TAG, "ERROR: selectedDocs size (" + selectedDocs.size() + ") exceeds sampleSize (" + sampleSize + "), truncating");
-                        selectedDocs = selectedDocs.subList(0, sampleSize);
-                        // Also ensure selectedUserIds matches
-                        if (selectedUserIds.size() > sampleSize) {
-                            selectedUserIds = selectedUserIds.subList(0, sampleSize);
-                        }
-                    }
-                    
-                    // Final validation: ensure both lists are the same size
-                    if (selectedDocs.size() != selectedUserIds.size()) {
-                        Log.e(TAG, "ERROR: Mismatch between selectedDocs (" + selectedDocs.size() + ") and selectedUserIds (" + selectedUserIds.size() + ")");
-                        int minSize = Math.min(selectedDocs.size(), selectedUserIds.size());
-                        selectedDocs = selectedDocs.subList(0, minSize);
-                        selectedUserIds = selectedUserIds.subList(0, minSize);
-                    }
-                    
-                    // Final check: ensure we never exceed sampleSize
-                    if (selectedDocs.size() > sampleSize) {
-                        Log.e(TAG, "CRITICAL: Final check failed - selectedDocs size (" + selectedDocs.size() + ") still exceeds sampleSize (" + sampleSize + ")");
-                        selectedDocs = selectedDocs.subList(0, sampleSize);
-                        selectedUserIds = selectedUserIds.subList(0, Math.min(selectedUserIds.size(), sampleSize));
-                    }
-                    
-                    Log.d(TAG, "Final selection count: " + selectedDocs.size() + " entrants (sampleSize: " + sampleSize + ")");
+                                // CRITICAL: Final enforcement - ensure we don't exceed sampleSize
+                                int finalCount = currentSelectedCount + selectedDocs.size();
+                                if (finalCount > sampleSize) {
+                                    Log.e(TAG, "CRITICAL: Final count (" + finalCount + ") would exceed sampleSize (" + sampleSize + ")! Truncating.");
+                                    int maxToAdd = sampleSize - currentSelectedCount;
+                                    if (maxToAdd > 0) {
+                                        selectedDocs = new ArrayList<>(selectedDocs.subList(0, maxToAdd));
+                                        selectedUserIds = new ArrayList<>(selectedUserIds.subList(0, maxToAdd));
+                                    } else {
+                                        Log.e(TAG, "Cannot add any more - already at sample size!");
+                                        markAsProcessed(eventRef, callback);
+                                        return;
+                                    }
+                                }
+                                
+                                Log.d(TAG, "FINAL VERIFICATION: Will add " + selectedDocs.size() + " entrants (current: " + currentSelectedCount + ", new: " + selectedDocs.size() + ", total: " + (currentSelectedCount + selectedDocs.size()) + ", sampleSize: " + sampleSize + ")");
+                                Log.d(TAG, "Selected user IDs: " + selectedUserIds);
                     
                     moveToSelectedAndSendInvitations(eventRef, eventId, selectedDocs, selectedUserIds, 
                                                      eventTitle, deadlineEpochMs, callback);
@@ -235,6 +236,13 @@ public class EventSelectionHelper {
                     Log.e(TAG, "Failed to load waitlisted entrants", e);
                     if (callback != null) {
                         callback.onError("Failed to load waitlisted entrants: " + e.getMessage());
+                                }
+                            });
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to load current selected entrants count", e);
+                    if (callback != null) {
+                        callback.onError("Failed to load selected entrants: " + e.getMessage());
                     }
                 });
     }
@@ -330,12 +338,17 @@ public class EventSelectionHelper {
             }
             
             DocumentReference selectedRef = eventRef.collection("SelectedEntrants").document(userId);
-            // Keep users in WaitlistedEntrants collection (don't delete)
-            // DocumentReference waitlistRef = eventRef.collection("WaitlistedEntrants").document(userId);
+            DocumentReference waitlistRef = eventRef.collection("WaitlistedEntrants").document(userId);
+            DocumentReference nonSelectedRef = eventRef.collection("NonSelectedEntrants").document(userId);
+            DocumentReference cancelledRef = eventRef.collection("CancelledEntrants").document(userId);
             
+            // CRITICAL: Ensure mutual exclusivity - user can only exist in ONE collection
             batch.set(selectedRef, data);
-            // batch.delete(waitlistRef); // Keep in waitlist
-            batchCount += 1; // Only 1 operation now
+            // Remove from ALL other collections
+            batch.delete(waitlistRef);
+            batch.delete(nonSelectedRef);
+            batch.delete(cancelledRef);
+            batchCount += 4; // Set + 3 deletes
             
             if (batchCount >= MAX_BATCH_SIZE) {
                 final WriteBatch currentBatch = batch;
@@ -345,10 +358,12 @@ public class EventSelectionHelper {
             }
         }
         
-        // DON'T decrement waitlistCount - users stay in WaitlistedEntrants
-        // batch.update(eventRef, "waitlistCount", 
-        //     com.google.firebase.firestore.FieldValue.increment(-finalSelectedDocs.size()));
-        // batchCount++;
+        // Update waitlistCount since users are removed from WaitlistedEntrants
+        if (batchCount < MAX_BATCH_SIZE) {
+            batch.update(eventRef, "waitlistCount", 
+                com.google.firebase.firestore.FieldValue.increment(-finalSelectedDocs.size()));
+            batchCount++;
+        }
         
         if (batchCount > 0) {
             batchTasks.add(batch.commit());
@@ -483,180 +498,6 @@ public class EventSelectionHelper {
             if (callback != null) {
                 callback.onError("Failed to load event: " + e.getMessage());
             }
-        });
-    }
-    
-    /**
-     * Checks if selection notification was already sent and sends it if not.
-     */
-    private void checkAndSendSelectionNotification(String eventId, String eventTitle, List<String> userIds,
-                                                   Long deadlineEpochMs, InvitationHelper.InvitationCallback callback) {
-        // Check if selection notification already sent
-        DocumentReference eventRef = db.collection("events").document(eventId);
-        eventRef.get().addOnSuccessListener(eventDoc -> {
-            if (eventDoc == null || !eventDoc.exists()) {
-                Log.e(TAG, "Event not found for selection notification check");
-                if (callback != null) {
-                    callback.onComplete(userIds.size());
-                }
-                return;
-            }
-            
-            // Skip if event start date has already passed
-            long currentTime = System.currentTimeMillis();
-            Long startsAtEpochMs = eventDoc.getLong("startsAtEpochMs");
-            if (startsAtEpochMs != null && startsAtEpochMs > 0 && currentTime >= startsAtEpochMs) {
-                Log.d(TAG, "Event " + eventId + " start date has already passed, skipping selection notification");
-                if (callback != null) {
-                    callback.onComplete(userIds.size());
-                }
-                return;
-            }
-            
-            Boolean selectionNotificationSent = eventDoc.getBoolean("selectionNotificationSent");
-            if (Boolean.TRUE.equals(selectionNotificationSent)) {
-                Log.d(TAG, "Selection notification already sent for event " + eventId + ", skipping");
-                if (callback != null) {
-                    callback.onComplete(userIds.size());
-                }
-                return;
-            }
-            
-            // FIX: Get organizer ID from event document instead of requiring authentication
-            String organizerId = eventDoc.getString("organizerId");
-            if (organizerId == null || organizerId.isEmpty()) {
-                // Fallback to current user if available
-                FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
-                if (currentUser != null) {
-                    organizerId = currentUser.getUid();
-                } else {
-                    Log.w(TAG, "No organizer ID in event, but proceeding with notification anyway");
-                    organizerId = "system"; // Use a placeholder
-                }
-            }
-            
-            final String finalOrganizerId = organizerId;
-            
-            // Use a transaction to atomically check and set the flag
-            // This prevents race conditions where multiple processes try to send notifications
-            final long finalCurrentTime = currentTime;
-            final Long finalStartsAtEpochMs = startsAtEpochMs;
-            db.runTransaction(transaction -> {
-                // Re-read the document in the transaction
-                DocumentSnapshot snapshot = transaction.get(eventRef);
-                if (!snapshot.exists()) {
-                    throw new RuntimeException("Event not found");
-                }
-                
-                // Check if notification already sent
-                Boolean alreadySent = snapshot.getBoolean("selectionNotificationSent");
-                if (Boolean.TRUE.equals(alreadySent)) {
-                    throw new RuntimeException("Notification already sent");
-                }
-                
-                // Check if event start date has passed (use values from outer scope)
-                if (finalStartsAtEpochMs != null && finalStartsAtEpochMs > 0 && finalCurrentTime >= finalStartsAtEpochMs) {
-                    throw new RuntimeException("Event start date has passed");
-                }
-                
-                // Atomically set the flag
-                transaction.update(eventRef, "selectionNotificationSent", true);
-                return null;
-            }).addOnSuccessListener(aVoid -> {
-                Log.d(TAG, "Atomically marked selection notification as sent for event " + eventId);
-                // Now send the notification (will work even without user authentication)
-                sendSelectionNotification(eventId, eventTitle, userIds, deadlineEpochMs, eventRef, finalOrganizerId, callback);
-            })
-            .addOnFailureListener(e -> {
-                String errorMsg = e.getMessage();
-                if (errorMsg != null && (errorMsg.contains("already sent") || errorMsg.contains("start date has passed"))) {
-                    Log.d(TAG, "Selection notification cannot be sent: " + errorMsg);
-                } else {
-                    Log.e(TAG, "Transaction failed for selection notification", e);
-                    // FIX: Even if transaction fails, try to send notification to ensure it's sent
-                    // This handles edge cases where the flag check fails but notification should still be sent
-                    Log.w(TAG, "Attempting to send notification despite transaction failure");
-                    sendSelectionNotification(eventId, eventTitle, userIds, deadlineEpochMs, eventRef, finalOrganizerId, callback);
-                }
-                // Don't call callback here - let sendSelectionNotification handle it
-            });
-        }).addOnFailureListener(e -> {
-            Log.e(TAG, "Failed to check selection notification status", e);
-            // FIX: Even on error, try to send notification to ensure it's sent
-            Log.w(TAG, "Attempting to send notification despite error checking status");
-            String organizerId = "system";
-            FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
-            if (currentUser != null) {
-                organizerId = currentUser.getUid();
-            }
-            // Use the existing eventRef variable that was declared at the start of the method
-            sendSelectionNotification(eventId, eventTitle, userIds, deadlineEpochMs, eventRef, organizerId, callback);
-        });
-    }
-    
-    /**
-     * Sends selection notification to selected entrants.
-     */
-    private void sendSelectionNotification(String eventId, String eventTitle, List<String> userIds,
-                                          Long deadlineEpochMs, DocumentReference eventRef,
-                                          String organizerId, InvitationHelper.InvitationCallback callback) {
-        NotificationHelper notificationHelper = new NotificationHelper();
-        
-        // Format deadline nicely
-        String deadlineText = "N/A";
-        if (deadlineEpochMs != null && deadlineEpochMs > 0) {
-            java.text.SimpleDateFormat dateFormat = new java.text.SimpleDateFormat("MMM d, yyyy 'at' h:mm a", java.util.Locale.getDefault());
-            deadlineText = dateFormat.format(new java.util.Date(deadlineEpochMs));
-        }
-        
-        String notificationTitle = "You've been selected! 🎉";
-        String notificationMessage = "Congratulations! You've been selected for " + 
-            (eventTitle != null ? eventTitle : "this event") + 
-            ". Please check your invitations to accept or decline. " +
-            "Deadline to respond: " + deadlineText;
-        
-        // FIX: Use NotificationHelper's createNotificationRequest directly to bypass auth requirement
-        // This ensures notifications are sent even when app is in background
-        Map<String, Object> notificationRequest = new HashMap<>();
-        notificationRequest.put("eventId", eventId);
-        notificationRequest.put("eventTitle", eventTitle != null ? eventTitle : "Event");
-        notificationRequest.put("organizerId", organizerId);
-        notificationRequest.put("userIds", userIds);
-        notificationRequest.put("groupType", "selection");
-        notificationRequest.put("message", notificationMessage);
-        notificationRequest.put("title", notificationTitle);
-        notificationRequest.put("status", "PENDING");
-        notificationRequest.put("createdAt", System.currentTimeMillis());
-        notificationRequest.put("processed", false);
-        
-        // Write to notificationRequests collection - Cloud Functions will handle sending
-        db.collection("notificationRequests").add(notificationRequest)
-                .addOnSuccessListener(docRef -> {
-                    Log.d(TAG, "✓ Created selection notification request for " + userIds.size() + " users");
-                    Log.d(TAG, "Request ID: " + docRef.getId());
-                    if (callback != null) {
-                        callback.onComplete(userIds.size());
-                    }
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Failed to create selection notification request", e);
-                    // Still report success since invitations were created
-                    if (callback != null) {
-                        callback.onComplete(userIds.size());
-                    }
-                });
-    }
-    
-    /**
-     * Marks the event as having sent the selection notification.
-     */
-    private void markSelectionNotificationSent(DocumentReference eventRef) {
-        eventRef.update("selectionNotificationSent", true)
-                .addOnSuccessListener(aVoid -> {
-                    Log.d(TAG, "Marked event as having sent selection notification");
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Failed to mark selection notification as sent", e);
                 });
     }
     
@@ -688,17 +529,11 @@ public class EventSelectionHelper {
             
             String organizerId = eventDoc.getString("organizerId");
             if (organizerId == null || organizerId.isEmpty()) {
-                // Fallback to current user if available
-                FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
-                if (currentUser != null) {
-                    organizerId = currentUser.getUid();
-                } else {
-                    Log.e(TAG, "No organizer ID found in event and user not authenticated");
-                    if (callback != null) {
-                        callback.onError("No organizer ID available");
-                    }
-                    return;
+                Log.e(TAG, "No organizer ID found in event");
+                if (callback != null) {
+                    callback.onError("No organizer ID available");
                 }
+                return;
             }
             
             final String finalOrganizerId = organizerId;
@@ -746,9 +581,13 @@ public class EventSelectionHelper {
                         .addOnSuccessListener(aVoid -> {
                             Log.d(TAG, "✓ Created " + userIds.size() + " invitation documents");
                             
-                            // FIX: Always send selection notification, even if user not authenticated
-                            // The notification will be sent via Cloud Functions which doesn't require auth
-                            checkAndSendSelectionNotification(eventId, eventTitle, userIds, deadlineEpochMs, callback);
+                            // NOTE: Selection notifications are now handled by Cloud Function (processAutomaticEntrantSelection)
+                            // The Cloud Function automatically sends personalized notifications when entrants are selected.
+                            // No need to send notification here - Cloud Function handles it.
+                            Log.d(TAG, "✓ Created " + userIds.size() + " invitations. Cloud Function will send selection notifications.");
+                            if (callback != null) {
+                                callback.onComplete(userIds.size());
+                            }
                         })
                         .addOnFailureListener(e -> {
                             Log.e(TAG, "Failed to create invitations", e);
@@ -833,11 +672,17 @@ public class EventSelectionHelper {
                                     }
                                     
                                     DocumentReference nonSelectedRef = eventRef.collection("NonSelectedEntrants").document(userId);
-                                    // Keep users in WaitlistedEntrants collection (don't delete)
+                                    DocumentReference waitlistRef = eventRef.collection("WaitlistedEntrants").document(userId);
+                                    DocumentReference selectedRef = eventRef.collection("SelectedEntrants").document(userId);
+                                    DocumentReference cancelledRef = eventRef.collection("CancelledEntrants").document(userId);
                                     
+                                    // CRITICAL: Ensure mutual exclusivity - user can only exist in ONE collection
                                     batch.set(nonSelectedRef, data);
-                                    // batch.delete(waitlistRef); // Keep in waitlist
-                                    batchCount += 1; // Only 1 operation now
+                                    // Remove from ALL other collections
+                                    batch.delete(waitlistRef);
+                                    batch.delete(selectedRef);
+                                    batch.delete(cancelledRef);
+                                    batchCount += 4; // Set + 3 deletes
                                     
                                     if (batchCount >= MAX_BATCH_SIZE) {
                                         final WriteBatch currentBatch = batch;

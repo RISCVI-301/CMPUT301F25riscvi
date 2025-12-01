@@ -2,17 +2,16 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
-    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.CAMERA" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" 
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
@@ -23,6 +22,7 @@
         android:roundIcon="@mipmap/entrant_ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.EventEase">
+
         <activity
             android:name="com.example.eventease.ui.entrant.eventdetail.EventDetailActivity"
             android:exported="false" />
@@ -38,7 +38,6 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
             <!-- Deep link intent filter for QR codes - Custom scheme (primary) -->
@@ -56,6 +55,20 @@
                 <data android:scheme="https" android:host="eventease.app" android:pathPrefix="/event" />
             </intent-filter>
         </activity>
+      
+        <!-- Profile Setup Activity (First-time user) -->
+        <activity
+            android:name="com.example.eventease.auth.ProfileSetupActivity"
+            android:exported="false"
+            android:label="Setup Profile"
+            android:theme="@style/Theme.EventEase" />
+
+        <!-- Permission Request Activity (After profile setup) -->
+        <activity
+            android:name="com.example.eventease.auth.PermissionRequestActivity"
+            android:exported="false"
+            android:label="Permissions"
+            android:theme="@style/Theme.EventEase" />
 
         <!-- Admin Activity -->
         <activity
@@ -89,13 +102,14 @@
         <activity
             android:name=".ui.organizer.OrganizerMyEventActivity"
             android:exported="false" />
-
         <activity
             android:name=".ui.organizer.OrganizerCreateEventActivity"
             android:exported="false" />
-
         <activity
             android:name=".ui.organizer.OrganizerAccountActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.organizer.OrganizerEditProfileActivity"
             android:exported="false" />
         <activity android:name=".ui.organizer.OrganizerWaitlistActivity" />
         <activity
@@ -104,13 +118,6 @@
         <activity
             android:name=".ui.organizer.OrganizerEntrantLocationsActivity"
             android:exported="false" />
-
-        <!-- Test Activity for Visual Workflow Testing -->
-        <activity
-            android:name=".test.WorkflowTestActivity"
-            android:exported="false"
-            android:label="Workflow Test"
-            android:theme="@style/Theme.EventEase" />
 
         <activity
             android:name=".ui.entrant.notifications.NotificationsActivity"

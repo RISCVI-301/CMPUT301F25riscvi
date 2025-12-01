@@ -20,6 +20,11 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import java.util.ArrayList;
 import java.util.List;
 
+import android.content.Intent;
+import android.widget.Button;
+import android.util.Log;
+import com.example.eventease.MainActivity;
+
 /**
  * Fragment for admin users to view and manage all user profiles in the system.
  * 
@@ -57,8 +62,16 @@ public class AdminProfilesFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        // Setup logout button
-        setupLogoutButton(view);
+        Button switchButton = view.findViewById(R.id.btnSwitchToEntrantView);
+        if (switchButton != null) {
+            switchButton.setOnClickListener(v -> {
+                android.util.Log.d("AdminToEntrant", "Admin to Entrant Clicked");
+                Intent intent = new Intent(requireContext(), com.example.eventease.MainActivity.class);
+                intent.putExtra("force_entrant", true);
+                startActivity(intent);
+                requireActivity().finish();
+            });
+        }
 
         rv = view.findViewById(R.id.rvProfiles);
         if (rv != null) {
@@ -126,9 +139,11 @@ public class AdminProfilesFragment extends Fragment {
     }
 
     private void deleteProfileAndRefresh(@NonNull UserProfile profile) {
-        // Check if trying to delete current admin user
-        com.google.firebase.auth.FirebaseUser currentUser = com.google.firebase.auth.FirebaseAuth.getInstance().getCurrentUser();
-        if (currentUser != null && profile.getUid() != null && profile.getUid().equals(currentUser.getUid())) {
+        // Check if trying to delete current device's profile
+        com.example.eventease.auth.DeviceAuthManager authManager = 
+            new com.example.eventease.auth.DeviceAuthManager(requireContext());
+        String deviceId = authManager.getUid();
+        if (deviceId != null && profile.getUid() != null && profile.getUid().equals(deviceId)) {
             Toast.makeText(requireContext(), "You cannot delete your own profile", Toast.LENGTH_LONG).show();
             return;
         }
@@ -175,13 +190,5 @@ public class AdminProfilesFragment extends Fragment {
             .show();
     }
 
-    private void setupLogoutButton(View view) {
-        View logoutButton = view.findViewById(R.id.adminLogoutButton);
-        if (logoutButton != null && getActivity() instanceof com.example.eventease.admin.AdminMainActivity) {
-            logoutButton.setOnClickListener(v -> {
-                ((com.example.eventease.admin.AdminMainActivity) getActivity()).performLogout();
-            });
-        }
-    }
 }
 

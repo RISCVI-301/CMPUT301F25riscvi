@@ -180,7 +180,7 @@ public class InvitationDeadlineProcessor {
             return;
         }
         
-        Log.d(TAG, "Moving " + userIds.size() + " non-responders to CancelledEntrants");
+        Log.d(TAG, "Moving " + userIds.size() + " non-responders to CancelledEntrants for eventId=" + eventId);
         
         // Fetch user data for all non-responders
         List<Task<DocumentSnapshot>> userTasks = new ArrayList<>();
@@ -200,12 +200,42 @@ public class InvitationDeadlineProcessor {
                         DocumentSnapshot userDoc = i < userDocs.size() ? (DocumentSnapshot) userDocs.get(i) : null;
                         
                         DocumentReference selectedRef = eventRef.collection("SelectedEntrants").document(userId);
+                        DocumentReference nonSelectedRef = eventRef.collection("NonSelectedEntrants").document(userId);
+                        DocumentReference waitlistRef = eventRef.collection("WaitlistedEntrants").document(userId);
                         DocumentReference cancelledRef = eventRef.collection("CancelledEntrants").document(userId);
                         
                         Map<String, Object> cancelledData = buildCancelledEntry(userId, userDoc);
+
+                        // Extract a human-readable name for logging
+                        String displayName = null;
+                        if (userDoc != null && userDoc.exists()) {
+                            displayName = userDoc.getString("fullName");
+                            if (displayName == null || displayName.trim().isEmpty()) {
+                                displayName = userDoc.getString("name");
+                            }
+                            if (displayName == null || displayName.trim().isEmpty()) {
+                                String first = userDoc.getString("firstName");
+                                String last = userDoc.getString("lastName");
+                                displayName = ((first != null ? first : "") + " " + (last != null ? last : "")).trim();
+                            }
+                        }
+                        if (displayName == null || displayName.trim().isEmpty()) {
+                            displayName = "(unknown)";
+                        }
                         batch.set(cancelledRef, cancelledData, SetOptions.merge());
+
+                        Log.d(TAG,
+                                "ENTRANT_MOVE: eventId=" + eventId +
+                                        ", userId=" + userId +
+                                        ", name=" + displayName +
+                                        ", from=[SelectedEntrants,NonSelectedEntrants,WaitlistedEntrants]" +
+                                        ", to=CancelledEntrants" +
+                                        ", reason=deadline_non_responder");
+                        // CRITICAL: Remove from ALL other collections to ensure user exists in only ONE collection
                         batch.delete(selectedRef);
-                        batchCount += 2;
+                        batch.delete(nonSelectedRef);
+                        batch.delete(waitlistRef);
+                        batchCount += 4;
                         
                         // Update invitation status to DECLINED
                         if (i < invitationIds.size()) {
@@ -454,15 +484,12 @@ public class InvitationDeadlineProcessor {
                             })
                             .addOnFailureListener(e -> {
                                 Log.e(TAG, "Failed to load responded invitations", e);
-                                // On error, assume all selected entrants are non-responders
-                                List<String> allUserIds = new ArrayList<>();
-                                for (QueryDocumentSnapshot doc : selectedSnapshot) {
-                                    allUserIds.add(doc.getId());
+                                // IMPORTANT: Do NOT move everyone to Cancelled on error.
+                                // That could incorrectly cancel ACCEPTED entrants.
+                                // Instead, log the error and report via callback without moving anyone.
+                                if (callback != null) {
+                                    callback.onError("Failed to load responded invitations: " + e.getMessage());
                                 }
-                                Log.w(TAG, "Moving all " + allUserIds.size() + " selected entrants to cancelled (error checking responses)");
-                                findInvitationIdsForUsers(eventId, allUserIds, invitationIds -> {
-                                    moveNonRespondersToCancelled(eventRef, eventId, allUserIds, invitationIds, callback);
-                                });
                             });
                 })
                 .addOnFailureListener(e -> {

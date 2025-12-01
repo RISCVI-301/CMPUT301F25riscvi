@@ -8,6 +8,7 @@ import android.graphics.Color;
 import android.os.Bundle;
 import android.provider.MediaStore;
 import android.text.TextUtils;
+import android.text.format.DateFormat;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
@@ -23,7 +24,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions;
 import com.example.eventease.R;
-import com.example.eventease.admin.event.data.Event;
+import com.example.eventease.model.Event;
 import com.google.android.material.button.MaterialButton;
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.WriterException;
@@ -44,7 +45,7 @@ public class EventDetailActivity extends AppCompatActivity {
         onDeleteCallback = deleteCallback;
         Intent i = new Intent(context, EventDetailActivity.class);
         i.putExtra(EXTRA_EVENT, event);
-        i.putExtra(EXTRA_WAITLIST_COUNT, event.getWaitlist_count()); // keeping existing behavior
+        i.putExtra(EXTRA_WAITLIST_COUNT, event.getWaitlistCount()); // keeping existing behavior
         context.startActivity(i);
     }
 
@@ -64,6 +65,7 @@ public class EventDetailActivity extends AppCompatActivity {
         ImageButton btnBack      = findViewById(R.id.btnBack);
         TextView tvEventTitle    = findViewById(R.id.tvEventTitle);
         ImageView ivPoster       = findViewById(R.id.ivPoster);
+        TextView tvDateLocation  = findViewById(R.id.tvDateLocation);
         TextView tvDescription   = findViewById(R.id.tvDescription);
         TextView tvWaitlistCount = findViewById(R.id.tvWaitlistCount);
         TextView tvGuidelines    = findViewById(R.id.tvGuidelines);
@@ -96,6 +98,32 @@ public class EventDetailActivity extends AppCompatActivity {
         // Set event title
         if (event.getTitle() != null) {
             tvEventTitle.setText(event.getTitle());
+        }
+
+        // Set date, time, and location
+        if (tvDateLocation != null) {
+            boolean hasDate = event.getStartsAtEpochMs() > 0;
+            String dateTimeText = hasDate
+                    ? DateFormat.format("EEE, MMM d · h:mm a", event.getStartsAtEpochMs()).toString()
+                    : "";
+
+            String locationText = event.getLocation();
+            boolean hasLocation = !TextUtils.isEmpty(locationText);
+
+            String dateLocationText;
+            if (hasDate && hasLocation) {
+                dateLocationText = dateTimeText + " • " + locationText;
+            } else if (hasDate) {
+                dateLocationText = dateTimeText;
+            } else if (hasLocation) {
+                dateLocationText = locationText;
+            } else {
+                dateLocationText = "Date and location TBD";
+            }
+            tvDateLocation.setText(dateLocationText);
+            tvDateLocation.setVisibility(View.VISIBLE);
+        } else {
+            android.util.Log.e("EventDetailActivity", "tvDateLocation TextView not found!");
         }
 
         // Load poster image

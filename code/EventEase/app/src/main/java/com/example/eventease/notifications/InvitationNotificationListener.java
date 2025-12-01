@@ -12,8 +12,6 @@ import androidx.core.app.NotificationCompat;
 
 import com.example.eventease.MainActivity;
 import com.example.eventease.R;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.EventListener;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -32,7 +30,10 @@ public class InvitationNotificationListener {
     private final FirebaseFirestore db;
     private final Context context;
     private long lastNotificationTime = 0;
+    private long listenerStartTime = 0;
     private static final long NOTIFICATION_COOLDOWN = 5000;
+    private static final long IGNORE_OLDER_THAN_MS = 60000; // Ignore invitations older than 1 minute when listener starts
+    private boolean isFirstSnapshot = true;
     
     public InvitationNotificationListener(Context context) {
         this.context = context;
@@ -41,13 +42,14 @@ public class InvitationNotificationListener {
     }
     
     public void startListening() {
-        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        if (user == null) {
-            Log.d(TAG, "No user logged in, cannot listen for invitations");
+        com.example.eventease.auth.DeviceAuthManager authManager = 
+            new com.example.eventease.auth.DeviceAuthManager(context);
+        String uid = authManager.getUid();
+        
+        if (uid == null || uid.isEmpty()) {
+            Log.d(TAG, "No device ID found, cannot listen for invitations");
             return;
         }
-        
-        String uid = user.getUid();
         
         if (registration != null) {
             registration.remove();
@@ -58,6 +60,10 @@ public class InvitationNotificationListener {
         Query query = db.collection("invitations")
                 .whereEqualTo("uid", uid)
                 .whereEqualTo("status", "PENDING");
+        
+        // Track when listener starts to ignore old invitations
+        listenerStartTime = System.currentTimeMillis();
+        isFirstSnapshot = true;
         
         registration = query.addSnapshotListener(new EventListener<QuerySnapshot>() {
             @Override
@@ -78,6 +84,18 @@ public class InvitationNotificationListener {
                     return;
                 }
                 
+                // Check if this is the first snapshot (initial load with existing documents)
+                boolean fromCache = snapshots.getMetadata().isFromCache();
+                boolean isInitialLoad = isFirstSnapshot && !fromCache;
+                
+                if (isInitialLoad) {
+                    Log.d(TAG, "Initial snapshot - ignoring existing invitations, only processing NEW ones going forward");
+                    isFirstSnapshot = false;
+                    // Skip processing existing invitations on first load
+                    return;
+                }
+                
+                // After first snapshot, only process truly NEW invitations
                 // Track the most recent invitation to avoid duplicate notifications
                 DocumentSnapshot mostRecentInvitation = null;
                 long mostRecentTime = 0;
@@ -100,28 +118,45 @@ public class InvitationNotificationListener {
             }
         });
         
-        Log.d(TAG, "Started listening for invitations for user: " + uid);
+        Log.d(TAG, "Started listening for invitations for user: " + uid + " at time: " + listenerStartTime);
     }
     
     public void stopListening() {
         if (registration != null) {
             registration.remove();
             registration = null;
+            isFirstSnapshot = true; // Reset for next time
+            listenerStartTime = 0;
             Log.d(TAG, "Stopped listening for invitations");
         }
     }
     
     private void handleNewInvitation(DocumentSnapshot invitationDoc) {
         long currentTime = System.currentTimeMillis();
+        
+        // Check cooldown
         if (currentTime - lastNotificationTime < NOTIFICATION_COOLDOWN) {
             Log.d(TAG, "Skipping notification due to cooldown");
             return;
+        }
+        
+        // Check if invitation was created before listener started (ignore old invitations)
+        Long issuedAt = invitationDoc.getLong("issuedAt");
+        if (issuedAt != null && issuedAt > 0 && listenerStartTime > 0) {
+            // If invitation was created before listener started, ignore it
+            // Add a small buffer (5 seconds) to account for timing differences
+            if (issuedAt < (listenerStartTime - 5000)) {
+                Log.d(TAG, "Skipping old invitation - created at " + issuedAt + ", listener started at " + listenerStartTime);
+                return;
+            }
         }
         
         String eventId = invitationDoc.getString("eventId");
         if (eventId == null || eventId.isEmpty()) {
             return;
         }
+        
+        Log.d(TAG, "Processing NEW invitation for event: " + eventId);
         
         db.collection("events").document(eventId).get()
                 .addOnSuccessListener(eventDoc -> {

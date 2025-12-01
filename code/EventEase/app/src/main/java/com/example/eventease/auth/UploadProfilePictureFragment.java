@@ -52,7 +52,6 @@ public class UploadProfilePictureFragment extends Fragment {
     private ImageView profileIconImage;
     private ProgressBar progressUpload;
     private Uri selectedImageUri;
-    private AuthManager auth;
     private File photoFile;
 
     private final ActivityResultLauncher<String> pickImageLauncher = registerForActivityResult(
@@ -111,7 +110,6 @@ public class UploadProfilePictureFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        auth = App.graph().auth;
         
         profileIconImage = view.findViewById(R.id.profileIconImage);
         progressUpload = view.findViewById(R.id.progressUpload);
@@ -247,7 +245,7 @@ public class UploadProfilePictureFragment extends Fragment {
             return;
         }
 
-        String uid = auth.getUid();
+        String uid = com.example.eventease.auth.AuthHelper.getUid(requireContext());
         if (uid == null) {
             Toast.makeText(requireContext(), "User not authenticated", Toast.LENGTH_SHORT).show();
             return;
